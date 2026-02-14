@@ -33,7 +33,8 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testRuntimeOnly("junit:junit:4.13.2") // needed for IntelliJ test framework's JUnit5TestSessionListener
+    testImplementation("junit:junit:4.13.2") // needed for BasePlatformTestCase (JUnit 3 based)
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.11.4") // bridges JUnit 3/4 tests to JUnit Platform
 }
 
 kotlin {

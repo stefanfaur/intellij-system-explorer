@@ -4,4 +4,8 @@
     <vendor>stefanfaur</vendor>
     <description>A full-featured system file browser inside IntelliJ IDEA</description>
     <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.github.stefanfaur.explorer.settings.ExplorerSettings"/>
+    </extensions>
 </idea-plugin>
