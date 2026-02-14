@@ -33,6 +33,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testRuntimeOnly("junit:junit:4.13.2") // needed for IntelliJ test framework's JUnit5TestSessionListener
 }
 
 kotlin {
