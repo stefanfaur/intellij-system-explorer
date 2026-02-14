@@ -1,0 +1,13 @@
+[versions]
+kotlin = "2.1.0"
+intelliJPlatform = "2.5.0"
+junit = "5.11.4"
+kotlinxCoroutines = "1.10.1"
+
+[libraries]
+junit = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+
+[plugins]
+kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+intelliJPlatform = { id = "org.jetbrains.intellij.platform", version.ref = "intelliJPlatform" }

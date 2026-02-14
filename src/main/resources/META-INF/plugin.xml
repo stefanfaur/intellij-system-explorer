@@ -1,0 +1,7 @@
+<idea-plugin>
+    <id>com.github.stefanfaur.systemexplorer</id>
+    <name>System Explorer</name>
+    <vendor>stefanfaur</vendor>
+    <description>A full-featured system file browser inside IntelliJ IDEA</description>
+    <depends>com.intellij.modules.platform</depends>
+</idea-plugin>
