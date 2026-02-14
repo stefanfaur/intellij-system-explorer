@@ -8,5 +8,8 @@
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="com.github.stefanfaur.explorer.settings.ExplorerSettings"/>
         <applicationService serviceImplementation="com.github.stefanfaur.explorer.model.BookmarkManager"/>
+        <toolWindow id="System Explorer"
+                    anchor="right"
+                    factoryClass="com.github.stefanfaur.explorer.ExplorerToolWindowFactory"/>
     </extensions>
 </idea-plugin>
