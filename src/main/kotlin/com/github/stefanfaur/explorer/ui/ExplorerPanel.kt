@@ -96,6 +96,12 @@ class ExplorerPanel(private val project: Project) : Disposable {
             updateStatus()
         }
 
+        // Wire file modification callback to refresh status and bookmarks
+        fileTreeComponent.onFilesModified = {
+            updateStatus()
+            loadBookmarks() // refresh bookmarks in case one was added
+        }
+
         component = buildUI()
 
         // Set initial state

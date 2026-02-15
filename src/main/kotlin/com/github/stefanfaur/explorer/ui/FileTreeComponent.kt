@@ -3,16 +3,25 @@ package com.github.stefanfaur.explorer.ui
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.TreeSpeedSearch
 import com.intellij.ui.treeStructure.Tree
+import com.github.stefanfaur.explorer.actions.FileActions
+import com.github.stefanfaur.explorer.model.Bookmark
+import com.github.stefanfaur.explorer.model.BookmarkManager
 import com.github.stefanfaur.explorer.model.FileTreeModel
+import com.github.stefanfaur.explorer.settings.ExplorerSettings
 import java.awt.Component
+import java.awt.datatransfer.DataFlavor
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.Icon
+import javax.swing.JMenuItem
+import javax.swing.JPopupMenu
 import javax.swing.JTree
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeSelectionListener
@@ -43,15 +52,22 @@ class FileTreeComponent(private val project: Project) : Disposable {
     /** Called when tree selection changes (for status bar updates, etc.). */
     var onSelectionChanged: (() -> Unit)? = null
 
+    /** Called when files are modified (for ExplorerPanel to refresh). */
+    var onFilesModified: (() -> Unit)? = null
+
     var showHidden: Boolean = false
     var filterPattern: String = ""
 
     private var currentRootPath: String? = null
 
+    /** Files marked for move (cut). Cleared after paste or copy. */
+    private var cutFiles: List<VirtualFile>? = null
+
     // Store listener references for cleanup in dispose()
     private val expandListener: TreeWillExpandListener
     private val mouseListener: MouseAdapter
     private val selectionListener: TreeSelectionListener
+    private val popupMouseListener: MouseAdapter
 
     init {
         tree.isRootVisible = false
@@ -106,6 +122,24 @@ class FileTreeComponent(private val project: Project) : Disposable {
             onSelectionChanged?.invoke()
         }
         tree.addTreeSelectionListener(selectionListener)
+
+        // Context menu (right-click popup)
+        popupMouseListener = object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) { showPopupIfNeeded(e) }
+            override fun mouseReleased(e: MouseEvent) { showPopupIfNeeded(e) }
+
+            private fun showPopupIfNeeded(e: MouseEvent) {
+                if (e.isPopupTrigger) {
+                    // Select the node under cursor if not already selected
+                    val path = tree.getPathForLocation(e.x, e.y)
+                    if (path != null && !tree.isPathSelected(path)) {
+                        tree.selectionPath = path
+                    }
+                    createPopupMenu().show(tree, e.x, e.y)
+                }
+            }
+        }
+        tree.addMouseListener(popupMouseListener)
     }
 
     /**
@@ -152,6 +186,200 @@ class FileTreeComponent(private val project: Project) : Disposable {
         }
     }
 
+    // ---- Context menu ----
+
+    /** The directory context for paste and new file/folder operations. */
+    private fun getContextDirectory(): VirtualFile? {
+        val selected = getSelectedFiles().firstOrNull()
+        return if (selected?.isDirectory == true) selected else selected?.parent
+    }
+
+    private fun createPopupMenu(): JPopupMenu {
+        val menu = JPopupMenu()
+        val selected = getSelectedFiles()
+        val singleFile = selected.singleOrNull()
+        val contextDir = getContextDirectory()
+
+        // Open (files only)
+        if (singleFile != null && !singleFile.isDirectory) {
+            menu.add(JMenuItem("Open").apply {
+                addActionListener {
+                    FileEditorManager.getInstance(project).openFile(singleFile, true)
+                }
+            })
+        }
+
+        // Open in System
+        if (singleFile != null) {
+            menu.add(JMenuItem("Open in System").apply {
+                addActionListener {
+                    java.awt.Desktop.getDesktop().open(java.io.File(singleFile.path))
+                }
+            })
+        }
+
+        menu.addSeparator()
+
+        // Copy
+        if (selected.isNotEmpty()) {
+            menu.add(JMenuItem("Copy").apply {
+                addActionListener {
+                    FileActions.copyToClipboard(selected)
+                    cutFiles = null // clear any pending cut
+                }
+            })
+        }
+
+        // Cut
+        if (selected.isNotEmpty()) {
+            menu.add(JMenuItem("Cut").apply {
+                addActionListener {
+                    FileActions.copyToClipboard(selected)
+                    cutFiles = selected.toList() // mark for move on paste
+                }
+            })
+        }
+
+        // Paste
+        if (contextDir != null) {
+            menu.add(JMenuItem("Paste").apply {
+                addActionListener { pasteFiles(contextDir) }
+            })
+        }
+
+        // Copy Path
+        if (singleFile != null) {
+            menu.add(JMenuItem("Copy Path").apply {
+                addActionListener { FileActions.copyPathToClipboard(singleFile) }
+            })
+        }
+
+        menu.addSeparator()
+
+        // Rename
+        if (singleFile != null) {
+            menu.add(JMenuItem("Rename").apply {
+                addActionListener { renameFile(singleFile) }
+            })
+        }
+
+        // Delete
+        if (selected.isNotEmpty()) {
+            menu.add(JMenuItem("Delete").apply {
+                addActionListener { deleteFiles(selected) }
+            })
+        }
+
+        menu.addSeparator()
+
+        // New File
+        if (contextDir != null) {
+            menu.add(JMenuItem("New File").apply {
+                addActionListener { createNewFile(contextDir) }
+            })
+        }
+
+        // New Folder
+        if (contextDir != null) {
+            menu.add(JMenuItem("New Folder").apply {
+                addActionListener { createNewFolder(contextDir) }
+            })
+        }
+
+        menu.addSeparator()
+
+        // Add to Bookmarks (directories only)
+        if (singleFile != null && singleFile.isDirectory) {
+            menu.add(JMenuItem("Add to Bookmarks").apply {
+                addActionListener { addToBookmarks(singleFile) }
+            })
+        }
+
+        // Refresh
+        menu.add(JMenuItem("Refresh").apply {
+            addActionListener { refresh(); onFilesModified?.invoke() }
+        })
+
+        return menu
+    }
+
+    private fun pasteFiles(destDir: VirtualFile) {
+        val cuts = cutFiles
+        if (cuts != null) {
+            // Move operation
+            cuts.forEach { FileActions.moveTo(it, destDir) }
+            cutFiles = null
+        } else {
+            // Copy from clipboard
+            val clipboard = CopyPasteManager.getInstance()
+            val transferable = clipboard.contents ?: return
+            if (transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                @Suppress("UNCHECKED_CAST")
+                val files = transferable.getTransferData(DataFlavor.javaFileListFlavor) as List<*>
+                files.filterIsInstance<java.io.File>().forEach { file ->
+                    val vf = LocalFileSystem.getInstance().findFileByPath(file.absolutePath)
+                    if (vf != null) FileActions.copyTo(vf, destDir)
+                }
+            }
+        }
+        refresh()
+        onFilesModified?.invoke()
+    }
+
+    private fun renameFile(file: VirtualFile) {
+        val newName = Messages.showInputDialog(
+            project, "Enter new name:", "Rename", null, file.name, null
+        )
+        if (newName != null && newName.isNotBlank() && newName != file.name) {
+            FileActions.rename(file, newName)
+            refresh()
+            onFilesModified?.invoke()
+        }
+    }
+
+    private fun deleteFiles(files: List<VirtualFile>) {
+        try {
+            val settings = ExplorerSettings.getInstance()
+            if (settings.state.confirmDelete) {
+                val message = if (files.size == 1) "Delete '${files[0].name}'?" else "Delete ${files.size} items?"
+                val result = Messages.showYesNoDialog(project, message, "Confirm Delete", Messages.getQuestionIcon())
+                if (result != Messages.YES) return
+            }
+        } catch (_: Exception) {
+            // Settings service might not be available in tests; proceed without confirmation
+        }
+        files.forEach { FileActions.delete(it) }
+        refresh()
+        onFilesModified?.invoke()
+    }
+
+    private fun createNewFile(parentDir: VirtualFile) {
+        val name = Messages.showInputDialog(project, "Enter file name:", "New File", null)
+        if (name != null && name.isNotBlank()) {
+            FileActions.createFile(parentDir, name)
+            refresh()
+            onFilesModified?.invoke()
+        }
+    }
+
+    private fun createNewFolder(parentDir: VirtualFile) {
+        val name = Messages.showInputDialog(project, "Enter folder name:", "New Folder", null)
+        if (name != null && name.isNotBlank()) {
+            FileActions.createFolder(parentDir, name)
+            refresh()
+            onFilesModified?.invoke()
+        }
+    }
+
+    private fun addToBookmarks(dir: VirtualFile) {
+        try {
+            val manager = BookmarkManager.getInstance()
+            manager.addBookmark(Bookmark(dir.name, dir.path))
+        } catch (_: Exception) {
+            // Service might not be available in tests
+        }
+    }
+
     private fun loadChildren(parentNode: DefaultMutableTreeNode, parentFile: VirtualFile) {
         val model = FileTreeModel(showHidden = showHidden, foldersFirst = true)
         val children = if (filterPattern.isNotBlank()) {
@@ -176,6 +404,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
     override fun dispose() {
         tree.removeTreeWillExpandListener(expandListener)
         tree.removeMouseListener(mouseListener)
+        tree.removeMouseListener(popupMouseListener)
         tree.removeTreeSelectionListener(selectionListener)
     }
 
