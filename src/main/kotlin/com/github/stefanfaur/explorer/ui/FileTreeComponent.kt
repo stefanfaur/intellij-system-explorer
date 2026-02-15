@@ -491,12 +491,12 @@ class FileTreeComponent(private val project: Project) : Disposable {
             val vf = node?.userObject as? VirtualFile
             if (vf != null) {
                 text = vf.name
-                icon = getIconForFile(vf, expanded)
+                icon = getIconForFile(vf)
             }
             return component
         }
 
-        private fun getIconForFile(vf: VirtualFile, expanded: Boolean): Icon {
+        private fun getIconForFile(vf: VirtualFile): Icon {
             return if (vf.isDirectory) {
                 AllIcons.Nodes.Folder
             } else {

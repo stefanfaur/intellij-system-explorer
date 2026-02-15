@@ -13,8 +13,11 @@ import com.intellij.ui.components.JBTextField
 import com.github.stefanfaur.explorer.actions.NavigationActions
 import com.github.stefanfaur.explorer.util.FileSizeFormatter
 import java.awt.BorderLayout
+import java.awt.Component
+import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.event.ActionListener
+import javax.swing.BoxLayout
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -175,7 +178,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
 
     private fun buildToolbar(): JComponent {
         val toolbarPanel = JPanel()
-        toolbarPanel.layout = javax.swing.BoxLayout(toolbarPanel, javax.swing.BoxLayout.Y_AXIS)
+        toolbarPanel.layout = BoxLayout(toolbarPanel, BoxLayout.Y_AXIS)
 
         // Row 1: navigation buttons
         val buttonsPanel = JPanel(FlowLayout(FlowLayout.LEFT, 2, 2))
@@ -186,18 +189,18 @@ class ExplorerPanel(private val project: Project) : Disposable {
         buttonsPanel.add(refreshButton)
         buttonsPanel.add(hiddenToggle)
         buttonsPanel.add(settingsButton)
-        buttonsPanel.alignmentX = java.awt.Component.LEFT_ALIGNMENT
+        buttonsPanel.alignmentX = Component.LEFT_ALIGNMENT
         toolbarPanel.add(buttonsPanel)
 
         // Row 2: current path (full width)
-        pathField.alignmentX = java.awt.Component.LEFT_ALIGNMENT
-        pathField.maximumSize = java.awt.Dimension(Int.MAX_VALUE, pathField.preferredSize.height)
+        pathField.alignmentX = Component.LEFT_ALIGNMENT
+        pathField.maximumSize = Dimension(Int.MAX_VALUE, pathField.preferredSize.height)
         toolbarPanel.add(pathField)
 
         // Row 3: filter field
         filterField.emptyText.text = "Filter (e.g. *.kt)"
-        filterField.alignmentX = java.awt.Component.LEFT_ALIGNMENT
-        filterField.maximumSize = java.awt.Dimension(Int.MAX_VALUE, filterField.preferredSize.height)
+        filterField.alignmentX = Component.LEFT_ALIGNMENT
+        filterField.maximumSize = Dimension(Int.MAX_VALUE, filterField.preferredSize.height)
         toolbarPanel.add(filterField)
 
         return toolbarPanel
@@ -292,7 +295,6 @@ class ExplorerPanel(private val project: Project) : Disposable {
             val files = selected.filter { !it.isDirectory }
             val fileSizeBytes = files.sumOf { it.length }
             val dirChildCount = dirs.sumOf { FileSizeFormatter.countDirectChildren(it) }
-            val dirSizeBytes = dirs.sumOf { FileSizeFormatter.computeDirectoryImmediateSize(it) }
 
             statusLabel.text = when {
                 dirs.isEmpty() -> {
@@ -301,6 +303,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
                 }
                 files.isEmpty() -> {
                     // Only directories selected
+                    val dirSizeBytes = dirs.sumOf { FileSizeFormatter.computeDirectoryImmediateSize(it) }
                     "${selected.size} selected -- $dirChildCount items, ${FileSizeFormatter.format(dirSizeBytes)}"
                 }
                 else -> {

@@ -2,8 +2,6 @@ package com.github.stefanfaur.explorer.unit
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
-import java.awt.BorderLayout
-import java.awt.Component
 import javax.swing.JPanel
 import javax.swing.JTextField
 import javax.swing.BoxLayout

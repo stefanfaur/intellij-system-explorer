@@ -5,8 +5,6 @@ import org.junit.jupiter.api.Assertions.*
 import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeCellRenderer
-import java.awt.Color
-import java.awt.Component
 
 /**
  * Verifies that the file tree cell renderer does not paint a background

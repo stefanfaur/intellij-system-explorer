@@ -31,7 +31,7 @@ class QuickOpenAction : AnAction("Quick Open Directory") {
                 panel.navigateTo(path)
                 // Ensure the tool window is visible
                 ToolWindowManager.getInstance(project)
-                    .getToolWindow("System Explorer")
+                    .getToolWindow(ExplorerActionUtil.TOOL_WINDOW_ID)
                     ?.show()
             }
         }

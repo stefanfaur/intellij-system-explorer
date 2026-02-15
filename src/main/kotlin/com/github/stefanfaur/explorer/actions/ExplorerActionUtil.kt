@@ -1,6 +1,7 @@
 package com.github.stefanfaur.explorer.actions
 
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindowManager
 import com.github.stefanfaur.explorer.ui.ExplorerPanel
 import com.github.stefanfaur.explorer.ui.FileTreeComponent
@@ -14,7 +15,7 @@ import java.awt.Container
  */
 object ExplorerActionUtil {
 
-    private const val TOOL_WINDOW_ID = "System Explorer"
+    internal const val TOOL_WINDOW_ID = "System Explorer"
 
     /**
      * Returns the [ExplorerPanel] currently attached to the System Explorer tool window,
@@ -39,12 +40,15 @@ object ExplorerActionUtil {
     /**
      * Activates the System Explorer tool window and returns the ExplorerPanel.
      * Used by global actions that need the panel even when the tool window isn't focused.
+     *
+     * Ensures the tool window content is initialized before attempting to find the panel
+     * by calling [com.intellij.openapi.wm.ToolWindow.activate] which runs the content
+     * factory synchronously if it hasn't been called yet.
      */
-    fun activateAndFindPanel(project: com.intellij.openapi.project.Project): ExplorerPanel? {
+    fun activateAndFindPanel(project: Project): ExplorerPanel? {
         val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID) ?: return null
-        if (!toolWindow.isVisible) {
-            toolWindow.show()
-        }
+        // activate() ensures content is initialized (unlike show() which can be async)
+        toolWindow.activate(null)
         val content = toolWindow.contentManager.selectedContent ?: return null
         val rootComponent = content.component ?: return null
         return findComponentOfType(rootComponent, ExplorerPanel::class.java)
