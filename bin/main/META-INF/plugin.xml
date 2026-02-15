@@ -76,6 +76,13 @@
                     description="Refresh the file tree">
                 <keyboard-shortcut keymap="$default" first-keystroke="F5"/>
             </action>
+
+            <action id="SystemExplorer.QuickOpen"
+                    class="com.github.stefanfaur.explorer.actions.QuickOpenAction"
+                    text="Quick Open Directory"
+                    description="Open a directory by typing its path">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift O"/>
+            </action>
         </group>
     </actions>
 </idea-plugin>

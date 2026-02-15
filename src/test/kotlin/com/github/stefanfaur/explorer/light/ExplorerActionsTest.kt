@@ -98,6 +98,17 @@ class ExplorerActionsTest : BasePlatformTestCase() {
         assertShortcutBound("SystemExplorer.RefreshTree", "F5")
     }
 
+    // ---- QuickOpen action tests ----
+
+    fun `test QuickOpen action is registered`() {
+        val action = actionManager.getAction("SystemExplorer.QuickOpen")
+        assertNotNull("QuickOpen action should be registered", action)
+    }
+
+    fun `test QuickOpen has Ctrl+Shift+O shortcut`() {
+        assertShortcutBound("SystemExplorer.QuickOpen", "$platformCtrl shift O")
+    }
+
     // ---- Action group test ----
 
     fun `test all actions belong to SystemExplorer group`() {

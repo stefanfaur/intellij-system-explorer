@@ -48,5 +48,20 @@ object NavigationActions {
             currentIndex++
             return history[currentIndex]
         }
+
+        /**
+         * Returns recent unique paths from the navigation history,
+         * most recent first, capped at [limit] entries.
+         * Only includes paths up to the current index (excludes forward-history entries).
+         */
+        fun getRecentPaths(limit: Int = 10): List<String> {
+            val seen = linkedSetOf<String>()
+            // Walk backwards from current position to oldest (exclude forward history)
+            for (i in currentIndex downTo 0) {
+                seen.add(history[i])
+                if (seen.size >= limit) break
+            }
+            return seen.toList()
+        }
     }
 }

@@ -51,6 +51,11 @@ class ExplorerPanel(private val project: Project) : Disposable {
         private set
 
     private val history = NavigationActions.NavigationHistory()
+
+    /**
+     * Returns the navigation history for use by the Quick Open dialog.
+     */
+    fun getNavigationHistory(): NavigationActions.NavigationHistory = history
     internal val fileTreeComponent = FileTreeComponent(project)
     private val bookmarksPanel = BookmarksPanel { path -> navigateTo(path) }
     private val pathField = JBTextField()
