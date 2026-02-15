@@ -11,5 +11,9 @@
         <toolWindow id="System Explorer"
                     anchor="right"
                     factoryClass="com.github.stefanfaur.explorer.ExplorerToolWindowFactory"/>
+        <applicationConfigurable id="com.github.stefanfaur.explorer.settings"
+                                 displayName="System Explorer"
+                                 parentId="tools"
+                                 instance="com.github.stefanfaur.explorer.settings.ExplorerConfigurable"/>
     </extensions>
 </idea-plugin>
