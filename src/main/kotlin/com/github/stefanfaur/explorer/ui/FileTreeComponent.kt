@@ -14,6 +14,7 @@ import com.intellij.ui.TreeSpeedSearch
 import com.intellij.ui.treeStructure.Tree
 import com.github.stefanfaur.explorer.actions.DragDropHandler
 import com.github.stefanfaur.explorer.actions.FileActions
+import com.github.stefanfaur.explorer.actions.FileTreeTransferHandler
 import com.github.stefanfaur.explorer.model.Bookmark
 import com.github.stefanfaur.explorer.model.BookmarkManager
 import com.github.stefanfaur.explorer.model.FileTreeModel
@@ -161,6 +162,11 @@ class FileTreeComponent(private val project: Project) : Disposable {
         } catch (e: Exception) {
             LOG.debug("Failed to register drag-and-drop handler: ${e.message}")
         }
+
+        // Register standard Swing TransferHandler for reliable drag-and-drop
+        tree.dragEnabled = true
+        tree.transferHandler = FileTreeTransferHandler(this)
+        tree.dropMode = javax.swing.DropMode.ON_OR_INSERT
     }
 
     /**

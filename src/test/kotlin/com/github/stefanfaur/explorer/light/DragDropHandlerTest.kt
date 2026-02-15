@@ -9,6 +9,7 @@ import com.github.stefanfaur.explorer.ui.FileTreeComponent
 import java.awt.Point
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
+import java.awt.datatransfer.UnsupportedFlavorException
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
@@ -310,6 +311,42 @@ class DragDropHandlerTest : BasePlatformTestCase() {
 
         val pathStr = transferable.getTransferData(DataFlavor.stringFlavor) as String
         assertTrue("path string should contain file path", pathStr.contains("pathfile.txt"))
+    }
+
+    // ---- Swing TransferHandler ----
+
+    fun `test tree has a TransferHandler set`() {
+        assertNotNull(
+            "Tree should have a TransferHandler for Swing DnD",
+            fileTreeComponent.tree.transferHandler
+        )
+    }
+
+    fun `test TransferHandler canImport for file list flavor`() {
+        val handler = fileTreeComponent.tree.transferHandler
+        assertNotNull(handler)
+
+        // The TransferHandler should support importing javaFileListFlavor
+        val support = handler.canImport(
+            javax.swing.TransferHandler.TransferSupport(
+                fileTreeComponent.tree,
+                createTestTransferable(listOf(testRoot))
+            )
+        )
+        assertTrue("TransferHandler should support importing file lists", support)
+    }
+
+    private fun createTestTransferable(files: List<VirtualFile>): Transferable {
+        val ioFiles = files.map { java.io.File(it.path) }
+        return object : Transferable {
+            private val flavors = arrayOf(DataFlavor.javaFileListFlavor)
+            override fun getTransferDataFlavors() = flavors
+            override fun isDataFlavorSupported(flavor: DataFlavor) = flavor in flavors
+            override fun getTransferData(flavor: DataFlavor): Any = when (flavor) {
+                DataFlavor.javaFileListFlavor -> ioFiles
+                else -> throw UnsupportedFlavorException(flavor)
+            }
+        }
     }
 
     // ---- Helper methods ----
