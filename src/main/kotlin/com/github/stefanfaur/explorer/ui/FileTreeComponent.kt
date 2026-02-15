@@ -1,6 +1,7 @@
 package com.github.stefanfaur.explorer.ui
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -14,6 +15,7 @@ import java.awt.event.MouseEvent
 import javax.swing.Icon
 import javax.swing.JTree
 import javax.swing.event.TreeExpansionEvent
+import javax.swing.event.TreeSelectionListener
 import javax.swing.event.TreeWillExpandListener
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeCellRenderer
@@ -25,8 +27,11 @@ import javax.swing.tree.DefaultTreeModel
  * Uses a simple [DefaultTreeModel] with [DefaultMutableTreeNode] approach.
  * Each node's userObject is the [VirtualFile] it represents (except for placeholder nodes).
  * Directories are lazily expanded via [TreeWillExpandListener].
+ *
+ * Implements [Disposable] so that all registered listeners are cleaned up when the component
+ * is disposed, preventing memory leaks.
  */
-class FileTreeComponent(private val project: Project) {
+class FileTreeComponent(private val project: Project) : Disposable {
 
     private val rootNode = DefaultMutableTreeNode("root")
     private val treeModel = DefaultTreeModel(rootNode)
@@ -43,6 +48,11 @@ class FileTreeComponent(private val project: Project) {
 
     private var currentRootPath: String? = null
 
+    // Store listener references for cleanup in dispose()
+    private val expandListener: TreeWillExpandListener
+    private val mouseListener: MouseAdapter
+    private val selectionListener: TreeSelectionListener
+
     init {
         tree.isRootVisible = false
         tree.showsRootHandles = true
@@ -56,7 +66,7 @@ class FileTreeComponent(private val project: Project) {
         }
 
         // Lazy directory expansion
-        tree.addTreeWillExpandListener(object : TreeWillExpandListener {
+        expandListener = object : TreeWillExpandListener {
             override fun treeWillExpand(event: TreeExpansionEvent) {
                 val node = event.path.lastPathComponent as DefaultMutableTreeNode
                 val file = node.userObject as? VirtualFile ?: return
@@ -71,10 +81,11 @@ class FileTreeComponent(private val project: Project) {
             }
 
             override fun treeWillCollapse(event: TreeExpansionEvent) {}
-        })
+        }
+        tree.addTreeWillExpandListener(expandListener)
 
         // Double-click handler
-        tree.addMouseListener(object : MouseAdapter() {
+        mouseListener = object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount == 2) {
                     val path = tree.getPathForLocation(e.x, e.y) ?: return
@@ -87,12 +98,14 @@ class FileTreeComponent(private val project: Project) {
                     }
                 }
             }
-        })
+        }
+        tree.addMouseListener(mouseListener)
 
         // Selection change listener
-        tree.addTreeSelectionListener {
+        selectionListener = TreeSelectionListener {
             onSelectionChanged?.invoke()
         }
+        tree.addTreeSelectionListener(selectionListener)
     }
 
     /**
@@ -101,7 +114,7 @@ class FileTreeComponent(private val project: Project) {
     fun setRoot(path: String) {
         currentRootPath = path
         rootNode.removeAllChildren()
-        val dir = LocalFileSystem.getInstance().findFileByPath(path)
+        val dir = LocalFileSystem.getInstance().refreshAndFindFileByPath(path)
         if (dir != null && dir.isDirectory) {
             loadChildren(rootNode, dir)
         }
@@ -158,6 +171,15 @@ class FileTreeComponent(private val project: Project) {
     }
 
     /**
+     * Removes all listeners registered on the tree to prevent memory leaks.
+     */
+    override fun dispose() {
+        tree.removeTreeWillExpandListener(expandListener)
+        tree.removeMouseListener(mouseListener)
+        tree.removeTreeSelectionListener(selectionListener)
+    }
+
+    /**
      * Custom cell renderer that displays VirtualFile names with appropriate icons.
      */
     private inner class VirtualFileCellRenderer : DefaultTreeCellRenderer() {
@@ -182,7 +204,7 @@ class FileTreeComponent(private val project: Project) {
 
         private fun getIconForFile(vf: VirtualFile, expanded: Boolean): Icon {
             return if (vf.isDirectory) {
-                if (expanded) AllIcons.Nodes.Folder else AllIcons.Nodes.Folder
+                AllIcons.Nodes.Folder
             } else {
                 vf.fileType.icon ?: AllIcons.FileTypes.Any_type
             }

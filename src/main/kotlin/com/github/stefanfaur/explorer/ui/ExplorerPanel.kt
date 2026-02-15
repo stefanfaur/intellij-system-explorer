@@ -1,7 +1,10 @@
 package com.github.stefanfaur.explorer.ui
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.JBSplitter
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
@@ -11,6 +14,7 @@ import com.github.stefanfaur.explorer.actions.NavigationActions
 import com.github.stefanfaur.explorer.util.FileSizeFormatter
 import java.awt.BorderLayout
 import java.awt.FlowLayout
+import java.awt.event.ActionListener
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -20,7 +24,7 @@ import javax.swing.JToggleButton
  * The main panel for the System Explorer tool window.
  *
  * Contains:
- * - A toolbar at the top with navigation buttons (Up, Home, Refresh, Hidden toggle, Settings) and an editable path bar
+ * - A toolbar at the top with navigation buttons (Back, Forward, Up, Home, Refresh, Hidden toggle, Settings) and an editable path bar
  * - A filter text field for glob pattern filtering
  * - A splitter with bookmarks sidebar on the left and a file tree on the right
  * - A status bar at the bottom showing selection info
@@ -31,8 +35,15 @@ import javax.swing.JToggleButton
  *
  * Methods:
  * - [navigateTo]: Changes the current directory to the given path
+ *
+ * Implements [Disposable] so that all registered listeners are cleaned up when the panel
+ * is disposed, preventing memory leaks.
  */
-class ExplorerPanel(private val project: Project) {
+class ExplorerPanel(private val project: Project) : Disposable {
+
+    companion object {
+        private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(ExplorerPanel::class.java)
+    }
 
     val component: JComponent
 
@@ -47,6 +58,8 @@ class ExplorerPanel(private val project: Project) {
     private val statusLabel = JBLabel("Ready")
 
     // Toolbar buttons
+    private val backButton = JButton("<")
+    private val forwardButton = JButton(">")
     private val upButton = JButton("Up")
     private val homeButton = JButton("Home")
     private val refreshButton = JButton("Refresh")
@@ -55,9 +68,23 @@ class ExplorerPanel(private val project: Project) {
 
     private var showHidden: Boolean = false
 
+    // Store listener references for cleanup in dispose()
+    private lateinit var backListener: ActionListener
+    private lateinit var forwardListener: ActionListener
+    private lateinit var upListener: ActionListener
+    private lateinit var homeListener: ActionListener
+    private lateinit var refreshListener: ActionListener
+    private lateinit var hiddenListener: ActionListener
+    private lateinit var settingsListener: ActionListener
+    private lateinit var pathListener: ActionListener
+    private lateinit var filterListener: ActionListener
+
     init {
         currentPath = System.getProperty("user.home")
         history.push(currentPath)
+
+        // Register FileTreeComponent as a child disposable
+        Disposer.register(this, fileTreeComponent)
 
         // Wire double-click on directories to navigate into them
         fileTreeComponent.onDirectoryDoubleClicked = { vf ->
@@ -80,13 +107,33 @@ class ExplorerPanel(private val project: Project) {
 
     /**
      * Navigates to the given directory path, updating the tree and path bar.
+     * Pushes the path onto the navigation history.
      */
     fun navigateTo(path: String) {
+        navigateToInternal(path, pushHistory = true)
+    }
+
+    /**
+     * Internal navigation method that optionally pushes to history.
+     * Used by back/forward buttons to avoid double-pushing.
+     */
+    private fun navigateToInternal(path: String, pushHistory: Boolean) {
         currentPath = path
         pathField.text = path
         fileTreeComponent.setRoot(path)
-        history.push(path)
+        if (pushHistory) {
+            history.push(path)
+        }
+        updateHistoryButtons()
         updateStatus()
+    }
+
+    /**
+     * Updates the enabled state of back/forward buttons based on history.
+     */
+    private fun updateHistoryButtons() {
+        backButton.isEnabled = history.canGoBack
+        forwardButton.isEnabled = history.canGoForward
     }
 
     private fun buildUI(): JComponent {
@@ -116,6 +163,8 @@ class ExplorerPanel(private val project: Project) {
         // Top row: buttons + path bar
         val topRow = JPanel(BorderLayout())
         val buttonsPanel = JPanel(FlowLayout(FlowLayout.LEFT, 2, 2))
+        buttonsPanel.add(backButton)
+        buttonsPanel.add(forwardButton)
         buttonsPanel.add(upButton)
         buttonsPanel.add(homeButton)
         buttonsPanel.add(refreshButton)
@@ -134,56 +183,76 @@ class ExplorerPanel(private val project: Project) {
     }
 
     private fun wireActions() {
-        upButton.addActionListener {
+        backListener = ActionListener {
+            history.back()?.let { path -> navigateToInternal(path, pushHistory = false) }
+        }
+        backButton.addActionListener(backListener)
+
+        forwardListener = ActionListener {
+            history.forward()?.let { path -> navigateToInternal(path, pushHistory = false) }
+        }
+        forwardButton.addActionListener(forwardListener)
+
+        upListener = ActionListener {
             val parent = NavigationActions.goToParent(currentPath)
             if (parent != currentPath) {
                 navigateTo(parent)
             }
         }
+        upButton.addActionListener(upListener)
 
-        homeButton.addActionListener {
+        homeListener = ActionListener {
             navigateTo(NavigationActions.goHome())
         }
+        homeButton.addActionListener(homeListener)
 
-        refreshButton.addActionListener {
+        refreshListener = ActionListener {
             fileTreeComponent.setRoot(currentPath)
             updateStatus()
         }
+        refreshButton.addActionListener(refreshListener)
 
-        hiddenToggle.addActionListener {
+        hiddenListener = ActionListener {
             showHidden = hiddenToggle.isSelected
             fileTreeComponent.showHidden = showHidden
             fileTreeComponent.setRoot(currentPath)
             updateStatus()
         }
+        hiddenToggle.addActionListener(hiddenListener)
 
-        settingsButton.addActionListener {
+        settingsListener = ActionListener {
             ShowSettingsUtil.getInstance().showSettingsDialog(project, "System Explorer")
         }
+        settingsButton.addActionListener(settingsListener)
 
-        pathField.addActionListener {
+        pathListener = ActionListener {
             val typed = pathField.text.trim()
             if (typed.isNotEmpty()) {
-                val file = java.io.File(typed)
-                if (file.isDirectory) {
+                val vf = LocalFileSystem.getInstance().refreshAndFindFileByPath(typed)
+                if (vf != null && vf.isDirectory) {
                     navigateTo(typed)
                 }
             }
         }
+        pathField.addActionListener(pathListener)
 
-        filterField.addActionListener {
+        filterListener = ActionListener {
             fileTreeComponent.filterPattern = filterField.text.trim()
             fileTreeComponent.setRoot(currentPath)
             updateStatus()
         }
+        filterField.addActionListener(filterListener)
+
+        // Set initial button state
+        updateHistoryButtons()
     }
 
     private fun loadBookmarks() {
         try {
             val manager = com.github.stefanfaur.explorer.model.BookmarkManager.getInstance()
             bookmarksPanel.setBookmarks(manager.getBookmarks())
-        } catch (_: Exception) {
-            // BookmarkManager might not be available in test environments
+        } catch (e: Exception) {
+            LOG.warn("Failed to load bookmarks", e)
         }
     }
 
@@ -210,6 +279,22 @@ class ExplorerPanel(private val project: Project) {
      * Returns the current status bar text (for testing).
      */
     fun getStatusText(): String = statusLabel.text
+
+    /**
+     * Removes all listeners registered on buttons and fields to prevent memory leaks.
+     * Child disposables (FileTreeComponent) are disposed automatically by the Disposer framework.
+     */
+    override fun dispose() {
+        backButton.removeActionListener(backListener)
+        forwardButton.removeActionListener(forwardListener)
+        upButton.removeActionListener(upListener)
+        homeButton.removeActionListener(homeListener)
+        refreshButton.removeActionListener(refreshListener)
+        hiddenToggle.removeActionListener(hiddenListener)
+        settingsButton.removeActionListener(settingsListener)
+        pathField.removeActionListener(pathListener)
+        filterField.removeActionListener(filterListener)
+    }
 
     // Wire actions after all fields are initialized
     init {
