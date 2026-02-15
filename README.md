@@ -85,7 +85,7 @@ A collapsible sidebar on the left side of the tool window shows bookmarked direc
 
 - **Default bookmarks:** Home, Desktop, Downloads are added on first run.
 - **Click to navigate:** Click a bookmark to navigate the tree to that directory.
-- **Add bookmarks:** Right-click any directory in the tree > **Add to Bookmarks**.
+- **Add bookmarks:** Right-click any directory in the tree > **Add to Bookmarks**. The sidebar refreshes automatically.
 - **Persistence:** Bookmarks are stored across IDE restarts.
 
 ### File Operations
@@ -122,11 +122,11 @@ Drag files between System Explorer and other IDE views:
 - **Hold Shift while dropping:** Moves files instead of copying.
 - **Drag within Explorer:** Drop files onto a directory to copy/move them there.
 
-The drop target highlights valid directories. Dropping onto a file targets its parent directory. Dropping in empty space is rejected.
+The drop target highlights valid directories. Dropping onto a file targets its parent directory. Dropping in empty space is rejected. Drag-and-drop uses both IntelliJ's DnDManager (for IDE interop) and Swing's TransferHandler (for reliable within-tree and cross-component DnD).
 
 ### Quick Open Dialog
 
-Press **Ctrl+Shift+O** (when the System Explorer window is focused) to open the Quick Open dialog. This provides fast directory navigation without browsing the tree:
+Press **Ctrl+Shift+O** from anywhere in the IDE to open the Quick Open dialog. This provides fast directory navigation without browsing the tree:
 
 - **Type a path:** Enter any absolute directory path in the text field.
 - **Browse button:** Click **...** to open a native directory chooser dialog.
@@ -149,7 +149,9 @@ Press **Enter** in the filter field to apply. Directories always remain visible 
 The bottom of the tool window shows contextual information:
 
 - **No selection:** Shows the count of folders and files in the current directory (e.g., "3 folders, 12 files").
-- **With selection:** Shows the number of selected items and their total size (e.g., "2 selected -- 14.5 KB").
+- **Files selected:** Shows the number of selected items and their total size (e.g., "2 selected -- 14.5 KB").
+- **Directories selected:** Shows child count and immediate size (e.g., "1 selected -- 5 items, 2.0 KB").
+- **Mixed selection:** Shows directory item count and file size (e.g., "3 selected -- 10 items in dirs, 4.0 KB in files").
 
 File sizes are auto-formatted (B, KB, MB, GB, TB).
 
@@ -161,11 +163,15 @@ Access via **Settings** (Ctrl+Alt+S) > **Tools** > **System Explorer**, or click
 |---------|---------|-------------|
 | **Show hidden files** | Off | Show dotfiles (`.gitignore`, `.hidden/`, etc.) in the tree |
 | **Sort folders first** | On | List directories before files. When off, all entries are sorted alphabetically |
+| **Show file size in tree** | On | Display file sizes next to filenames in the tree |
+| **Show file permissions** | Off | Display file permission info in the tree |
+| **Expand directories on single click** | On | Expand/collapse directories with a single click |
+| **Remember last visited path** | On | Restore the last visited directory when reopening the tool window |
 | **Confirm before delete** | On | Show a confirmation dialog before deleting files |
 | **Delete to trash** | On | Move deleted files to the system trash instead of permanently deleting them |
-| **Default root path** | *(empty = home)* | The directory shown when the tool window first opens. Leave empty for your home directory |
+| **Default root path** | *(empty = home)* | The directory shown when the tool window first opens. Uses a directory chooser dialog. Leave empty for your home directory |
 
-Settings are persisted in `explorerSettings.xml` and apply across all projects.
+Settings are organized into Display, Behavior, Delete Behavior, and Paths groups. Persisted in `explorerSettings.xml` and apply across all projects.
 
 ## Keyboard Shortcuts
 
@@ -178,19 +184,20 @@ All shortcuts are configurable via **Settings** > **Keymap** > search "System Ex
 | **Ctrl+X** | Cut selected files (move on paste) | When System Explorer is focused |
 | **Ctrl+V** | Paste files from clipboard | When System Explorer is focused |
 | **Ctrl+Shift+C** | Copy absolute path to clipboard | When System Explorer is focused |
-| **Ctrl+Shift+O** | Open Quick Open Directory dialog | When System Explorer is focused |
+| **Ctrl+Shift+O** | Open Quick Open Directory dialog | Global (works from any view) |
 | **F2** | Rename selected file | When System Explorer is focused |
 | **Delete** | Delete selected files | When System Explorer is focused |
 | **F5** | Refresh file tree | When System Explorer is focused |
 
-**Note on shortcut scoping:** All shortcuts except Alt+E only activate when the System Explorer tool window is focused and active. When the tool window is not focused, the shortcuts fall through to their default IDE bindings (e.g., Ctrl+C in the editor copies text as usual).
+**Note on shortcut scoping:** Alt+E and Ctrl+Shift+O work globally from anywhere in the IDE. All other shortcuts only activate when the System Explorer tool window is focused. When unfocused, they fall through to their default IDE bindings (e.g., Ctrl+C in the editor copies text as usual).
 
 ## UI Layout
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ [<] [>] [Up] [Home] [Refresh] [Hidden] [Settings]  [/path/to/dir  ] │  Toolbar
-│ [Filter (e.g. *.kt)                                              ] │  Filter bar
+│ [<] [>] [Up] [Home] [Refresh] [Hidden] [Settings]      │  Buttons
+│ [/path/to/current/directory                           ] │  Path bar
+│ [Filter (e.g. *.kt)                                  ] │  Filter bar
 ├──────────────┬──────────────────────────────────────────┤
 │  Home        │  > bin/                                  │
 │  Desktop     │  > etc/                                  │  Bookmarks | File Tree
@@ -202,7 +209,8 @@ All shortcuts are configurable via **Settings** > **Keymap** > search "System Ex
 └─────────────────────────────────────────────────────────┘
 ```
 
-- **Toolbar (top):** Back, Forward, Up, Home, Refresh, Hidden toggle, Settings button, and an editable path bar. Type a path and press Enter to navigate directly.
+- **Toolbar (top):** Three rows — navigation buttons (Back, Forward, Up, Home, Refresh, Hidden toggle, Settings), a full-width editable path bar, and a filter field.
+- **Path bar:** Type a path and press Enter to navigate directly.
 - **Filter bar:** Glob pattern filter. Press Enter to apply.
 - **Bookmarks (left):** Click to navigate. Right-click directories in the tree to add bookmarks.
 - **File tree (right):** The main filesystem view. Supports right-click context menu, double-click, drag-and-drop, and keyboard navigation.
@@ -276,8 +284,9 @@ The test suite has 160 tests organized in a four-layer pyramid:
 src/main/kotlin/com/github/stefanfaur/explorer/
 ├── ExplorerToolWindowFactory.kt    # Tool window entry point (registered in plugin.xml)
 ├── actions/
-│   ├── DragDropHandler.kt          # DnDSource + DnDTarget for file drag-and-drop
+│   ├── DragDropHandler.kt          # DnDSource + DnDTarget for IntelliJ DnD interop
 │   ├── ExplorerActionUtil.kt       # Utility to find ExplorerPanel from AnActionEvent
+│   ├── FileTreeTransferHandler.kt  # Swing TransferHandler for reliable drag-and-drop
 │   ├── ExplorerActions.kt          # 8 AnAction subclasses for keyboard shortcuts
 │   ├── FileActions.kt              # Stateless file operations (copy, move, delete, rename)
 │   ├── NavigationActions.kt        # Navigation utilities + NavigationHistory
