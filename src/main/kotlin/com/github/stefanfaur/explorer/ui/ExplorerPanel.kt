@@ -174,10 +174,10 @@ class ExplorerPanel(private val project: Project) : Disposable {
     }
 
     private fun buildToolbar(): JComponent {
-        val toolbarPanel = JPanel(BorderLayout())
+        val toolbarPanel = JPanel()
+        toolbarPanel.layout = javax.swing.BoxLayout(toolbarPanel, javax.swing.BoxLayout.Y_AXIS)
 
-        // Top row: buttons + path bar
-        val topRow = JPanel(BorderLayout())
+        // Row 1: navigation buttons
         val buttonsPanel = JPanel(FlowLayout(FlowLayout.LEFT, 2, 2))
         buttonsPanel.add(backButton)
         buttonsPanel.add(forwardButton)
@@ -186,14 +186,19 @@ class ExplorerPanel(private val project: Project) : Disposable {
         buttonsPanel.add(refreshButton)
         buttonsPanel.add(hiddenToggle)
         buttonsPanel.add(settingsButton)
-        topRow.add(buttonsPanel, BorderLayout.WEST)
-        topRow.add(pathField, BorderLayout.CENTER)
+        buttonsPanel.alignmentX = java.awt.Component.LEFT_ALIGNMENT
+        toolbarPanel.add(buttonsPanel)
 
-        toolbarPanel.add(topRow, BorderLayout.NORTH)
+        // Row 2: current path (full width)
+        pathField.alignmentX = java.awt.Component.LEFT_ALIGNMENT
+        pathField.maximumSize = java.awt.Dimension(Int.MAX_VALUE, pathField.preferredSize.height)
+        toolbarPanel.add(pathField)
 
-        // Bottom row: filter field
+        // Row 3: filter field
         filterField.emptyText.text = "Filter (e.g. *.kt)"
-        toolbarPanel.add(filterField, BorderLayout.SOUTH)
+        filterField.alignmentX = java.awt.Component.LEFT_ALIGNMENT
+        filterField.maximumSize = java.awt.Dimension(Int.MAX_VALUE, filterField.preferredSize.height)
+        toolbarPanel.add(filterField)
 
         return toolbarPanel
     }
