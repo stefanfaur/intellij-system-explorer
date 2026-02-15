@@ -11,6 +11,7 @@ version = providers.gradleProperty("pluginVersion").get()
 
 repositories {
     mavenCentral()
+    maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies")
 
     intellijPlatform {
         defaultRepositories()
@@ -35,6 +36,9 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("junit:junit:4.13.2") // needed for BasePlatformTestCase (JUnit 3 based)
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.11.4") // bridges JUnit 3/4 tests to JUnit Platform
+
+    testImplementation("com.intellij.remoterobot:remote-robot:0.11.23")
+    testImplementation("com.intellij.remoterobot:remote-fixtures:0.11.23")
 }
 
 kotlin {
@@ -65,6 +69,23 @@ intellijPlatform {
     pluginVerification {
         ides {
             recommended()
+        }
+    }
+}
+
+intellijPlatformTesting {
+    runIde {
+        register("testUi") {
+            task {
+                jvmArgumentProviders.add(CommandLineArgumentProvider {
+                    listOf(
+                        "-Drobot-server.port=8082",
+                        "-Dide.mac.message.dialogs.as.sheets=false",
+                        "-Djb.privacy.policy.text=<!--999.999-->",
+                        "-Djb.consents.confirmation.enabled=false",
+                    )
+                })
+            }
         }
     }
 }
