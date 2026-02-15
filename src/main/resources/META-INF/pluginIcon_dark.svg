@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <!-- Folder body -->
+  <rect x="2" y="12" width="30" height="22" rx="2" ry="2" fill="#6BA5E7"/>
+  <!-- Folder tab -->
+  <path d="M2 14V12a2 2 0 0 1 2-2h8l3 4H2z" fill="#7DB4F0"/>
+  <!-- Folder front face -->
+  <rect x="2" y="16" width="30" height="18" rx="2" ry="2" fill="#7DB4F0"/>
+  <!-- Magnifying glass circle -->
+  <circle cx="28" cy="26" r="7" fill="none" stroke="#C8C8C8" stroke-width="2.5"/>
+  <!-- Magnifying glass lens -->
+  <circle cx="28" cy="26" r="5" fill="#FFFFFF" opacity="0.2"/>
+  <!-- Magnifying glass handle -->
+  <line x1="33" y1="31" x2="38" y2="36" stroke="#C8C8C8" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

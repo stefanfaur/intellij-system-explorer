@@ -2,7 +2,41 @@
     <id>com.github.stefanfaur.systemexplorer</id>
     <name>System Explorer</name>
     <vendor>stefanfaur</vendor>
-    <description>A full-featured system file browser inside IntelliJ IDEA</description>
+    <description><![CDATA[
+<p>A full-featured system file browser embedded directly in your IntelliJ IDEA tool window.
+Navigate, manage, and operate on files across your entire filesystem without leaving the IDE.</p>
+
+<h3>Features</h3>
+<ul>
+  <li>Browse the entire filesystem in a tree view</li>
+  <li>Copy, move, rename, and delete files and directories</li>
+  <li>Bookmarks sidebar for quick access to frequently used directories</li>
+  <li>Drag-and-drop between System Explorer and Project view</li>
+  <li>Quick Open dialog for fast directory navigation by path</li>
+  <li>Context menu with all file operations</li>
+  <li>Filter files by glob pattern</li>
+  <li>Status bar with selection info</li>
+</ul>
+
+<h3>Settings</h3>
+<ul>
+  <li>Show/hide hidden files</li>
+  <li>Sort folders first</li>
+  <li>Confirm before delete</li>
+  <li>Delete to system trash</li>
+</ul>
+
+<h3>Keyboard Shortcuts</h3>
+<ul>
+  <li><b>Alt+E</b> &mdash; Toggle System Explorer panel</li>
+  <li><b>Ctrl+C / Ctrl+X / Ctrl+V</b> &mdash; Copy, cut, paste files</li>
+  <li><b>F2</b> &mdash; Rename selected file</li>
+  <li><b>Delete</b> &mdash; Delete selected files</li>
+  <li><b>F5</b> &mdash; Refresh file tree</li>
+  <li><b>Ctrl+Shift+O</b> &mdash; Quick Open directory</li>
+  <li><b>Ctrl+Shift+C</b> &mdash; Copy file path</li>
+</ul>
+]]></description>
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
