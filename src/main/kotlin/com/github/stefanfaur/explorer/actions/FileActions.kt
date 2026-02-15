@@ -1,7 +1,11 @@
 package com.github.stefanfaur.explorer.actions
 
 import com.intellij.openapi.application.runWriteAction
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.vfs.VirtualFile
+import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.StringSelection
+import java.awt.datatransfer.Transferable
 
 object FileActions {
 
@@ -41,5 +45,28 @@ object FileActions {
         runWriteAction {
             file.move(this, destDir)
         }
+    }
+
+    fun copyToClipboard(files: List<VirtualFile>) {
+        val fileList = files.mapNotNull {
+            java.io.File(it.path)
+        }
+        val pathsString = files.joinToString("\n") { it.path }
+        val transferable = object : Transferable {
+            private val flavors = arrayOf(DataFlavor.javaFileListFlavor, DataFlavor.stringFlavor)
+            override fun getTransferDataFlavors() = flavors
+            override fun isDataFlavorSupported(flavor: DataFlavor) = flavor in flavors
+            override fun getTransferData(flavor: DataFlavor): Any = when (flavor) {
+                DataFlavor.javaFileListFlavor -> fileList
+                DataFlavor.stringFlavor -> pathsString
+                else -> throw java.awt.datatransfer.UnsupportedFlavorException(flavor)
+            }
+        }
+        CopyPasteManager.getInstance().setContents(transferable)
+    }
+
+    fun copyPathToClipboard(file: VirtualFile) {
+        val transferable = StringSelection(file.path)
+        CopyPasteManager.getInstance().setContents(transferable)
     }
 }
