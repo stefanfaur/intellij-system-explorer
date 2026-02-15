@@ -122,4 +122,36 @@ class FileActionsTest : BasePlatformTestCase() {
 
         assertNull(result)
     }
+
+    fun `test delete file with toTrash false permanently deletes`() {
+        val file = runWriteActionAndWait {
+            testRoot.createChildData(this, "permanent-delete.txt")
+        }
+
+        FileActions.delete(file, toTrash = false)
+
+        assertNull(testRoot.findChild("permanent-delete.txt"))
+    }
+
+    fun `test delete file with toTrash true removes file`() {
+        val file = runWriteActionAndWait {
+            testRoot.createChildData(this, "trash-delete.txt")
+        }
+
+        FileActions.delete(file, toTrash = true)
+
+        // In a test environment, moveToTrash may not be supported and will
+        // fall back to permanent delete. Either way, the file should be gone.
+        assertNull(testRoot.findChild("trash-delete.txt"))
+    }
+
+    fun `test delete folder with toTrash false permanently deletes`() {
+        val folder = runWriteActionAndWait {
+            testRoot.createChildDirectory(this, "permanent-delete-dir")
+        }
+
+        FileActions.delete(folder, toTrash = false)
+
+        assertNull(testRoot.findChild("permanent-delete-dir"))
+    }
 }

@@ -338,17 +338,22 @@ class FileTreeComponent(private val project: Project) : Disposable {
     }
 
     internal fun deleteFiles(files: List<VirtualFile>) {
+        var toTrash = false
         try {
             val settings = ExplorerSettings.getInstance()
+            toTrash = settings.state.deleteToTrash
             if (settings.state.confirmDelete) {
-                val message = if (files.size == 1) "Delete '${files[0].name}'?" else "Delete ${files.size} items?"
-                val result = Messages.showYesNoDialog(project, message, "Confirm Delete", Messages.getQuestionIcon())
+                val action = if (toTrash) "Move to Trash" else "Permanently delete"
+                val itemDesc = if (files.size == 1) "'${files[0].name}'" else "${files.size} items"
+                val message = "$action $itemDesc?"
+                val title = if (toTrash) "Move to Trash" else "Confirm Delete"
+                val result = Messages.showYesNoDialog(project, message, title, Messages.getQuestionIcon())
                 if (result != Messages.YES) return
             }
         } catch (_: Exception) {
             // Settings service might not be available in tests; proceed without confirmation
         }
-        files.forEach { FileActions.delete(it) }
+        files.forEach { FileActions.delete(it, toTrash) }
         refresh()
         onFilesModified?.invoke()
     }
@@ -356,7 +361,11 @@ class FileTreeComponent(private val project: Project) : Disposable {
     private fun createNewFile(parentDir: VirtualFile) {
         val name = Messages.showInputDialog(project, "Enter file name:", "New File", null)
         if (name != null && name.isNotBlank()) {
-            FileActions.createFile(parentDir, name)
+            val created = FileActions.createFile(parentDir, name)
+            if (created == null) {
+                Messages.showWarningDialog(project, "A file with the name '$name' already exists.", "File Already Exists")
+                return
+            }
             refresh()
             onFilesModified?.invoke()
         }
@@ -365,7 +374,11 @@ class FileTreeComponent(private val project: Project) : Disposable {
     private fun createNewFolder(parentDir: VirtualFile) {
         val name = Messages.showInputDialog(project, "Enter folder name:", "New Folder", null)
         if (name != null && name.isNotBlank()) {
-            FileActions.createFolder(parentDir, name)
+            val created = FileActions.createFolder(parentDir, name)
+            if (created == null) {
+                Messages.showWarningDialog(project, "A folder with the name '$name' already exists.", "Folder Already Exists")
+                return
+            }
             refresh()
             onFilesModified?.invoke()
         }

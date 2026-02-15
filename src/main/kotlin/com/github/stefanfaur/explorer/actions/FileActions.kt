@@ -29,7 +29,20 @@ object FileActions {
         }
     }
 
-    fun delete(file: VirtualFile) {
+    fun delete(file: VirtualFile, toTrash: Boolean = false) {
+        if (toTrash) {
+            try {
+                val ioFile = java.io.File(file.path)
+                val desktop = java.awt.Desktop.getDesktop()
+                if (desktop.isSupported(java.awt.Desktop.Action.MOVE_TO_TRASH) && desktop.moveToTrash(ioFile)) {
+                    // Refresh the VFS so IntelliJ notices the file is gone
+                    file.parent?.refresh(false, false)
+                    return
+                }
+            } catch (_: Exception) {
+                // moveToTrash not supported or failed; fall back to permanent delete
+            }
+        }
         runWriteAction {
             file.delete(this)
         }
