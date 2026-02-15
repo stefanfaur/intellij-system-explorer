@@ -405,10 +405,11 @@ class FileTreeComponent(private val project: Project) : Disposable {
         }
     }
 
-    private fun addToBookmarks(dir: VirtualFile) {
+    internal fun addToBookmarks(dir: VirtualFile) {
         try {
             val manager = BookmarkManager.getInstance()
             manager.addBookmark(Bookmark(dir.name, dir.path))
+            onFilesModified?.invoke()
         } catch (_: Exception) {
             // Service might not be available in tests
         }

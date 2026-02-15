@@ -1,8 +1,10 @@
 package com.github.stefanfaur.explorer.light
 
+import com.intellij.openapi.application.runWriteActionAndWait
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.github.stefanfaur.explorer.model.BookmarkManager
 import com.github.stefanfaur.explorer.model.Bookmark
+import com.github.stefanfaur.explorer.ui.FileTreeComponent
 
 class BookmarkManagerTest : BasePlatformTestCase() {
 
@@ -91,5 +93,22 @@ class BookmarkManagerTest : BasePlatformTestCase() {
         manager.clearAll()
 
         assertTrue(manager.getBookmarks().isEmpty())
+    }
+
+    fun `test addToBookmarks triggers onFilesModified callback`() {
+        val dir = runWriteActionAndWait {
+            myFixture.tempDirFixture.findOrCreateDir("bookmarkCallbackDir")
+        }
+        val fileTreeComponent = FileTreeComponent(project)
+        var callbackFired = false
+        fileTreeComponent.onFilesModified = { callbackFired = true }
+
+        try {
+            // Simulate what happens when user right-clicks -> Add to Bookmarks
+            fileTreeComponent.addToBookmarks(dir)
+            assertTrue("onFilesModified callback should fire after adding a bookmark", callbackFired)
+        } finally {
+            fileTreeComponent.dispose()
+        }
     }
 }
