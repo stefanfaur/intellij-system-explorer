@@ -130,6 +130,57 @@ class ExplorerConfigurableTest : BasePlatformTestCase() {
         assertFalse(configurable.isModified)
     }
 
+    fun `test defaultRootField is a TextFieldWithBrowseButton`() {
+        configurable.createComponent()
+        assertNotNull(configurable.defaultRootBrowseField)
+        // Verify it's a TextFieldWithBrowseButton, not a plain JTextField
+        assertTrue(configurable.defaultRootBrowseField is com.intellij.openapi.ui.TextFieldWithBrowseButton)
+    }
+
+    fun `test new setting checkboxes exist after createComponent`() {
+        configurable.createComponent()
+        assertNotNull(configurable.showFileSizeInTreeCheckBox)
+        assertNotNull(configurable.showFilePermissionsCheckBox)
+        assertNotNull(configurable.expandOnSingleClickCheckBox)
+        assertNotNull(configurable.rememberLastPathCheckBox)
+    }
+
+    fun `test apply saves new settings`() {
+        configurable.createComponent()
+        configurable.reset()
+
+        configurable.showFileSizeInTreeCheckBox.isSelected = false
+        configurable.showFilePermissionsCheckBox.isSelected = true
+        configurable.expandOnSingleClickCheckBox.isSelected = false
+        configurable.rememberLastPathCheckBox.isSelected = false
+
+        configurable.apply()
+
+        val settings = ExplorerSettings.getInstance()
+        assertFalse(settings.state.showFileSizeInTree)
+        assertTrue(settings.state.showFilePermissions)
+        assertFalse(settings.state.expandDirectoriesOnSingleClick)
+        assertFalse(settings.state.rememberLastPath)
+    }
+
+    fun `test reset restores new settings from state`() {
+        val settings = ExplorerSettings.getInstance()
+        settings.loadState(ExplorerSettings.State(
+            showFileSizeInTree = false,
+            showFilePermissions = true,
+            expandDirectoriesOnSingleClick = false,
+            rememberLastPath = false,
+        ))
+
+        configurable.createComponent()
+        configurable.reset()
+
+        assertFalse(configurable.showFileSizeInTreeCheckBox.isSelected)
+        assertTrue(configurable.showFilePermissionsCheckBox.isSelected)
+        assertFalse(configurable.expandOnSingleClickCheckBox.isSelected)
+        assertFalse(configurable.rememberLastPathCheckBox.isSelected)
+    }
+
     fun `test reset after modification restores original values`() {
         configurable.createComponent()
         configurable.reset()

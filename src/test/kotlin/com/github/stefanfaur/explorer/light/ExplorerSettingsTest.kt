@@ -50,6 +50,17 @@ class ExplorerSettingsTest : BasePlatformTestCase() {
         assertEquals("/custom/path", fresh.state.defaultRoot)
     }
 
+    fun `test new settings have expected default values`() {
+        val settings = ExplorerSettings.getInstance()
+
+        // New settings with defaults
+        assertTrue(settings.state.showFileSizeInTree)
+        assertFalse(settings.state.showFilePermissions)
+        assertEquals("name", settings.state.sortBy)
+        assertTrue(settings.state.expandDirectoriesOnSingleClick)
+        assertTrue(settings.state.rememberLastPath)
+    }
+
     fun `test default state equals unmodified state`() {
         // PersistentStateComponent only saves when state differs from default
         val default1 = ExplorerSettings.State()

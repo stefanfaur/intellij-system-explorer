@@ -17,6 +17,11 @@ class ExplorerSettings : PersistentStateComponent<ExplorerSettings.State> {
         var confirmDelete: Boolean = true,
         var deleteToTrash: Boolean = true,
         var defaultRoot: String = "",
+        var showFileSizeInTree: Boolean = true,
+        var showFilePermissions: Boolean = false,
+        var sortBy: String = "name",  // "name", "size", "modified"
+        var expandDirectoriesOnSingleClick: Boolean = true,
+        var rememberLastPath: Boolean = true,
     )
 
     private var myState = State()
