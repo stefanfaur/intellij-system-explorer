@@ -4,6 +4,7 @@ import com.intellij.openapi.application.runWriteActionAndWait
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.github.stefanfaur.explorer.model.FileTreeModel
+import com.github.stefanfaur.explorer.util.FileSizeFormatter
 
 class FileTreeModelTest : BasePlatformTestCase() {
 
@@ -83,5 +84,27 @@ class FileTreeModelTest : BasePlatformTestCase() {
         val dir = testRoot.findChild("folderA")!!
 
         assertFalse(model.isLeaf(dir))
+    }
+
+    fun `test directory stats count children correctly`() {
+        val dir = runWriteActionAndWait {
+            val d = myFixture.tempDirFixture.findOrCreateDir("statsDir")
+            d.createChildData(this, "file1.txt").setBinaryContent("abc".toByteArray())
+            d.createChildData(this, "file2.txt").setBinaryContent("defgh".toByteArray())
+            d.createChildDirectory(this, "subdir")
+            d
+        }
+        assertEquals(3, FileSizeFormatter.countDirectChildren(dir))
+    }
+
+    fun `test directory stats compute immediate size correctly`() {
+        val dir = runWriteActionAndWait {
+            val d = myFixture.tempDirFixture.findOrCreateDir("sizeDir")
+            d.createChildData(this, "a.txt").setBinaryContent("abc".toByteArray())    // 3 bytes
+            d.createChildData(this, "b.txt").setBinaryContent("defgh".toByteArray())  // 5 bytes
+            d.createChildDirectory(this, "subdir")  // 0 bytes
+            d
+        }
+        assertEquals(8L, FileSizeFormatter.computeDirectoryImmediateSize(dir))
     }
 }

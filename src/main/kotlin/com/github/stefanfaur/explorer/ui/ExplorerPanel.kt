@@ -281,13 +281,37 @@ class ExplorerPanel(private val project: Project) : Disposable {
      * Updates the status bar based on the current state.
      *
      * When nothing is selected: shows child count like "3 folders, 2 files"
-     * When items are selected: shows "N selected -- SIZE"
+     * When only files selected: shows "N selected -- SIZE"
+     * When only directories selected: shows "N selected -- X items, SIZE"
+     * When mixed selection: shows "N selected -- X items in dirs, SIZE"
      */
     internal fun updateStatus() {
         val selected = fileTreeComponent.getSelectedFiles()
         if (selected.isNotEmpty()) {
-            val totalSize = selected.filter { !it.isDirectory }.sumOf { it.length }
-            statusLabel.text = "${selected.size} selected -- ${FileSizeFormatter.format(totalSize)}"
+            val dirs = selected.filter { it.isDirectory }
+            val files = selected.filter { !it.isDirectory }
+            val fileSizeBytes = files.sumOf { it.length }
+            val dirChildCount = dirs.sumOf { FileSizeFormatter.countDirectChildren(it) }
+            val dirSizeBytes = dirs.sumOf { FileSizeFormatter.computeDirectoryImmediateSize(it) }
+
+            statusLabel.text = when {
+                dirs.isEmpty() -> {
+                    // Only files selected
+                    "${selected.size} selected -- ${FileSizeFormatter.format(fileSizeBytes)}"
+                }
+                files.isEmpty() -> {
+                    // Only directories selected
+                    "${selected.size} selected -- $dirChildCount items, ${FileSizeFormatter.format(dirSizeBytes)}"
+                }
+                else -> {
+                    // Mixed selection
+                    if (dirChildCount > 0) {
+                        "${selected.size} selected -- $dirChildCount items in dirs, ${FileSizeFormatter.format(fileSizeBytes)} in files"
+                    } else {
+                        "${selected.size} selected -- ${FileSizeFormatter.format(fileSizeBytes)}"
+                    }
+                }
+            }
         } else {
             val children = fileTreeComponent.getRootChildren()
             val folderCount = children.count { it.isDirectory }

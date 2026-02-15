@@ -70,4 +70,51 @@ class StatusBarFormattingTest {
     fun `selection with large files formats size properly`() {
         assertEquals("5 selected -- 1.0 MB", formatSelection(5, 1048576))
     }
+
+    // --- Directory stats formatting ---
+
+    /**
+     * Formats the status text when only directories are selected.
+     * Should show child count info instead of "0 B".
+     */
+    private fun formatDirectorySelection(selectedCount: Int, totalChildren: Int, totalSizeBytes: Long): String {
+        val sizeStr = FileSizeFormatter.format(totalSizeBytes)
+        return "$selectedCount selected -- $totalChildren items, $sizeStr"
+    }
+
+    /**
+     * Formats the status text for a mixed selection (files + directories).
+     */
+    private fun formatMixedSelection(selectedCount: Int, dirChildren: Int, fileSizeBytes: Long): String {
+        val sizeStr = FileSizeFormatter.format(fileSizeBytes)
+        return if (dirChildren > 0) {
+            "$selectedCount selected -- $dirChildren items in dirs, $sizeStr in files"
+        } else {
+            "$selectedCount selected -- $sizeStr"
+        }
+    }
+
+    @Test
+    fun `directory selection shows child count and size`() {
+        val result = formatDirectorySelection(1, 5, 2048)
+        assertEquals("1 selected -- 5 items, 2.0 KB", result)
+    }
+
+    @Test
+    fun `multiple directories show combined child count`() {
+        val result = formatDirectorySelection(2, 15, 1048576)
+        assertEquals("2 selected -- 15 items, 1.0 MB", result)
+    }
+
+    @Test
+    fun `mixed selection shows dir items and file size`() {
+        val result = formatMixedSelection(3, 10, 4096)
+        assertEquals("3 selected -- 10 items in dirs, 4.0 KB in files", result)
+    }
+
+    @Test
+    fun `mixed selection with no dir children shows only file size`() {
+        val result = formatMixedSelection(2, 0, 1024)
+        assertEquals("2 selected -- 1.0 KB", result)
+    }
 }
