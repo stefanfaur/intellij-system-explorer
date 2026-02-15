@@ -61,7 +61,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
     private var currentRootPath: String? = null
 
     /** Files marked for move (cut). Cleared after paste or copy. */
-    private var cutFiles: List<VirtualFile>? = null
+    internal var cutFiles: List<VirtualFile>? = null
 
     // Store listener references for cleanup in dispose()
     private val expandListener: TreeWillExpandListener
@@ -189,7 +189,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
     // ---- Context menu ----
 
     /** The directory context for paste and new file/folder operations. */
-    private fun getContextDirectory(): VirtualFile? {
+    internal fun getContextDirectory(): VirtualFile? {
         val selected = getSelectedFiles().firstOrNull()
         return if (selected?.isDirectory == true) selected else selected?.parent
     }
@@ -303,7 +303,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
         return menu
     }
 
-    private fun pasteFiles(destDir: VirtualFile) {
+    internal fun pasteFiles(destDir: VirtualFile) {
         val cuts = cutFiles
         if (cuts != null) {
             // Move operation
@@ -326,7 +326,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
         onFilesModified?.invoke()
     }
 
-    private fun renameFile(file: VirtualFile) {
+    internal fun renameFile(file: VirtualFile) {
         val newName = Messages.showInputDialog(
             project, "Enter new name:", "Rename", null, file.name, null
         )
@@ -337,7 +337,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
         }
     }
 
-    private fun deleteFiles(files: List<VirtualFile>) {
+    internal fun deleteFiles(files: List<VirtualFile>) {
         try {
             val settings = ExplorerSettings.getInstance()
             if (settings.state.confirmDelete) {

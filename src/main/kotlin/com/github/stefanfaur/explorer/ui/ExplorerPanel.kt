@@ -51,7 +51,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
         private set
 
     private val history = NavigationActions.NavigationHistory()
-    private val fileTreeComponent = FileTreeComponent(project)
+    internal val fileTreeComponent = FileTreeComponent(project)
     private val bookmarksPanel = BookmarksPanel { path -> navigateTo(path) }
     private val pathField = JBTextField()
     private val filterField = JBTextField()
@@ -103,6 +103,11 @@ class ExplorerPanel(private val project: Project) : Disposable {
         }
 
         component = buildUI()
+
+        // Store this ExplorerPanel as a client property so actions can find it
+        (component as? javax.swing.JComponent)?.putClientProperty(
+            ExplorerPanel::class.java.name, this
+        )
 
         // Set initial state
         pathField.text = currentPath
