@@ -1,12 +1,10 @@
 package com.github.stefanfaur.explorer.light
 
-import com.intellij.ide.dnd.DnDAction
 import com.intellij.openapi.application.runWriteActionAndWait
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.github.stefanfaur.explorer.actions.DragDropHandler
 import com.github.stefanfaur.explorer.ui.FileTreeComponent
-import java.awt.Point
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
 import java.awt.datatransfer.UnsupportedFlavorException
@@ -15,13 +13,11 @@ import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 
 /**
- * Tests for the DragDropHandler which provides drag-and-drop support
- * for the FileTreeComponent's JTree.
+ * Tests for the DragDropHandler which provides DnDTarget support
+ * for the FileTreeComponent's JTree (receiving drops from IntelliJ panels).
  *
- * Since DnDEvent is an interface in the IntelliJ platform and cannot be
- * instantiated directly in tests, we test:
- * - canStartDragging / startDragging directly (they take DnDAction + Point)
- * - resolveTargetDirectory and performDrop as testable internal methods
+ * Drag-out is handled by Swing's TransferHandler (FileTreeTransferHandler),
+ * tested via the TransferHandler tests below.
  *
  * Note: FileTreeComponent.setRoot uses LocalFileSystem which does not
  * work with TempFileSystem in tests. We populate the tree model directly.
@@ -53,63 +49,6 @@ class DragDropHandlerTest : BasePlatformTestCase() {
 
     fun `test handler can be instantiated with FileTreeComponent`() {
         assertNotNull(handler)
-    }
-
-    // ---- canStartDragging ----
-
-    fun `test canStartDragging returns false when nothing is selected`() {
-        fileTreeComponent.tree.clearSelection()
-
-        val result = handler.canStartDragging(DnDAction.COPY, Point(10, 10))
-        assertFalse("canStartDragging should return false when no files are selected", result)
-    }
-
-    fun `test canStartDragging returns true when files are selected`() {
-        val file = runWriteActionAndWait {
-            testRoot.createChildData(this, "draggable.txt")
-        }
-        populateTree(listOf(file))
-        selectFirstNode()
-
-        val result = handler.canStartDragging(DnDAction.COPY, Point(10, 10))
-        assertTrue("canStartDragging should return true when files are selected", result)
-    }
-
-    // ---- startDragging ----
-
-    fun `test startDragging returns bean with Transferable attached object`() {
-        val file = runWriteActionAndWait {
-            val f = testRoot.createChildData(this, "dragme.txt")
-            f.setBinaryContent("drag content".toByteArray())
-            f
-        }
-        populateTree(listOf(file))
-        selectFirstNode()
-
-        val bean = handler.startDragging(DnDAction.COPY, Point(10, 10))
-
-        assertNotNull("startDragging should return a non-null bean", bean)
-        val attached = bean!!.attachedObject
-        assertNotNull("bean should have an attached object", attached)
-        assertTrue("attached object should be a Transferable", attached is Transferable)
-
-        val transferable = attached as Transferable
-        assertTrue(
-            "transferable should support javaFileListFlavor",
-            transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)
-        )
-
-        @Suppress("UNCHECKED_CAST")
-        val ioFiles = transferable.getTransferData(DataFlavor.javaFileListFlavor) as List<java.io.File>
-        assertTrue("file list should contain at least one file", ioFiles.isNotEmpty())
-        assertEquals("dragme.txt", ioFiles[0].name)
-    }
-
-    fun `test startDragging returns null when nothing selected`() {
-        fileTreeComponent.tree.clearSelection()
-
-        val bean = handler.startDragging(DnDAction.COPY, Point(10, 10))
-        assertNull("startDragging should return null when nothing is selected", bean)
     }
 
     // ---- resolveTargetDirectory ----
@@ -220,30 +159,25 @@ class DragDropHandlerTest : BasePlatformTestCase() {
     // ---- performDrop same-directory guard ----
 
     fun `test performDrop skips files already in the target directory`() {
-        // Create a file directly inside testRoot
         val fileInRoot = runWriteActionAndWait {
             val f = testRoot.createChildData(this, "already-here.txt")
             f.setBinaryContent("original content".toByteArray())
             f
         }
 
-        // Count children before the drop
         testRoot.refresh(false, true)
         val childrenBefore = testRoot.children.map { it.name }.sorted()
 
-        // Attempt to "copy" the file into its own parent directory (testRoot)
         handler.performDrop(listOf(fileInRoot), testRoot, isMove = false)
 
         testRoot.refresh(false, true)
         val childrenAfter = testRoot.children.map { it.name }.sorted()
 
-        // The file should not be duplicated - directory contents should be unchanged
         assertEquals(
             "Directory contents should be unchanged when dropping a file onto its own parent",
             childrenBefore,
             childrenAfter
         )
-        // Verify file content is untouched
         assertEquals("original content", String(fileInRoot.contentsToByteArray()))
     }
 
@@ -262,17 +196,14 @@ class DragDropHandlerTest : BasePlatformTestCase() {
             f
         }
 
-        // Drop both files into testRoot: fileInRoot should be skipped, fileInSubDir should be copied
         handler.performDrop(listOf(fileInRoot, fileInSubDir), testRoot, isMove = false)
 
         testRoot.refresh(false, true)
 
-        // fileInSubDir should now have a copy in testRoot
         val copied = testRoot.findChild("should-move.txt")
         assertNotNull("File from different directory should be copied to target", copied)
         assertEquals("moving", String(copied!!.contentsToByteArray()))
 
-        // Original in subDir should still exist (copy, not move)
         subDir.refresh(false, true)
         assertNotNull("Original file should still exist in subDir", subDir.findChild("should-move.txt"))
     }
@@ -313,11 +244,18 @@ class DragDropHandlerTest : BasePlatformTestCase() {
         assertTrue("path string should contain file path", pathStr.contains("pathfile.txt"))
     }
 
-    // ---- Swing TransferHandler ----
+    // ---- Swing DnD configuration ----
+
+    fun `test tree dragEnabled should be true for Swing drag-out`() {
+        assertTrue(
+            "tree.dragEnabled must be true so Swing's TransferHandler can initiate drags to other panels",
+            fileTreeComponent.tree.dragEnabled
+        )
+    }
 
     fun `test tree has a TransferHandler set`() {
         assertNotNull(
-            "Tree should have a TransferHandler for Swing DnD",
+            "Tree should have a TransferHandler for drag-out and paste support",
             fileTreeComponent.tree.transferHandler
         )
     }
@@ -326,7 +264,6 @@ class DragDropHandlerTest : BasePlatformTestCase() {
         val handler = fileTreeComponent.tree.transferHandler
         assertNotNull(handler)
 
-        // The TransferHandler should support importing javaFileListFlavor
         val support = handler.canImport(
             javax.swing.TransferHandler.TransferSupport(
                 fileTreeComponent.tree,
@@ -351,10 +288,6 @@ class DragDropHandlerTest : BasePlatformTestCase() {
 
     // ---- Helper methods ----
 
-    /**
-     * Populates the tree model directly with the given VirtualFile list,
-     * bypassing setRoot which requires LocalFileSystem.
-     */
     private fun populateTree(files: List<VirtualFile>) {
         val model = fileTreeComponent.tree.model as DefaultTreeModel
         val root = model.root as DefaultMutableTreeNode
@@ -362,7 +295,6 @@ class DragDropHandlerTest : BasePlatformTestCase() {
         for (file in files) {
             val node = DefaultMutableTreeNode(file)
             if (file.isDirectory) {
-                // Add placeholder child so directory is expandable
                 node.add(DefaultMutableTreeNode("loading..."))
             }
             root.add(node)

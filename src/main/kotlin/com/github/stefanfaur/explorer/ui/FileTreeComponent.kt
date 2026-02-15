@@ -10,6 +10,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.TreeSpeedSearch
 import com.intellij.ui.treeStructure.Tree
 import com.github.stefanfaur.explorer.actions.DragDropHandler
@@ -19,7 +20,6 @@ import com.github.stefanfaur.explorer.model.Bookmark
 import com.github.stefanfaur.explorer.model.BookmarkManager
 import com.github.stefanfaur.explorer.model.FileTreeModel
 import com.github.stefanfaur.explorer.settings.ExplorerSettings
-import java.awt.Component
 import java.awt.datatransfer.DataFlavor
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -31,7 +31,6 @@ import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeSelectionListener
 import javax.swing.event.TreeWillExpandListener
 import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
 
 /**
@@ -51,7 +50,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
     }
 
     private val rootNode = DefaultMutableTreeNode("root")
-    private val treeModel = DefaultTreeModel(rootNode)
+    private val treeModel = DefaultTreeModel(rootNode, true)
     val tree: JTree = Tree(treeModel)
 
     /** Called when a directory is double-clicked (navigate into it). */
@@ -66,7 +65,9 @@ class FileTreeComponent(private val project: Project) : Disposable {
     var showHidden: Boolean = false
     var filterPattern: String = ""
 
-    private var currentRootPath: String? = null
+    /** The path currently displayed as the tree root. */
+    var currentRootPath: String? = null
+        private set
 
     /** Files marked for move (cut). Cleared after paste or copy. */
     internal var cutFiles: List<VirtualFile>? = null
@@ -150,23 +151,28 @@ class FileTreeComponent(private val project: Project) : Disposable {
         }
         tree.addMouseListener(popupMouseListener)
 
-        // Register drag-and-drop handler
+        // Swing DnD handles drag-out (from our tree to IntelliJ panels / external apps).
+        // tree.dragEnabled installs Swing's DragGestureRecognizer; TransferHandler
+        // creates the Transferable. This is the most portable approach.
+        tree.dragEnabled = true
+        tree.transferHandler = FileTreeTransferHandler(this)
+        tree.dropMode = javax.swing.DropMode.ON_OR_INSERT
+
+        // Register as DnDTarget ONLY (not DnDSource) via IntelliJ's DnDManager.
+        // This receives drops from IntelliJ-internal panels (Project View, etc.)
+        // that use DnDManager for their drag operations.
+        // We do NOT register as DnDSource because that conflicts with Swing's
+        // DragGestureRecognizer — both systems listen for mouse-drag gestures
+        // and they interfere with each other.
         try {
             val handler = DragDropHandler(this, project)
             dragDropHandler = handler
-            val dndManager = DnDManager.getInstance()
-            dndManager.registerSource(handler, tree)
-            dndManager.registerTarget(handler, tree)
+            DnDManager.getInstance().registerTarget(handler, tree)
         } catch (e: IllegalStateException) {
             LOG.debug("DnDManager not available, drag-and-drop disabled: ${e.message}")
         } catch (e: Exception) {
             LOG.debug("Failed to register drag-and-drop handler: ${e.message}")
         }
-
-        // Register standard Swing TransferHandler for reliable drag-and-drop
-        tree.dragEnabled = true
-        tree.transferHandler = FileTreeTransferHandler(this)
-        tree.dropMode = javax.swing.DropMode.ON_OR_INSERT
     }
 
     /**
@@ -434,6 +440,8 @@ class FileTreeComponent(private val project: Project) : Disposable {
             if (child.isDirectory) {
                 // Add a placeholder child so the node is expandable
                 childNode.add(DefaultMutableTreeNode("loading..."))
+            } else {
+                childNode.allowsChildren = false
             }
             parentNode.add(childNode)
         }
@@ -448,13 +456,11 @@ class FileTreeComponent(private val project: Project) : Disposable {
         tree.removeMouseListener(popupMouseListener)
         tree.removeTreeSelectionListener(selectionListener)
 
-        // Unregister drag-and-drop handler
+        // Unregister DnDTarget (source is not registered — Swing handles drag-out)
         try {
             val handler = dragDropHandler
             if (handler != null) {
-                val dndManager = DnDManager.getInstance()
-                dndManager.unregisterSource(handler, tree)
-                dndManager.unregisterTarget(handler, tree)
+                DnDManager.getInstance().unregisterTarget(handler, tree)
                 dragDropHandler = null
             }
         } catch (e: IllegalStateException) {
@@ -466,42 +472,28 @@ class FileTreeComponent(private val project: Project) : Disposable {
 
     /**
      * Custom cell renderer that displays VirtualFile names with appropriate icons.
+     *
+     * Uses IntelliJ's [ColoredTreeCellRenderer] which integrates with IntelliJ's
+     * Tree painting and handles backgrounds/opacity correctly.
      */
-    private inner class VirtualFileCellRenderer : DefaultTreeCellRenderer() {
-
-        init {
-            // Prevent DefaultTreeCellRenderer from painting its own background
-            // on non-selected items. Without this, every row gets a visible
-            // background rectangle that clashes with the tree's native L&F.
-            isOpaque = false
-            backgroundNonSelectionColor = null
-        }
-
-        override fun getTreeCellRendererComponent(
-            tree: JTree,
-            value: Any?,
-            sel: Boolean,
-            expanded: Boolean,
-            leaf: Boolean,
-            row: Int,
-            hasFocus: Boolean
-        ): Component {
-            val component = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus)
+    private inner class VirtualFileCellRenderer : ColoredTreeCellRenderer() {
+        override fun customizeCellRenderer(
+            tree: JTree, value: Any?, selected: Boolean,
+            expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean
+        ) {
             val node = value as? DefaultMutableTreeNode
             val vf = node?.userObject as? VirtualFile
             if (vf != null) {
-                text = vf.name
+                append(vf.name)
                 icon = getIconForFile(vf)
+            } else {
+                append(value?.toString() ?: "")
             }
-            return component
         }
 
         private fun getIconForFile(vf: VirtualFile): Icon {
-            return if (vf.isDirectory) {
-                AllIcons.Nodes.Folder
-            } else {
-                vf.fileType.icon ?: AllIcons.FileTypes.Any_type
-            }
+            return if (vf.isDirectory) AllIcons.Nodes.Folder
+            else vf.fileType.icon ?: AllIcons.FileTypes.Any_type
         }
     }
 }

@@ -14,8 +14,13 @@ import javax.swing.tree.DefaultMutableTreeNode
 
 /**
  * Standard Swing [TransferHandler] for the file tree.
- * Provides reliable drag-and-drop by using Swing's built-in DnD mechanism
- * rather than relying solely on IntelliJ's DnDManager.
+ *
+ * Handles:
+ * - Drag OUT from the explorer tree (via [createTransferable])
+ * - Drop IN from external apps and IntelliJ panels that use AWT DnD (via [importData])
+ * - Paste operations (via [importData] with `!support.isDrop`)
+ *
+ * Drops that don't land on a specific tree node fall back to the current root directory.
  */
 class FileTreeTransferHandler(
     private val fileTreeComponent: FileTreeComponent
@@ -48,35 +53,24 @@ class FileTreeTransferHandler(
         if (!support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) return false
         // In paste mode (not a drop), just check the flavor
         if (!support.isDrop) return true
-        val tree = support.component as? JTree ?: return false
-        val dropLocation = support.dropLocation as? JTree.DropLocation ?: return false
-        val path = dropLocation.path ?: return false
-        val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return false
-        val vf = node.userObject as? VirtualFile ?: return false
-        // Can drop on directories or files (file = drop into parent dir)
+        // For drops: accept if we can resolve a target directory (node or root fallback)
+        resolveDropTarget(support) ?: return false
         return true
     }
 
     override fun importData(support: TransferSupport): Boolean {
         if (!canImport(support)) return false
 
-        val tree = support.component as? JTree ?: return false
-
         val targetDir: VirtualFile
         val isMove: Boolean
+
         if (support.isDrop) {
-            val dropLocation = support.dropLocation as? JTree.DropLocation ?: return false
-            val path = dropLocation.path ?: return false
-            val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return false
-            val targetVf = node.userObject as? VirtualFile ?: return false
-            targetDir = if (targetVf.isDirectory) targetVf else targetVf.parent ?: return false
+            targetDir = resolveDropTarget(support) ?: return false
             isMove = support.dropAction == MOVE
         } else {
-            // Paste mode: use currently selected node
-            val selPath = tree.selectionPath ?: return false
-            val node = selPath.lastPathComponent as? DefaultMutableTreeNode ?: return false
-            val targetVf = node.userObject as? VirtualFile ?: return false
-            targetDir = if (targetVf.isDirectory) targetVf else targetVf.parent ?: return false
+            // Paste mode: use currently selected node or root
+            val tree = support.component as? JTree ?: return false
+            targetDir = resolveSelectionTarget(tree) ?: return false
             isMove = false
         }
 
@@ -112,5 +106,45 @@ class FileTreeTransferHandler(
         if (action == MOVE) {
             fileTreeComponent.refresh()
         }
+    }
+
+    /**
+     * Resolves the target directory for a drop.
+     * If the drop is on a tree node, uses that node's directory.
+     * Otherwise falls back to the current root directory.
+     */
+    private fun resolveDropTarget(support: TransferSupport): VirtualFile? {
+        val dropLocation = support.dropLocation as? JTree.DropLocation ?: return getRootDir()
+        val path = dropLocation.path
+        if (path != null) {
+            val node = path.lastPathComponent as? DefaultMutableTreeNode
+            val vf = node?.userObject as? VirtualFile
+            if (vf != null) {
+                return if (vf.isDirectory) vf else vf.parent
+            }
+        }
+        // Drop was in empty space — fall back to current root directory
+        return getRootDir()
+    }
+
+    /**
+     * Resolves the target directory from the current tree selection (for paste).
+     * Falls back to the current root directory if nothing is selected.
+     */
+    private fun resolveSelectionTarget(tree: JTree): VirtualFile? {
+        val selPath = tree.selectionPath
+        if (selPath != null) {
+            val node = selPath.lastPathComponent as? DefaultMutableTreeNode
+            val vf = node?.userObject as? VirtualFile
+            if (vf != null) {
+                return if (vf.isDirectory) vf else vf.parent
+            }
+        }
+        return getRootDir()
+    }
+
+    private fun getRootDir(): VirtualFile? {
+        val rootPath = fileTreeComponent.currentRootPath ?: return null
+        return LocalFileSystem.getInstance().findFileByPath(rootPath)
     }
 }

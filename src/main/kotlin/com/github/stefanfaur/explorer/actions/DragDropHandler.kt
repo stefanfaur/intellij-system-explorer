@@ -1,14 +1,16 @@
 package com.github.stefanfaur.explorer.actions
 
 import com.intellij.ide.dnd.DnDAction
-import com.intellij.ide.dnd.DnDDragStartBean
 import com.intellij.ide.dnd.DnDEvent
-import com.intellij.ide.dnd.DnDSource
-import com.intellij.ide.dnd.DnDTarget
+import com.intellij.ide.dnd.DnDNativeTarget
+import com.intellij.ide.dnd.FileFlavorProvider
+import com.intellij.ide.dnd.TransferableWrapper
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiFileSystemItem
 import com.github.stefanfaur.explorer.ui.FileTreeComponent
 import java.awt.Point
 import java.awt.datatransfer.DataFlavor
@@ -18,20 +20,26 @@ import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.TreePath
 
 /**
- * Provides drag-and-drop support for the [FileTreeComponent]'s JTree.
+ * Handles drops INTO the explorer tree from IntelliJ-internal panels
+ * (Project View, editor, etc.) that use IntelliJ's [DnDManager] system,
+ * as well as native drops from external applications.
  *
- * Implements both [DnDSource] (dragging FROM the explorer tree) and
- * [DnDTarget] (dropping INTO the explorer tree).
+ * Implements [DnDNativeTarget] (extends [DnDTarget]) so that both
+ * DnDManager-initiated drags and native AWT DnD drags are received.
+ *
+ * Drag-out from the explorer is handled by Swing's [TransferHandler] via
+ * [FileTreeTransferHandler] — the two systems are intentionally separated
+ * because registering both a [DnDSource] and Swing's drag gesture recognizer
+ * on the same component causes them to conflict over mouse events.
  *
  * Behavior:
- * - FROM Explorer tree TO elsewhere = copy files
- * - FROM elsewhere TO Explorer tree = copy files into the target directory
+ * - FROM IntelliJ panels TO Explorer tree = copy files into target directory
  * - Hold Shift while dropping = move instead of copy
  */
 class DragDropHandler(
     private val fileTreeComponent: FileTreeComponent,
     private val project: Project
-) : DnDSource, DnDTarget {
+) : DnDNativeTarget {
 
     private val tree get() = fileTreeComponent.tree
 
@@ -39,29 +47,10 @@ class DragDropHandler(
         private val LOG = Logger.getInstance(DragDropHandler::class.java)
     }
 
-    // ---- DnDSource ----
-
-    override fun canStartDragging(action: DnDAction, dragOrigin: Point): Boolean {
-        return fileTreeComponent.getSelectedFiles().isNotEmpty()
-    }
-
-    override fun startDragging(action: DnDAction, dragOrigin: Point): DnDDragStartBean? {
-        val selected = fileTreeComponent.getSelectedFiles()
-        if (selected.isEmpty()) return null
-        val transferable = createTransferable(selected)
-        return DnDDragStartBean(transferable)
-    }
-
-    override fun dropActionChanged(gestureModifiers: Int) {
-        // No action needed; shift detection is handled at drop time
-    }
-
     // ---- DnDTarget ----
 
     override fun update(event: DnDEvent): Boolean {
-        val point = event.point ?: return false
-        val node = getNodeAtPoint(point) ?: return false
-        val targetDir = resolveTargetDirectory(node)
+        val targetDir = resolveDropTarget(event.point)
         if (targetDir != null) {
             event.setDropPossible(true)
             return true
@@ -71,23 +60,38 @@ class DragDropHandler(
     }
 
     override fun drop(event: DnDEvent) {
-        val point = event.point ?: return
-        val node = getNodeAtPoint(point) ?: return
-        val targetDir = resolveTargetDirectory(node) ?: return
-
-        // Determine if this is a move (shift held) or copy
+        val targetDir = resolveDropTarget(event.point) ?: return
         val isMove = event.action == DnDAction.MOVE
 
-        // Extract files from the event's attached object
-        val files = extractFiles(event.attachedObject)
-        if (files.isEmpty()) return
+        val files = extractFiles(event)
+        if (files.isEmpty()) {
+            LOG.debug("Drop: no files could be extracted from event")
+            return
+        }
 
-        // Filter out files that already reside in the target directory
         val filesToDrop = files.filter { it.parent != targetDir }
         if (filesToDrop.isEmpty()) return
 
         performDrop(filesToDrop, targetDir, isMove)
         fileTreeComponent.refresh()
+    }
+
+    /**
+     * Resolves the target directory for a drop at the given point.
+     * If the point is over a tree node, uses that node's directory.
+     * Otherwise falls back to the current root directory.
+     */
+    private fun resolveDropTarget(point: Point?): VirtualFile? {
+        if (point != null) {
+            val node = getNodeAtPoint(point)
+            if (node != null) {
+                val dir = resolveTargetDirectory(node)
+                if (dir != null) return dir
+            }
+        }
+        // Fall back to current root directory
+        val rootPath = fileTreeComponent.currentRootPath ?: return null
+        return LocalFileSystem.getInstance().findFileByPath(rootPath)
     }
 
     // ---- Internal/testable methods ----
@@ -108,16 +112,10 @@ class DragDropHandler(
      * Files that already reside in the target directory are skipped.
      * Each file operation is wrapped in a try-catch so that one failure
      * does not abort the entire batch.
-     *
-     * @param files the files to copy/move
-     * @param targetDir the destination directory
-     * @param isMove true to move files, false to copy
      */
     fun performDrop(files: List<VirtualFile>, targetDir: VirtualFile, isMove: Boolean) {
         for (file in files) {
-            // Skip files that already reside in the target directory
             if (file.parent == targetDir) continue
-
             try {
                 if (isMove) {
                     FileActions.moveTo(file, targetDir)
@@ -153,49 +151,61 @@ class DragDropHandler(
 
     // ---- Private helpers ----
 
-    /**
-     * Gets the tree node at the given point coordinates.
-     * Returns null if the point is not directly over a tree node,
-     * which correctly rejects drops in empty space.
-     */
     private fun getNodeAtPoint(point: Point): DefaultMutableTreeNode? {
         val path: TreePath = tree.getPathForLocation(point.x, point.y) ?: return null
         return path.lastPathComponent as? DefaultMutableTreeNode
     }
 
     /**
-     * Extracts [VirtualFile] objects from the DnD attached object.
+     * Extracts [VirtualFile] objects from a [DnDEvent].
      *
-     * Handles three cases:
-     * 1. Attached object is a [Transferable] with javaFileListFlavor (from our own drag source)
-     * 2. Attached object is a List<VirtualFile> (legacy or internal)
-     * 3. Attached object is a List<java.io.File> (from external sources)
+     * Handles multiple data formats in priority order:
+     * 1. [TransferableWrapper] — IntelliJ's Project View sends this via DnDManager.
+     *    It does NOT extend [Transferable]; it extends [FileFlavorProvider].
+     * 2. [FileFlavorProvider] — any object that can provide a file list.
+     * 3. [Transferable] with javaFileListFlavor — from Swing DnD or clipboard.
+     * 4. [DnDNativeTarget.EventInfo] — raw AWT transferable from native drops.
+     * 5. Direct List<VirtualFile> or List<java.io.File>.
      */
-    private fun extractFiles(attachedObject: Any?): List<VirtualFile> {
-        if (attachedObject == null) return emptyList()
+    private fun extractFiles(event: DnDEvent): List<VirtualFile> {
+        val attachedObject = event.attachedObject
 
-        // Handle Transferable (from our own drag source via createTransferable)
-        if (attachedObject is Transferable) {
-            if (attachedObject.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-                try {
-                    @Suppress("UNCHECKED_CAST")
-                    val ioFiles = attachedObject.getTransferData(DataFlavor.javaFileListFlavor) as List<java.io.File>
-                    val vFiles = ioFiles.mapNotNull { file ->
-                        LocalFileSystem.getInstance().findFileByPath(file.absolutePath)
-                    }
-                    if (vFiles.isNotEmpty()) return vFiles
-                } catch (e: Exception) {
-                    LOG.debug("Failed to extract files from Transferable: ${e.message}")
-                }
-            }
+        if (attachedObject == null) {
+            LOG.debug("extractFiles: attachedObject is null")
+            return tryNativeEventInfo(event)
         }
 
+        LOG.debug("extractFiles: attachedObject type = ${attachedObject.javaClass.name}")
+
+        // 1. TransferableWrapper — from Project View and other IntelliJ tree panels.
+        //    Provides getPsiElements() and asFileList() directly.
+        //    Does NOT implement Transferable (extends FileFlavorProvider instead).
+        if (attachedObject is TransferableWrapper) {
+            LOG.debug("extractFiles: handling as TransferableWrapper")
+            val result = extractFromTransferableWrapper(attachedObject)
+            if (result.isNotEmpty()) return result
+        }
+
+        // 2. FileFlavorProvider — anything that can provide a file list.
+        if (attachedObject is FileFlavorProvider) {
+            LOG.debug("extractFiles: handling as FileFlavorProvider")
+            val result = extractFromFileFlavorProvider(attachedObject)
+            if (result.isNotEmpty()) return result
+        }
+
+        // 3. Transferable with standard data flavors.
+        if (attachedObject is Transferable) {
+            LOG.debug("extractFiles: handling as Transferable")
+            val result = extractFromTransferable(attachedObject)
+            if (result.isNotEmpty()) return result
+        }
+
+        // 4. Direct list of VirtualFiles or java.io.Files.
         if (attachedObject is List<*>) {
-            // Check if it's VirtualFiles (from our drag source)
+            LOG.debug("extractFiles: handling as List")
             val virtualFiles = attachedObject.filterIsInstance<VirtualFile>()
             if (virtualFiles.isNotEmpty()) return virtualFiles
 
-            // Check if it's java.io.Files (from external sources)
             val ioFiles = attachedObject.filterIsInstance<java.io.File>()
             if (ioFiles.isNotEmpty()) {
                 return ioFiles.mapNotNull { file ->
@@ -204,6 +214,133 @@ class DragDropHandler(
             }
         }
 
+        // 5. Native event info fallback (for external app drops via DnDNativeTarget).
+        val nativeResult = tryNativeEventInfo(event)
+        if (nativeResult.isNotEmpty()) return nativeResult
+
+        LOG.debug("extractFiles: could not extract any files from ${attachedObject.javaClass.name}")
+        return emptyList()
+    }
+
+    /**
+     * Extracts files from [TransferableWrapper] (sent by IntelliJ's Project View).
+     * Tries PSI elements first (more precise), then falls back to file list.
+     */
+    private fun extractFromTransferableWrapper(wrapper: TransferableWrapper): List<VirtualFile> {
+        // Try getPsiElements() — this is the richest data source
+        try {
+            val psiElements = wrapper.psiElements
+            if (psiElements != null && psiElements.isNotEmpty()) {
+                val vFiles = psiElements
+                    .filterIsInstance<PsiFileSystemItem>()
+                    .mapNotNull { it.virtualFile }
+                if (vFiles.isNotEmpty()) {
+                    LOG.debug("extractFromTransferableWrapper: got ${vFiles.size} files from PsiElements")
+                    return vFiles
+                }
+            }
+        } catch (e: Exception) {
+            LOG.debug("extractFromTransferableWrapper: getPsiElements() failed: ${e.message}")
+        }
+
+        // Fall back to asFileList()
+        return extractFromFileFlavorProvider(wrapper)
+    }
+
+    /**
+     * Extracts files from any [FileFlavorProvider] via its asFileList() method.
+     */
+    private fun extractFromFileFlavorProvider(provider: FileFlavorProvider): List<VirtualFile> {
+        try {
+            val fileList = provider.asFileList()
+            if (fileList != null && fileList.isNotEmpty()) {
+                val vFiles = fileList.mapNotNull { file ->
+                    LocalFileSystem.getInstance().findFileByPath(file.absolutePath)
+                }
+                if (vFiles.isNotEmpty()) {
+                    LOG.debug("extractFromFileFlavorProvider: got ${vFiles.size} files from asFileList()")
+                    return vFiles
+                }
+            }
+        } catch (e: Exception) {
+            LOG.debug("extractFromFileFlavorProvider: asFileList() failed: ${e.message}")
+        }
+        return emptyList()
+    }
+
+    /**
+     * Extracts files from a standard [Transferable] using javaFileListFlavor
+     * or by searching for PsiElement data flavors.
+     */
+    private fun extractFromTransferable(transferable: Transferable): List<VirtualFile> {
+        // Try javaFileListFlavor first (most common for Swing sources)
+        if (transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+            try {
+                @Suppress("UNCHECKED_CAST")
+                val ioFiles = transferable.getTransferData(DataFlavor.javaFileListFlavor) as List<java.io.File>
+                val vFiles = ioFiles.mapNotNull { file ->
+                    LocalFileSystem.getInstance().findFileByPath(file.absolutePath)
+                }
+                if (vFiles.isNotEmpty()) return vFiles
+            } catch (e: Exception) {
+                LOG.debug("extractFromTransferable: javaFileListFlavor failed: ${e.message}")
+            }
+        }
+
+        // Try extracting PsiElements from data flavors
+        return extractPsiFilesFromFlavors(transferable)
+    }
+
+    /**
+     * Searches a [Transferable]'s data flavors for PsiElement arrays.
+     * This is a fallback for Transferable objects that carry PSI data
+     * but aren't [TransferableWrapper] instances.
+     */
+    private fun extractPsiFilesFromFlavors(transferable: Transferable): List<VirtualFile> {
+        try {
+            for (flavor in transferable.transferDataFlavors) {
+                if (flavor.representationClass?.name?.contains("PsiElement") == true ||
+                    flavor.humanPresentableName.contains("PsiElement", ignoreCase = true)
+                ) {
+                    try {
+                        val data = transferable.getTransferData(flavor)
+                        if (data is Array<*>) {
+                            return data.filterIsInstance<PsiFileSystemItem>()
+                                .mapNotNull { it.virtualFile }
+                        }
+                    } catch (e: Exception) {
+                        LOG.debug("extractPsiFilesFromFlavors: flavor ${flavor.humanPresentableName} failed: ${e.message}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            LOG.debug("extractPsiFilesFromFlavors: failed to inspect flavors: ${e.message}")
+        }
+        return emptyList()
+    }
+
+    /**
+     * Attempts to extract files from [DnDNativeTarget.EventInfo] attached to the event.
+     * This handles drops from external applications (Finder, etc.) where the data
+     * arrives as a native AWT transferable rather than a DnDManager attached object.
+     */
+    private fun tryNativeEventInfo(event: DnDEvent): List<VirtualFile> {
+        try {
+            @Suppress("UNCHECKED_CAST", "DEPRECATION")
+            val key = Key.findKeyByName(DnDNativeTarget.EVENT_KEY) as? Key<DnDNativeTarget.EventInfo>
+            if (key != null) {
+                val eventInfo = event.getUserData(key)
+                if (eventInfo != null) {
+                    val transferable = eventInfo.transferable
+                    if (transferable != null) {
+                        LOG.debug("tryNativeEventInfo: found native EventInfo with transferable")
+                        return extractFromTransferable(transferable)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            LOG.debug("tryNativeEventInfo: failed: ${e.message}")
+        }
         return emptyList()
     }
 }
