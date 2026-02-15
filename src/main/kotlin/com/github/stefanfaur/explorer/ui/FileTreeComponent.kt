@@ -461,6 +461,15 @@ class FileTreeComponent(private val project: Project) : Disposable {
      * Custom cell renderer that displays VirtualFile names with appropriate icons.
      */
     private inner class VirtualFileCellRenderer : DefaultTreeCellRenderer() {
+
+        init {
+            // Prevent DefaultTreeCellRenderer from painting its own background
+            // on non-selected items. Without this, every row gets a visible
+            // background rectangle that clashes with the tree's native L&F.
+            isOpaque = false
+            backgroundNonSelectionColor = null
+        }
+
         override fun getTreeCellRendererComponent(
             tree: JTree,
             value: Any?,
