@@ -116,6 +116,23 @@ class ExplorerActionsTest : BasePlatformTestCase() {
         assertNotNull("SystemExplorer.ActionGroup should be registered", group)
     }
 
+    fun `test QuickOpen action is registered outside the explorer action group`() {
+        // QuickOpen should be a top-level action, not inside SystemExplorer.ActionGroup
+        val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
+        val action = actionManager.getAction("SystemExplorer.QuickOpen")
+        assertNotNull("QuickOpen action should be registered", action)
+
+        // Verify it's NOT inside the group (it should be independent)
+        val group = actionManager.getAction("SystemExplorer.ActionGroup") as? com.intellij.openapi.actionSystem.DefaultActionGroup
+        if (group != null) {
+            val children = group.getChildren(null)
+            val quickOpenInGroup = children.any {
+                actionManager.getId(it) == "SystemExplorer.QuickOpen"
+            }
+            assertFalse("QuickOpen should NOT be inside SystemExplorer.ActionGroup for global availability", quickOpenInGroup)
+        }
+    }
+
     // ---- Helper ----
 
     private fun assertShortcutBound(actionId: String, keystrokeSpec: String) {

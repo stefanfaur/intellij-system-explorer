@@ -37,6 +37,20 @@ object ExplorerActionUtil {
     }
 
     /**
+     * Activates the System Explorer tool window and returns the ExplorerPanel.
+     * Used by global actions that need the panel even when the tool window isn't focused.
+     */
+    fun activateAndFindPanel(project: com.intellij.openapi.project.Project): ExplorerPanel? {
+        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID) ?: return null
+        if (!toolWindow.isVisible) {
+            toolWindow.show()
+        }
+        val content = toolWindow.contentManager.selectedContent ?: return null
+        val rootComponent = content.component ?: return null
+        return findComponentOfType(rootComponent, ExplorerPanel::class.java)
+    }
+
+    /**
      * Whether the System Explorer tool window is active (visible and has focus).
      */
     fun isExplorerActive(e: AnActionEvent): Boolean {
