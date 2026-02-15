@@ -60,7 +60,28 @@ class ExplorerPanel(private val project: Project) : Disposable {
      */
     fun getNavigationHistory(): NavigationActions.NavigationHistory = history
     internal val fileTreeComponent = FileTreeComponent(project)
-    private val bookmarksPanel = BookmarksPanel { path -> navigateTo(path) }
+    private val bookmarksPanel = BookmarksPanel(
+        onBookmarkSelected = { path -> navigateTo(path) },
+        onBookmarkMoved = { from, to ->
+            try {
+                com.github.stefanfaur.explorer.model.BookmarkManager.getInstance().moveBookmark(from, to)
+            } catch (e: Exception) {
+                LOG.warn("Failed to move bookmark", e)
+            }
+        },
+        onBookmarkDeleted = { index ->
+            try {
+                val manager = com.github.stefanfaur.explorer.model.BookmarkManager.getInstance()
+                val bookmarks = manager.getBookmarks()
+                if (index in bookmarks.indices) {
+                    manager.removeBookmark(bookmarks[index].path)
+                    loadBookmarks()
+                }
+            } catch (e: Exception) {
+                LOG.warn("Failed to delete bookmark", e)
+            }
+        }
+    )
     private val pathField = JBTextField()
     private val filterField = JBTextField()
     private val statusLabel = JBLabel("Ready")
@@ -140,6 +161,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
         currentPath = path
         pathField.text = path
         fileTreeComponent.setRoot(path)
+        bookmarksPanel.highlightForPath(path)
         if (pushHistory) {
             history.push(path)
         }
@@ -275,6 +297,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
         try {
             val manager = com.github.stefanfaur.explorer.model.BookmarkManager.getInstance()
             bookmarksPanel.setBookmarks(manager.getBookmarks())
+            bookmarksPanel.highlightForPath(currentPath)
         } catch (e: Exception) {
             LOG.warn("Failed to load bookmarks", e)
         }
