@@ -232,3 +232,30 @@ jobs:
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+          # Create annotated tag with changelog excerpt
+          git tag -a "v$VERSION" -F changelog-entry.md
+          git push origin "v$VERSION"
+
+      - name: Bump to next snapshot version
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+          NEXT_VERSION=$(./.github/scripts/next-version.sh "$VERSION")
+          echo "Bumping version to $NEXT_VERSION"
+          ./.github/scripts/update-version.sh "$NEXT_VERSION"
+          git add gradle.properties
+          git commit -m "chore: bump version to $NEXT_VERSION"
+          git push
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.resolve-version.outputs.version }}
+          name: Release ${{ needs.resolve-version.outputs.version }}
+          body_path: changelog-entry.md
+          files: build/distributions/*.zip
+          draft: false
+          prerelease: false
