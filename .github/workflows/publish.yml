@@ -161,3 +161,20 @@ jobs:
           name: publish-verifier-reports
           path: build/reports/pluginVerifier/
           retention-days: 30
+
+  approval:
+    name: Manual Approval
+    runs-on: ubuntu-latest
+    needs: [resolve-version, validate, test-all, verify-all]
+    environment: production
+
+    steps:
+      - name: Wait for approval
+        run: |
+          echo "Release version: ${{ needs.resolve-version.outputs.version }}"
+          echo "All validations passed. Awaiting manual approval..."
+          echo ""
+          echo "Review:"
+          echo "- Test results: Check 'test-all' job"
+          echo "- Verifier reports: Check 'verify-all' artifacts"
+          echo "- Changelog: Check 'validate' artifacts"
