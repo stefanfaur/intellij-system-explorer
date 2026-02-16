@@ -1,7 +1,9 @@
 package ro.faur.explorer.ui
 
+import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.util.ui.JBUI
 import ro.faur.explorer.model.Bookmark
 import java.awt.BorderLayout
 import java.awt.datatransfer.DataFlavor
@@ -75,7 +77,22 @@ class BookmarksPanel(
         bookmarksList.dropMode = DropMode.INSERT
         bookmarksList.transferHandler = BookmarkTransferHandler()
 
+        // Custom renderer with left padding
+        bookmarksList.cellRenderer = object : ColoredListCellRenderer<String>() {
+            override fun customizeCellRenderer(
+                list: JList<out String>,
+                value: String,
+                index: Int,
+                selected: Boolean,
+                hasFocus: Boolean
+            ) {
+                append(value)
+                border = JBUI.Borders.empty(2, 4, 2, 4)
+            }
+        }
+
         val panel = JPanel(BorderLayout())
+        panel.border = JBUI.Borders.empty(0, 2, 0, 2)
         panel.add(JBScrollPane(bookmarksList), BorderLayout.CENTER)
         component = panel
     }
@@ -116,7 +133,6 @@ class BookmarksPanel(
         val bounds = bookmarksList.getCellBounds(index, index) ?: return
         if (!bounds.contains(e.point)) return
 
-        bookmarksList.selectedIndex = index
         val menu = JPopupMenu()
         menu.add(JMenuItem("Delete").apply {
             addActionListener {
