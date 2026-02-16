@@ -70,6 +70,12 @@ class FileTreeComponent(private val project: Project) : Disposable {
     var showHidden: Boolean = false
     var filterPattern: String = ""
 
+    /** Cached flag for whether to show file permissions (updated by ExplorerPanel). */
+    internal var showPermissions: Boolean = false
+
+    /** Cache for file permissions to avoid disk I/O on every render. */
+    private val permissionsCache = mutableMapOf<String, String>()
+
     /** The path currently displayed as the tree root. */
     var currentRootPath: String? = null
         private set
@@ -185,6 +191,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
      */
     fun setRoot(path: String) {
         currentRootPath = path
+        permissionsCache.clear() // Clear cache when changing directories
         rootNode.removeAllChildren()
         val dir = LocalFileSystem.getInstance().findFileByPath(path)
         if (dir != null && dir.isDirectory) {
@@ -198,6 +205,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
      * Performs a shallow (non-recursive) VFS refresh of the current directory only.
      */
     fun refresh() {
+        permissionsCache.clear() // Clear cache on refresh to get updated permissions
         currentRootPath?.let { path ->
             val dir = LocalFileSystem.getInstance().findFileByPath(path)
             // Shallow refresh: only the current directory, not recursive
@@ -498,12 +506,12 @@ class FileTreeComponent(private val project: Project) : Disposable {
                 icon = getIconForFile(vf)
 
                 // Add file permissions if enabled (right-aligned)
-                val settings = ExplorerSettings.getInstance()
-                if (settings.state.showFilePermissions) {
-                    val perms = formatPermissions(vf)
+                // Use cached flag to avoid expensive getInstance() calls on every cell render
+                if (showPermissions) {
+                    val perms = getCachedPermissions(vf)
                     if (perms.isNotEmpty()) {
                         // Calculate available width for filename
-                        val treeWidth = tree.visibleRect.width
+                        val treeWidth = tree.visibleRect.width // Use visible area, not total width
                         val permissionsWidth = 120 // Reserve space for permissions (drwxr-xr-x = ~100px)
                         val margin = 20 // Extra margin for safety
                         val availableWidth = treeWidth - permissionsWidth - margin
@@ -573,6 +581,16 @@ class FileTreeComponent(private val project: Project) : Disposable {
         private fun getIconForFile(vf: VirtualFile): Icon {
             return if (vf.isDirectory) AllIcons.Nodes.Folder
             else vf.fileType.icon ?: AllIcons.FileTypes.Any_type
+        }
+
+        /**
+         * Gets cached permissions for a file, computing and caching if not present.
+         * This avoids expensive disk I/O on every cell render.
+         */
+        private fun getCachedPermissions(file: VirtualFile): String {
+            return permissionsCache.getOrPut(file.path) {
+                formatPermissions(file)
+            }
         }
 
         private fun formatPermissions(file: VirtualFile): String {

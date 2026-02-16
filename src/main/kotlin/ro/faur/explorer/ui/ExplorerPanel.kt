@@ -323,13 +323,17 @@ class ExplorerPanel(private val project: Project) : Disposable {
         if (permissionsCheckbox != null) {
             permissionsListener = ItemListener { e ->
                 val settings = ExplorerSettings.getInstance()
-                settings.state.showFilePermissions = e.stateChange == ItemEvent.SELECTED
+                val enabled = e.stateChange == ItemEvent.SELECTED
+                settings.state.showFilePermissions = enabled
+                fileTreeComponent.showPermissions = enabled
                 fileTreeComponent.tree.repaint()
             }
             permissionsCheckbox.addItemListener(permissionsListener!!)
 
             // Initialize checkbox state from settings
-            permissionsCheckbox.isSelected = ExplorerSettings.getInstance().state.showFilePermissions
+            val settings = ExplorerSettings.getInstance()
+            permissionsCheckbox.isSelected = settings.state.showFilePermissions
+            fileTreeComponent.showPermissions = settings.state.showFilePermissions
         }
 
         // Set initial button state
