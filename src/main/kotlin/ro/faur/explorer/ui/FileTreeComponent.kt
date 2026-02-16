@@ -32,7 +32,6 @@ import javax.swing.Icon
 import javax.swing.JMenuItem
 import javax.swing.JPopupMenu
 import javax.swing.JTree
-import javax.swing.SwingConstants
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeSelectionListener
 import javax.swing.event.TreeWillExpandListener
@@ -507,9 +506,9 @@ class FileTreeComponent(private val project: Project) : Disposable {
                         // Calculate the tree width for right alignment
                         // visibleRect.width gives us the actual visible width of the tree
                         val treeWidth = tree.visibleRect.width
-                        // Subtract a small margin (20px) to account for tree borders and padding
-                        // Use appendTextPadding with SwingConstants.RIGHT to right-align the permissions
-                        appendTextPadding(treeWidth - 20, SwingConstants.RIGHT)
+                        // Reserve ~100px for permissions on the right edge
+                        // appendTextPadding will automatically truncate the filename with "..." if needed
+                        appendTextPadding(treeWidth - 100)
                         append(perms, SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     }
                 }
