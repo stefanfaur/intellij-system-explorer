@@ -147,11 +147,11 @@ All tests pass successfully:
 ✓ StatusBarCheckboxesTest - 7 tests
 ✓ StatusBarLayoutTest - 6 tests
 ✓ ToolbarIconsTest - 5 tests
-✓ ExplorerSettingsTest - 6 tests
+✓ ExplorerSettingsTest - 5 tests
 ✓ ExplorerConfigurableTest - 16 tests
 ```
 
-**Total:** 64 test cases covering all UI changes
+**Total:** 63 test cases covering all UI changes
 
 ---
 
