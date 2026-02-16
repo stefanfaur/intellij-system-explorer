@@ -181,7 +181,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
     fun setRoot(path: String) {
         currentRootPath = path
         rootNode.removeAllChildren()
-        val dir = LocalFileSystem.getInstance().refreshAndFindFileByPath(path)
+        val dir = LocalFileSystem.getInstance().findFileByPath(path)
         if (dir != null && dir.isDirectory) {
             loadChildren(rootNode, dir)
         }
@@ -190,9 +190,15 @@ class FileTreeComponent(private val project: Project) : Disposable {
 
     /**
      * Refreshes the tree by re-reading the current root.
+     * Performs a shallow (non-recursive) VFS refresh of the current directory only.
      */
     fun refresh() {
-        currentRootPath?.let { setRoot(it) }
+        currentRootPath?.let { path ->
+            val dir = LocalFileSystem.getInstance().findFileByPath(path)
+            // Shallow refresh: only the current directory, not recursive
+            dir?.refresh(false, false)
+            setRoot(path)
+        }
     }
 
     /**

@@ -274,7 +274,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
         pathListener = ActionListener {
             val typed = pathField.text.trim()
             if (typed.isNotEmpty()) {
-                val vf = LocalFileSystem.getInstance().refreshAndFindFileByPath(typed)
+                val vf = LocalFileSystem.getInstance().findFileByPath(typed)
                 if (vf != null && vf.isDirectory) {
                     navigateTo(typed)
                 }
