@@ -495,7 +495,6 @@ class FileTreeComponent(private val project: Project) : Disposable {
             val node = value as? DefaultMutableTreeNode
             val vf = node?.userObject as? VirtualFile
             if (vf != null) {
-                append(vf.name)
                 icon = getIconForFile(vf)
 
                 // Add file permissions if enabled (right-aligned)
@@ -503,18 +502,72 @@ class FileTreeComponent(private val project: Project) : Disposable {
                 if (settings.state.showFilePermissions) {
                     val perms = formatPermissions(vf)
                     if (perms.isNotEmpty()) {
-                        // Calculate the tree width for right alignment
-                        // visibleRect.width gives us the actual visible width of the tree
+                        // Calculate available width for filename
                         val treeWidth = tree.visibleRect.width
-                        // Reserve ~100px for permissions on the right edge
-                        // appendTextPadding will automatically truncate the filename with "..." if needed
-                        appendTextPadding(treeWidth - 100)
+                        val permissionsWidth = 120 // Reserve space for permissions (drwxr-xr-x = ~100px)
+                        val margin = 20 // Extra margin for safety
+                        val availableWidth = treeWidth - permissionsWidth - margin
+
+                        // Manually truncate filename if needed
+                        val fm = getFontMetrics(font)
+                        val truncatedName = truncateString(vf.name, fm, availableWidth)
+
+                        // Append truncated filename
+                        append(truncatedName)
+
+                        // Add padding to push permissions to the right
+                        appendTextPadding(treeWidth - permissionsWidth)
+
+                        // Append permissions
                         append(perms, SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    } else {
+                        // No permissions to show, just append the filename
+                        append(vf.name)
                     }
+                } else {
+                    // Permissions not enabled, just append the filename
+                    append(vf.name)
                 }
             } else {
                 append(value?.toString() ?: "")
             }
+        }
+
+        /**
+         * Truncates a string to fit within the specified width, adding "..." if necessary.
+         * Uses FontMetrics to accurately measure string width.
+         */
+        private fun truncateString(text: String, fm: java.awt.FontMetrics, maxWidth: Int): String {
+            if (maxWidth <= 0) return text
+
+            val textWidth = fm.stringWidth(text)
+            if (textWidth <= maxWidth) return text
+
+            val ellipsis = "..."
+            val ellipsisWidth = fm.stringWidth(ellipsis)
+            val availableWidth = maxWidth - ellipsisWidth
+
+            if (availableWidth <= 0) return ellipsis
+
+            // Binary search to find the optimal truncation point
+            var low = 0
+            var high = text.length
+            var result = text
+
+            while (low <= high) {
+                val mid = (low + high) / 2
+                val truncated = text.substring(0, mid)
+                val truncatedWidth = fm.stringWidth(truncated)
+
+                if (truncatedWidth <= availableWidth) {
+                    result = truncated + ellipsis
+                    low = mid + 1
+                } else {
+                    high = mid - 1
+                }
+            }
+
+            return result
         }
 
         private fun getIconForFile(vf: VirtualFile): Icon {
