@@ -71,7 +71,10 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            recommended()
+            // Verify against ALL compatible IDE versions
+            ide(providers.gradleProperty("pluginSinceBuild").get())  // 251
+            ide("252")  // 2025.2
+            ide("253")  // 2025.3
         }
     }
 }
