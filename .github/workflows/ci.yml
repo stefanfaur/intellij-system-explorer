@@ -114,3 +114,44 @@ jobs:
           name: verifier-reports
           path: build/reports/pluginVerifier/
           retention-days: 30
+
+  snapshot:
+    name: Build Snapshot
+    runs-on: ubuntu-latest
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Calculate snapshot version
+        id: version
+        run: |
+          CURRENT_VERSION=$(grep "^pluginVersion = " gradle.properties | cut -d'=' -f2 | tr -d ' ')
+          SNAPSHOT_VERSION="${CURRENT_VERSION}-build.${{ github.run_number }}"
+          echo "snapshot_version=$SNAPSHOT_VERSION" >> $GITHUB_OUTPUT
+          echo "Building snapshot version: $SNAPSHOT_VERSION"
+
+      - name: Update version temporarily
+        run: |
+          ./.github/scripts/update-version.sh "${{ steps.version.outputs.snapshot_version }}"
+
+      - name: Build plugin
+        run: ./gradlew buildPlugin --no-daemon --stacktrace
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-${{ steps.version.outputs.snapshot_version }}
+          path: build/distributions/*.zip
+          retention-days: 90
