@@ -34,7 +34,7 @@ class FilePermissionsDisplayTest {
             val permString = PosixFilePermissions.toString(perms)
             val prefix = if (isDirectory) "d" else "-"
             return "$prefix$permString"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return ""
         }
     }

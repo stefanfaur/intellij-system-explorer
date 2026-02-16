@@ -526,7 +526,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
                 val permString = PosixFilePermissions.toString(perms)
                 val prefix = if (file.isDirectory) "d" else "-"
                 return "$prefix$permString"
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 return ""  // Fail silently on any error
             }
         }
