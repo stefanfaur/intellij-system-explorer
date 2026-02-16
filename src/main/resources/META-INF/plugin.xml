@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>ro.faur.systemexplorer</id>
     <name>System Explorer</name>
-    <vendor>Stefan Faur</vendor>
+    <vendor email="stefan@faur.sh" url="https://faur.sh">Stefan Faur</vendor>
     <description><![CDATA[
 <p>A full-featured system file browser embedded directly in the IntelliJ IDEA tool window.
 Navigate, manage, and operate on files across your entire filesystem without leaving the IDE.</p>
@@ -37,6 +37,21 @@ Navigate, manage, and operate on files across your entire filesystem without lea
   <li><b>Ctrl+Shift+C</b> &mdash; Copy file path</li>
 </ul>
 ]]></description>
+
+    <change-notes><![CDATA[
+<h3>1.0.0</h3>
+<ul>
+  <li>Initial release</li>
+  <li>Full filesystem browser with tree view</li>
+  <li>File operations: copy, move, rename, delete</li>
+  <li>Bookmarks sidebar for quick directory access</li>
+  <li>Drag-and-drop support with Project view</li>
+  <li>Quick Open dialog for fast navigation</li>
+  <li>File filtering with glob patterns</li>
+  <li>Configurable settings and keyboard shortcuts</li>
+</ul>
+]]></change-notes>
+
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
