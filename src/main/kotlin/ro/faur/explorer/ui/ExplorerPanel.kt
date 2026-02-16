@@ -121,7 +121,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
     private var permissionsListener: ItemListener? = null
 
     init {
-        currentPath = System.getProperty("user.home")
+        currentPath = NavigationActions.goHome()
         history.push(currentPath)
 
         // Register FileTreeComponent as a child disposable
