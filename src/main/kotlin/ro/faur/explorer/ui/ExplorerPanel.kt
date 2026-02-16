@@ -1,5 +1,6 @@
 package ro.faur.explorer.ui
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
@@ -22,6 +23,7 @@ import java.awt.FlowLayout
 import java.awt.event.ActionListener
 import java.awt.event.ItemEvent
 import java.awt.event.ItemListener
+import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JButton
 import javax.swing.JComponent
@@ -93,10 +95,12 @@ class ExplorerPanel(private val project: Project) : Disposable {
     // Toolbar buttons
     private val backButton = JButton("<")
     private val forwardButton = JButton(">")
-    private val upButton = JButton("Up")
-    private val homeButton = JButton("Home")
-    private val refreshButton = JButton("Refresh")
-    private val settingsButton = JButton("Settings")
+    private val upButton = JButton("Up", AllIcons.Actions.MoveUp)
+    private val homeButton = JButton("Home", AllIcons.Nodes.HomeFolder)
+    private val refreshButton = JButton("Refresh", AllIcons.Actions.Refresh)
+    private val settingsButton = JButton(AllIcons.General.Settings).apply {
+        toolTipText = "Settings"
+    }
 
     // Status bar checkboxes
     private val hiddenCheckbox = JBCheckBox("Hidden")
@@ -219,15 +223,25 @@ class ExplorerPanel(private val project: Project) : Disposable {
         val toolbarPanel = JPanel()
         toolbarPanel.layout = BoxLayout(toolbarPanel, BoxLayout.Y_AXIS)
 
-        // Row 1: navigation buttons
-        val buttonsPanel = JPanel(FlowLayout(FlowLayout.LEFT, 2, 2))
-        buttonsPanel.add(backButton)
-        buttonsPanel.add(forwardButton)
-        buttonsPanel.add(upButton)
-        buttonsPanel.add(homeButton)
-        buttonsPanel.add(refreshButton)
-        buttonsPanel.add(settingsButton)
+        // Row 1: navigation buttons with Settings on the far right
+        val buttonsPanel = JPanel(BorderLayout())
+
+        // Left side: navigation buttons
+        val leftButtons = JPanel(FlowLayout(FlowLayout.LEFT, 2, 2))
+        leftButtons.add(backButton)
+        leftButtons.add(forwardButton)
+        leftButtons.add(upButton)
+        leftButtons.add(homeButton)
+        leftButtons.add(refreshButton)
+        buttonsPanel.add(leftButtons, BorderLayout.LINE_START)
+
+        // Right side: settings button
+        val rightButtons = JPanel(FlowLayout(FlowLayout.RIGHT, 2, 2))
+        rightButtons.add(settingsButton)
+        buttonsPanel.add(rightButtons, BorderLayout.LINE_END)
+
         buttonsPanel.alignmentX = Component.LEFT_ALIGNMENT
+        buttonsPanel.maximumSize = Dimension(Int.MAX_VALUE, buttonsPanel.preferredSize.height)
         toolbarPanel.add(buttonsPanel)
 
         // Row 2: current path (full width)
