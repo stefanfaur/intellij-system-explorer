@@ -76,6 +76,10 @@ class FileTreeComponent(private val project: Project) : Disposable {
     /** Cache for file permissions to avoid disk I/O on every render. */
     private val permissionsCache = mutableMapOf<String, String>()
 
+    /** Cached tree width to avoid accessing visibleRect during rendering (which triggers layout validation loops). */
+    @Volatile
+    private var cachedTreeWidth: Int = 400 // Default reasonable width
+
     /** The path currently displayed as the tree root. */
     var currentRootPath: String? = null
         private set
@@ -88,6 +92,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
     private val mouseListener: MouseAdapter
     private val selectionListener: TreeSelectionListener
     private val popupMouseListener: MouseAdapter
+    private val componentListener: java.awt.event.ComponentAdapter
     private var dragDropHandler: DragDropHandler? = null
 
     init {
@@ -161,6 +166,16 @@ class FileTreeComponent(private val project: Project) : Disposable {
             }
         }
         tree.addMouseListener(popupMouseListener)
+
+        // Component resize listener to update cached width
+        // This prevents accessing visibleRect during rendering, which triggers layout validation loops
+        componentListener = object : java.awt.event.ComponentAdapter() {
+            override fun componentResized(e: java.awt.event.ComponentEvent?) {
+                // Update cached width on resize
+                cachedTreeWidth = tree.width.coerceAtLeast(100) // Minimum reasonable width
+            }
+        }
+        tree.addComponentListener(componentListener)
 
         // Swing DnD handles drag-out (from our tree to IntelliJ panels / external apps).
         // tree.dragEnabled installs Swing's DragGestureRecognizer; TransferHandler
@@ -474,6 +489,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
         tree.removeMouseListener(mouseListener)
         tree.removeMouseListener(popupMouseListener)
         tree.removeTreeSelectionListener(selectionListener)
+        tree.removeComponentListener(componentListener)
 
         // Unregister DnDTarget (source is not registered — Swing handles drag-out)
         try {
@@ -510,8 +526,8 @@ class FileTreeComponent(private val project: Project) : Disposable {
                 if (showPermissions) {
                     val perms = getCachedPermissions(vf)
                     if (perms.isNotEmpty()) {
-                        // Calculate available width for filename
-                        val treeWidth = tree.visibleRect.width // Use visible area, not total width
+                        // Use cached width to avoid triggering layout validation during rendering
+                        val treeWidth = cachedTreeWidth
                         val permissionsWidth = 120 // Reserve space for permissions (drwxr-xr-x = ~100px)
                         val margin = 20 // Extra margin for safety
                         val availableWidth = treeWidth - permissionsWidth - margin

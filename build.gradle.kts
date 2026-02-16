@@ -37,6 +37,9 @@ dependencies {
     testImplementation("junit:junit:4.13.2") // needed for BasePlatformTestCase (JUnit 3 based)
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.11.4") // bridges JUnit 3/4 tests to JUnit Platform
 
+    testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+
     testImplementation("com.intellij.remoterobot:remote-robot:0.11.23")
     testImplementation("com.intellij.remoterobot:remote-fixtures:0.11.23")
 }
