@@ -94,7 +94,7 @@ tasks {
     test {
         useJUnitPlatform()
         // Exclude UI tests that require a running IDE instance (run via testUi task instead)
-        exclude("com/github/stefanfaur/explorer/ui/**")
+        exclude("ro/faur/explorer/ui/**")
     }
 
     wrapper {

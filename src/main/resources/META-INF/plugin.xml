@@ -1,5 +1,5 @@
 <idea-plugin>
-    <id>com.github.stefanfaur.systemexplorer</id>
+    <id>ro.faur.systemexplorer</id>
     <name>System Explorer</name>
     <vendor>Stefan Faur</vendor>
     <description><![CDATA[
@@ -40,21 +40,21 @@ Navigate, manage, and operate on files across your entire filesystem without lea
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <applicationService serviceImplementation="com.github.stefanfaur.explorer.settings.ExplorerSettings"/>
-        <applicationService serviceImplementation="com.github.stefanfaur.explorer.model.BookmarkManager"/>
+        <applicationService serviceImplementation="ro.faur.explorer.settings.ExplorerSettings"/>
+        <applicationService serviceImplementation="ro.faur.explorer.model.BookmarkManager"/>
         <toolWindow id="System Explorer"
                     anchor="right"
-                    factoryClass="com.github.stefanfaur.explorer.ExplorerToolWindowFactory"/>
-        <applicationConfigurable id="com.github.stefanfaur.explorer.settings"
+                    factoryClass="ro.faur.explorer.ExplorerToolWindowFactory"/>
+        <applicationConfigurable id="ro.faur.explorer.settings"
                                  displayName="System Explorer"
                                  parentId="tools"
-                                 instance="com.github.stefanfaur.explorer.settings.ExplorerConfigurable"/>
+                                 instance="ro.faur.explorer.settings.ExplorerConfigurable"/>
     </extensions>
 
     <actions>
         <!-- Toggle System Explorer tool window (global shortcut) -->
         <action id="SystemExplorer.Toggle"
-                class="com.github.stefanfaur.explorer.actions.ToggleExplorerAction"
+                class="ro.faur.explorer.actions.ToggleExplorerAction"
                 text="Toggle System Explorer"
                 description="Show or hide the System Explorer tool window">
             <keyboard-shortcut keymap="$default" first-keystroke="alt E"/>
@@ -63,49 +63,49 @@ Navigate, manage, and operate on files across your entire filesystem without lea
         <!-- File operation actions scoped to the System Explorer tool window -->
         <group id="SystemExplorer.ActionGroup" text="System Explorer Actions" popup="false">
             <action id="SystemExplorer.CopyFiles"
-                    class="com.github.stefanfaur.explorer.actions.CopyFilesAction"
+                    class="ro.faur.explorer.actions.CopyFilesAction"
                     text="Copy"
                     description="Copy selected files to clipboard">
                 <keyboard-shortcut keymap="$default" first-keystroke="ctrl C"/>
             </action>
 
             <action id="SystemExplorer.CutFiles"
-                    class="com.github.stefanfaur.explorer.actions.CutFilesAction"
+                    class="ro.faur.explorer.actions.CutFilesAction"
                     text="Cut"
                     description="Cut selected files (move on paste)">
                 <keyboard-shortcut keymap="$default" first-keystroke="ctrl X"/>
             </action>
 
             <action id="SystemExplorer.PasteFiles"
-                    class="com.github.stefanfaur.explorer.actions.PasteFilesAction"
+                    class="ro.faur.explorer.actions.PasteFilesAction"
                     text="Paste"
                     description="Paste files from clipboard">
                 <keyboard-shortcut keymap="$default" first-keystroke="ctrl V"/>
             </action>
 
             <action id="SystemExplorer.CopyPath"
-                    class="com.github.stefanfaur.explorer.actions.CopyPathAction"
+                    class="ro.faur.explorer.actions.CopyPathAction"
                     text="Copy Path"
                     description="Copy absolute path of selected file">
                 <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift C"/>
             </action>
 
             <action id="SystemExplorer.RenameFile"
-                    class="com.github.stefanfaur.explorer.actions.RenameFileAction"
+                    class="ro.faur.explorer.actions.RenameFileAction"
                     text="Rename"
                     description="Rename selected file">
                 <keyboard-shortcut keymap="$default" first-keystroke="F2"/>
             </action>
 
             <action id="SystemExplorer.DeleteFiles"
-                    class="com.github.stefanfaur.explorer.actions.DeleteFilesAction"
+                    class="ro.faur.explorer.actions.DeleteFilesAction"
                     text="Delete"
                     description="Delete selected files">
                 <keyboard-shortcut keymap="$default" first-keystroke="DELETE"/>
             </action>
 
             <action id="SystemExplorer.RefreshTree"
-                    class="com.github.stefanfaur.explorer.actions.RefreshTreeAction"
+                    class="ro.faur.explorer.actions.RefreshTreeAction"
                     text="Refresh"
                     description="Refresh the file tree">
                 <keyboard-shortcut keymap="$default" first-keystroke="F5"/>
@@ -115,7 +115,7 @@ Navigate, manage, and operate on files across your entire filesystem without lea
 
         <!-- Quick Open as a global action (works without System Explorer focused) -->
         <action id="SystemExplorer.QuickOpen"
-                class="com.github.stefanfaur.explorer.actions.QuickOpenAction"
+                class="ro.faur.explorer.actions.QuickOpenAction"
                 text="Quick Open Directory"
                 description="Open a directory in System Explorer by typing its path">
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift P"/>

@@ -257,13 +257,13 @@ The test suite has 160 tests organized in a four-layer pyramid:
 ./gradlew test
 
 # Run only pure unit tests (no IDE, sub-second)
-./gradlew test --tests "com.github.stefanfaur.explorer.unit.*"
+./gradlew test --tests "ro.faur.explorer.unit.*"
 
 # Run light platform tests (minimal IDE environment)
-./gradlew test --tests "com.github.stefanfaur.explorer.light.*"
+./gradlew test --tests "ro.faur.explorer.light.*"
 
 # Run heavy platform tests (full project environment)
-./gradlew test --tests "com.github.stefanfaur.explorer.heavy.*"
+./gradlew test --tests "ro.faur.explorer.heavy.*"
 
 # Run UI integration tests (requires running IDE via RemoteRobot)
 ./gradlew testUi
