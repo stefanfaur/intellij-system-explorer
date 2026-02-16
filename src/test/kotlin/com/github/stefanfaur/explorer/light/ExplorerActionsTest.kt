@@ -105,8 +105,8 @@ class ExplorerActionsTest : BasePlatformTestCase() {
         assertNotNull("QuickOpen action should be registered", action)
     }
 
-    fun `test QuickOpen has Ctrl+Shift+O shortcut`() {
-        assertShortcutBound("SystemExplorer.QuickOpen", "$platformCtrl shift O")
+    fun `test QuickOpen has Cmd+Shift+P shortcut`() {
+        assertShortcutBound("SystemExplorer.QuickOpen", "$platformCtrl shift P")
     }
 
     // ---- Action group test ----

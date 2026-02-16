@@ -126,7 +126,7 @@ The drop target highlights valid directories. Dropping onto a file targets its p
 
 ### Quick Open Dialog
 
-Press **Ctrl+Shift+O** from anywhere in the IDE to open the Quick Open dialog. This provides fast directory navigation without browsing the tree:
+Press **Cmd+Shift+P** from anywhere in the IDE to open the Quick Open dialog. This provides fast directory navigation without browsing the tree:
 
 - **Type a path:** Enter any absolute directory path in the text field.
 - **Browse button:** Click **...** to open a native directory chooser dialog.
@@ -184,12 +184,12 @@ All shortcuts are configurable via **Settings** > **Keymap** > search "System Ex
 | **Ctrl+X** | Cut selected files (move on paste) | When System Explorer is focused |
 | **Ctrl+V** | Paste files from clipboard | When System Explorer is focused |
 | **Ctrl+Shift+C** | Copy absolute path to clipboard | When System Explorer is focused |
-| **Ctrl+Shift+O** | Open Quick Open Directory dialog | Global (works from any view) |
+| **Cmd+Shift+P** | Open Quick Open Directory dialog | Global (works from any view) |
 | **F2** | Rename selected file | When System Explorer is focused |
 | **Delete** | Delete selected files | When System Explorer is focused |
 | **F5** | Refresh file tree | When System Explorer is focused |
 
-**Note on shortcut scoping:** Alt+E and Ctrl+Shift+O work globally from anywhere in the IDE. All other shortcuts only activate when the System Explorer tool window is focused. When unfocused, they fall through to their default IDE bindings (e.g., Ctrl+C in the editor copies text as usual).
+**Note on shortcut scoping:** Alt+E and Cmd+Shift+P work globally from anywhere in the IDE. All other shortcuts only activate when the System Explorer tool window is focused. When unfocused, they fall through to their default IDE bindings (e.g., Ctrl+C in the editor copies text as usual).
 
 ## UI Layout
 

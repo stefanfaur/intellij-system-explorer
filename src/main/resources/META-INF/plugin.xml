@@ -1,9 +1,9 @@
 <idea-plugin>
     <id>com.github.stefanfaur.systemexplorer</id>
     <name>System Explorer</name>
-    <vendor>stefanfaur</vendor>
+    <vendor>Stefan Faur</vendor>
     <description><![CDATA[
-<p>A full-featured system file browser embedded directly in your IntelliJ IDEA tool window.
+<p>A full-featured system file browser embedded directly in the IntelliJ IDEA tool window.
 Navigate, manage, and operate on files across your entire filesystem without leaving the IDE.</p>
 
 <h3>Features</h3>
@@ -33,7 +33,7 @@ Navigate, manage, and operate on files across your entire filesystem without lea
   <li><b>F2</b> &mdash; Rename selected file</li>
   <li><b>Delete</b> &mdash; Delete selected files</li>
   <li><b>F5</b> &mdash; Refresh file tree</li>
-  <li><b>Ctrl+Shift+O</b> &mdash; Quick Open directory</li>
+  <li><b>Cmd+Shift+P</b> &mdash; Quick Open directory</li>
   <li><b>Ctrl+Shift+C</b> &mdash; Copy file path</li>
 </ul>
 ]]></description>
@@ -118,7 +118,7 @@ Navigate, manage, and operate on files across your entire filesystem without lea
                 class="com.github.stefanfaur.explorer.actions.QuickOpenAction"
                 text="Quick Open Directory"
                 description="Open a directory in System Explorer by typing its path">
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift O"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift P"/>
         </action>
     </actions>
 </idea-plugin>

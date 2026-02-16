@@ -6,7 +6,7 @@ import com.intellij.openapi.wm.ToolWindowManager
 import com.github.stefanfaur.explorer.ui.QuickOpenDialog
 
 /**
- * Action that opens the Quick Open Directory dialog (Ctrl+Shift+O).
+ * Action that opens the Quick Open Directory dialog (Cmd+Shift+P).
  *
  * Works globally — the System Explorer does not need to be focused.
  * When the user confirms a valid directory path, opens/activates the
