@@ -1,5 +1,8 @@
 # System Explorer
 
+[![CI](https://github.com/stefanfaur/intellij-system-explorer/actions/workflows/ci.yml/badge.svg)](https://github.com/stefanfaur/intellij-system-explorer/actions/workflows/ci.yml)
+[![Release](https://github.com/stefanfaur/intellij-system-explorer/actions/workflows/publish.yml/badge.svg)](https://github.com/stefanfaur/intellij-system-explorer/actions/workflows/publish.yml)
+
 A full-featured system file browser plugin for IntelliJ-based IDEs. Browse, copy, move, and manage files across your entire filesystem without leaving the IDE.
 
 ## Table of Contents
@@ -327,6 +330,24 @@ src/main/kotlin/com/github/stefanfaur/explorer/
 | **Compatible IDEs** | IntelliJ IDEA, WebStorm, PyCharm, GoLand, CLion, PhpStorm, Rider, RubyMine, DataGrip, and all other JetBrains IDEs |
 | **Java** | 21+ |
 | **Kotlin** | 2.1.0 |
+
+## CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and delivery:
+
+- **CI Workflow**: Runs on every push
+  - Unit, light, heavy, and UI tests
+  - Plugin verification
+  - Snapshot builds on main branch
+
+- **Publish Workflow**: Manual or tag-triggered releases
+  - Comprehensive testing and verification
+  - Manual approval gate
+  - Automated versioning and changelog extraction
+  - Publishes to JetBrains Marketplace
+
+See [.github/TESTING.md](.github/TESTING.md) for testing guide.
+See [.github/SETUP.md](.github/SETUP.md) for setup instructions.
 
 ## License
 
