@@ -4,33 +4,37 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.JBSplitter
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextField
 import ro.faur.explorer.actions.NavigationActions
+import ro.faur.explorer.settings.ExplorerSettings
 import ro.faur.explorer.util.FileSizeFormatter
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.event.ActionListener
+import java.awt.event.ItemEvent
+import java.awt.event.ItemListener
 import javax.swing.BoxLayout
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
-import javax.swing.JToggleButton
 
 /**
  * The main panel for the System Explorer tool window.
  *
  * Contains:
- * - A toolbar at the top with navigation buttons (Back, Forward, Up, Home, Refresh, Hidden toggle, Settings) and an editable path bar
+ * - A toolbar at the top with navigation buttons (Back, Forward, Up, Home, Refresh, Settings) and an editable path bar
  * - A filter text field for glob pattern filtering
  * - A splitter with bookmarks sidebar on the left and a file tree on the right
- * - A status bar at the bottom showing selection info
+ * - A status bar at the bottom with file counts on the left and toggle checkboxes on the right
  *
  * Properties:
  * - [currentPath]: The currently displayed directory path
@@ -92,8 +96,11 @@ class ExplorerPanel(private val project: Project) : Disposable {
     private val upButton = JButton("Up")
     private val homeButton = JButton("Home")
     private val refreshButton = JButton("Refresh")
-    private val hiddenToggle = JToggleButton("Hidden")
     private val settingsButton = JButton("Settings")
+
+    // Status bar checkboxes
+    private val hiddenCheckbox = JBCheckBox("Hidden")
+    private val permissionsCheckbox = if (!SystemInfo.isWindows) JBCheckBox("Permissions") else null
 
     private var showHidden: Boolean = false
 
@@ -103,10 +110,11 @@ class ExplorerPanel(private val project: Project) : Disposable {
     private lateinit var upListener: ActionListener
     private lateinit var homeListener: ActionListener
     private lateinit var refreshListener: ActionListener
-    private lateinit var hiddenListener: ActionListener
     private lateinit var settingsListener: ActionListener
     private lateinit var pathListener: ActionListener
     private lateinit var filterListener: ActionListener
+    private lateinit var hiddenListener: ItemListener
+    private var permissionsListener: ItemListener? = null
 
     init {
         currentPath = System.getProperty("user.home")
@@ -191,8 +199,17 @@ class ExplorerPanel(private val project: Project) : Disposable {
         mainPanel.add(splitter, BorderLayout.CENTER)
 
         // --- SOUTH: Status bar ---
-        val statusBar = JPanel(FlowLayout(FlowLayout.LEFT))
-        statusBar.add(statusLabel)
+        val statusBar = JPanel(BorderLayout())
+        statusBar.add(statusLabel, BorderLayout.LINE_START)
+
+        // Right side: checkboxes panel
+        val checkboxPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 5, 0))
+        checkboxPanel.add(hiddenCheckbox)
+        if (permissionsCheckbox != null) {
+            checkboxPanel.add(permissionsCheckbox)
+        }
+        statusBar.add(checkboxPanel, BorderLayout.LINE_END)
+
         mainPanel.add(statusBar, BorderLayout.SOUTH)
 
         return mainPanel
@@ -209,7 +226,6 @@ class ExplorerPanel(private val project: Project) : Disposable {
         buttonsPanel.add(upButton)
         buttonsPanel.add(homeButton)
         buttonsPanel.add(refreshButton)
-        buttonsPanel.add(hiddenToggle)
         buttonsPanel.add(settingsButton)
         buttonsPanel.alignmentX = Component.LEFT_ALIGNMENT
         toolbarPanel.add(buttonsPanel)
@@ -258,14 +274,6 @@ class ExplorerPanel(private val project: Project) : Disposable {
         }
         refreshButton.addActionListener(refreshListener)
 
-        hiddenListener = ActionListener {
-            showHidden = hiddenToggle.isSelected
-            fileTreeComponent.showHidden = showHidden
-            fileTreeComponent.setRoot(currentPath)
-            updateStatus()
-        }
-        hiddenToggle.addActionListener(hiddenListener)
-
         settingsListener = ActionListener {
             ShowSettingsUtil.getInstance().showSettingsDialog(project, "System Explorer")
         }
@@ -288,6 +296,27 @@ class ExplorerPanel(private val project: Project) : Disposable {
             updateStatus()
         }
         filterField.addActionListener(filterListener)
+
+        // Wire checkbox listeners
+        hiddenListener = ItemListener { e ->
+            showHidden = e.stateChange == ItemEvent.SELECTED
+            fileTreeComponent.showHidden = showHidden
+            fileTreeComponent.setRoot(currentPath)
+            updateStatus()
+        }
+        hiddenCheckbox.addItemListener(hiddenListener)
+
+        if (permissionsCheckbox != null) {
+            permissionsListener = ItemListener { e ->
+                val settings = ExplorerSettings.getInstance()
+                settings.state.showFilePermissions = e.stateChange == ItemEvent.SELECTED
+                fileTreeComponent.tree.repaint()
+            }
+            permissionsCheckbox.addItemListener(permissionsListener!!)
+
+            // Initialize checkbox state from settings
+            permissionsCheckbox.isSelected = ExplorerSettings.getInstance().state.showFilePermissions
+        }
 
         // Set initial button state
         updateHistoryButtons()
@@ -361,10 +390,13 @@ class ExplorerPanel(private val project: Project) : Disposable {
         upButton.removeActionListener(upListener)
         homeButton.removeActionListener(homeListener)
         refreshButton.removeActionListener(refreshListener)
-        hiddenToggle.removeActionListener(hiddenListener)
         settingsButton.removeActionListener(settingsListener)
         pathField.removeActionListener(pathListener)
         filterField.removeActionListener(filterListener)
+        hiddenCheckbox.removeItemListener(hiddenListener)
+        if (permissionsCheckbox != null && permissionsListener != null) {
+            permissionsCheckbox.removeItemListener(permissionsListener!!)
+        }
     }
 
     // Wire actions after all fields are initialized
