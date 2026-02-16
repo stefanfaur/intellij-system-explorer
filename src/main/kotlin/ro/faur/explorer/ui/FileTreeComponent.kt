@@ -8,9 +8,11 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.ColoredTreeCellRenderer
+import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.TreeSpeedSearch
 import com.intellij.ui.treeStructure.Tree
 import ro.faur.explorer.actions.DragDropHandler
@@ -23,6 +25,9 @@ import ro.faur.explorer.settings.ExplorerSettings
 import java.awt.datatransfer.DataFlavor
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.attribute.PosixFilePermissions
 import javax.swing.Icon
 import javax.swing.JMenuItem
 import javax.swing.JPopupMenu
@@ -492,6 +497,16 @@ class FileTreeComponent(private val project: Project) : Disposable {
             if (vf != null) {
                 append(vf.name)
                 icon = getIconForFile(vf)
+
+                // Add file permissions if enabled
+                val settings = ExplorerSettings.getInstance()
+                if (settings.state.showFilePermissions) {
+                    val perms = formatPermissions(vf)
+                    if (perms.isNotEmpty()) {
+                        append("  ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
+                        append(perms, SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    }
+                }
             } else {
                 append(value?.toString() ?: "")
             }
@@ -500,6 +515,20 @@ class FileTreeComponent(private val project: Project) : Disposable {
         private fun getIconForFile(vf: VirtualFile): Icon {
             return if (vf.isDirectory) AllIcons.Nodes.Folder
             else vf.fileType.icon ?: AllIcons.FileTypes.Any_type
+        }
+
+        private fun formatPermissions(file: VirtualFile): String {
+            if (SystemInfo.isWindows) return ""
+
+            try {
+                val path = Paths.get(file.path)
+                val perms = Files.getPosixFilePermissions(path)
+                val permString = PosixFilePermissions.toString(perms)
+                val prefix = if (file.isDirectory) "d" else "-"
+                return "$prefix$permString"
+            } catch (e: Exception) {
+                return ""  // Fail silently on any error
+            }
         }
     }
 }
