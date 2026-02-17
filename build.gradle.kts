@@ -99,7 +99,9 @@ intellijPlatformTesting {
 tasks {
     test {
         useJUnitPlatform()
-        // Exclude UI tests that require a running IDE instance (run via testUi task instead)
+        // Keep :test headless-safe. Platform/UI tests are executed via testIdeUi/testUi tasks.
+        exclude("ro/faur/explorer/light/**")
+        exclude("ro/faur/explorer/heavy/**")
         exclude("ro/faur/explorer/ui/**")
     }
 

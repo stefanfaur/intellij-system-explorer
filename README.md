@@ -245,8 +245,8 @@ cd intellij-explorer
 |------|-------------|
 | `./gradlew buildPlugin` | Build the plugin ZIP for distribution |
 | `./gradlew runIde` | Launch a sandboxed IDE with the plugin installed |
-| `./gradlew test` | Run all unit and platform tests (160 tests) |
-| `./gradlew test --tests "*FileActionsTest"` | Run a specific test class |
+| `./gradlew test` | Run headless-safe unit tests |
+| `./gradlew test --tests "ro.faur.explorer.unit.GlobFilterTest"` | Run a specific unit test class |
 | `./gradlew verifyPlugin` | Run JetBrains plugin verification checks |
 | `./gradlew signPlugin` | Sign the plugin for marketplace distribution |
 | `./gradlew publishPlugin` | Publish to the JetBrains Marketplace |
@@ -256,19 +256,25 @@ cd intellij-explorer
 The test suite has 160 tests organized in a four-layer pyramid:
 
 ```bash
-# Run all tests (~7 seconds)
+# Run headless-safe unit tests
 ./gradlew test
 
 # Run only pure unit tests (no IDE, sub-second)
 ./gradlew test --tests "ro.faur.explorer.unit.*"
 
 # Run light platform tests (minimal IDE environment)
-./gradlew test --tests "ro.faur.explorer.light.*"
+./gradlew testIdeUi --tests "ro.faur.explorer.light.*"
 
 # Run heavy platform tests (full project environment)
-./gradlew test --tests "ro.faur.explorer.heavy.*"
+./gradlew testIdeUi --tests "ro.faur.explorer.heavy.*"
 
 # Run UI integration tests (requires running IDE via RemoteRobot)
+./gradlew testUi
+
+# Run the full suite used in CI
+./gradlew test
+./gradlew testIdeUi --tests "ro.faur.explorer.light.*"
+./gradlew testIdeUi --tests "ro.faur.explorer.heavy.*"
 ./gradlew testUi
 ```
 
