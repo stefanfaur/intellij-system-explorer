@@ -223,7 +223,7 @@ All shortcuts are configurable via **Settings** > **Keymap** > search "System Ex
 
 **Prerequisites:**
 - Java 21 (JDK)
-- Gradle 8.12+ (included via wrapper)
+- Gradle 8.13+ (included via wrapper)
 
 ```bash
 # Clone the repository

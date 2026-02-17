@@ -6,6 +6,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import ro.faur.explorer.model.Bookmark
 import java.awt.BorderLayout
+import java.awt.GraphicsEnvironment
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
 import java.awt.event.MouseAdapter
@@ -72,10 +73,12 @@ class BookmarksPanel(
             }
         })
 
-        // Drag-and-drop reordering
-        bookmarksList.dragEnabled = true
-        bookmarksList.dropMode = DropMode.INSERT
-        bookmarksList.transferHandler = BookmarkTransferHandler()
+        // Drag-and-drop reordering (skip in headless test environments).
+        if (!GraphicsEnvironment.isHeadless()) {
+            bookmarksList.dragEnabled = true
+            bookmarksList.dropMode = DropMode.INSERT
+            bookmarksList.transferHandler = BookmarkTransferHandler()
+        }
 
         // Custom renderer with left padding
         bookmarksList.cellRenderer = object : ColoredListCellRenderer<String>() {
