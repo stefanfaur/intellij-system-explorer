@@ -108,22 +108,19 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Run all tests
-        run: |
-          ./gradlew test --no-daemon --stacktrace
-          ./gradlew testIdeUi --tests "ro.faur.explorer.light.*" --no-daemon --stacktrace
-          ./gradlew testIdeUi --tests "ro.faur.explorer.heavy.*" --no-daemon --stacktrace
-
       - name: Setup Xvfb
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0
 
-      - name: Run UI tests
+      - name: Run all tests
         run: |
-          export DISPLAY=:99
-          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-          ./gradlew testUi --no-daemon --stacktrace
+          ./gradlew test --no-daemon --stacktrace
+          xvfb-run -a ./gradlew test -PincludeIdeTests=true --tests "ro.faur.explorer.light.*" --no-daemon --stacktrace
+          xvfb-run -a ./gradlew test -PincludeIdeTests=true --tests "ro.faur.explorer.heavy.*" --no-daemon --stacktrace
+
+      - name: Run UI tests
+        run: xvfb-run -a ./gradlew testUi --no-daemon --stacktrace
 
       - name: Upload test reports
         if: always()

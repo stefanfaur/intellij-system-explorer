@@ -24,8 +24,8 @@ cat /tmp/changelog.md
 ```bash
 # Run tests locally (same as CI)
 ./gradlew test
-./gradlew testIdeUi --tests "ro.faur.explorer.light.*"
-./gradlew testIdeUi --tests "ro.faur.explorer.heavy.*"
+./gradlew test -PincludeIdeTests=true --tests "ro.faur.explorer.light.*"
+./gradlew test -PincludeIdeTests=true --tests "ro.faur.explorer.heavy.*"
 
 # UI tests (requires display)
 ./gradlew testUi

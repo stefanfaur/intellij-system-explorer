@@ -99,9 +99,13 @@ intellijPlatformTesting {
 tasks {
     test {
         useJUnitPlatform()
-        // Keep :test headless-safe. Platform/UI tests are executed via testIdeUi/testUi tasks.
-        exclude("ro/faur/explorer/light/**")
-        exclude("ro/faur/explorer/heavy/**")
+        val includeIdeTests = project.findProperty("includeIdeTests")?.toString()?.toBoolean() == true
+        // Default: keep :test headless-safe.
+        // Opt-in for light/heavy suites with -PincludeIdeTests=true.
+        if (!includeIdeTests) {
+            exclude("ro/faur/explorer/light/**")
+            exclude("ro/faur/explorer/heavy/**")
+        }
         exclude("ro/faur/explorer/ui/**")
     }
 

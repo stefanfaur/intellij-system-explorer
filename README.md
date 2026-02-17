@@ -263,18 +263,18 @@ The test suite has 160 tests organized in a four-layer pyramid:
 ./gradlew test --tests "ro.faur.explorer.unit.*"
 
 # Run light platform tests (minimal IDE environment)
-./gradlew testIdeUi --tests "ro.faur.explorer.light.*"
+./gradlew test -PincludeIdeTests=true --tests "ro.faur.explorer.light.*"
 
 # Run heavy platform tests (full project environment)
-./gradlew testIdeUi --tests "ro.faur.explorer.heavy.*"
+./gradlew test -PincludeIdeTests=true --tests "ro.faur.explorer.heavy.*"
 
 # Run UI integration tests (requires running IDE via RemoteRobot)
 ./gradlew testUi
 
 # Run the full suite used in CI
 ./gradlew test
-./gradlew testIdeUi --tests "ro.faur.explorer.light.*"
-./gradlew testIdeUi --tests "ro.faur.explorer.heavy.*"
+./gradlew test -PincludeIdeTests=true --tests "ro.faur.explorer.light.*"
+./gradlew test -PincludeIdeTests=true --tests "ro.faur.explorer.heavy.*"
 ./gradlew testUi
 ```
 

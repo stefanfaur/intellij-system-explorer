@@ -40,38 +40,35 @@ jobs:
           path: build/reports/tests/test/
           retention-days: 30
 
+      - name: Setup Xvfb for IDE/UI tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0
+
       - name: Run light tests
-        run: ./gradlew testIdeUi --tests "ro.faur.explorer.light.*" --no-daemon --stacktrace
+        run: xvfb-run -a ./gradlew test -PincludeIdeTests=true --tests "ro.faur.explorer.light.*" --no-daemon --stacktrace
 
       - name: Upload light test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: light-test-reports
-          path: build/reports/tests/testIdeUi/
+          path: build/reports/tests/test/
           retention-days: 30
 
       - name: Run heavy tests
-        run: ./gradlew testIdeUi --tests "ro.faur.explorer.heavy.*" --no-daemon --stacktrace
+        run: xvfb-run -a ./gradlew test -PincludeIdeTests=true --tests "ro.faur.explorer.heavy.*" --no-daemon --stacktrace
 
       - name: Upload heavy test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: heavy-test-reports
-          path: build/reports/tests/testIdeUi/
+          path: build/reports/tests/test/
           retention-days: 30
 
-      - name: Setup Xvfb for UI tests
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0
-
       - name: Run UI tests
-        run: |
-          export DISPLAY=:99
-          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-          ./gradlew testUi --no-daemon --stacktrace
+        run: xvfb-run -a ./gradlew testUi --no-daemon --stacktrace
 
       - name: Upload UI test reports
         if: always()
