@@ -28,7 +28,9 @@ Navigate, manage, and operate on files across your entire filesystem without lea
 
 <h3>Keyboard Shortcuts</h3>
 <ul>
-  <li><b>Alt+E</b> &mdash; Toggle System Explorer panel</li>
+  <li><b>Alt+E</b> &mdash; Open and focus System Explorer panel</li>
+  <li><b>Enter</b> &mdash; Open selected file/folder in System Explorer</li>
+  <li><b>Backspace</b> &mdash; Go back in System Explorer history</li>
   <li><b>Ctrl+C / Ctrl+X / Ctrl+V</b> &mdash; Copy, cut, paste files</li>
   <li><b>F2</b> &mdash; Rename selected file</li>
   <li><b>Delete</b> &mdash; Delete selected files</li>
@@ -39,7 +41,7 @@ Navigate, manage, and operate on files across your entire filesystem without lea
 ]]></description>
 
     <change-notes><![CDATA[
-<h3>1.0.0</h3>
+<h3>1.0.0-pre-1</h3>
 <ul>
   <li>Initial release</li>
   <li>Full filesystem browser with tree view</li>
@@ -58,7 +60,7 @@ Navigate, manage, and operate on files across your entire filesystem without lea
         <applicationService serviceImplementation="ro.faur.explorer.settings.ExplorerSettings"/>
         <applicationService serviceImplementation="ro.faur.explorer.model.BookmarkManager"/>
         <toolWindow id="System Explorer"
-                    anchor="right"
+                    anchor="right"´
                     factoryClass="ro.faur.explorer.ExplorerToolWindowFactory"/>
         <applicationConfigurable id="ro.faur.explorer.settings"
                                  displayName="System Explorer"
@@ -67,16 +69,30 @@ Navigate, manage, and operate on files across your entire filesystem without lea
     </extensions>
 
     <actions>
-        <!-- Toggle System Explorer tool window (global shortcut) -->
+        <!-- Open/focus System Explorer tool window (global shortcut) -->
         <action id="SystemExplorer.Toggle"
                 class="ro.faur.explorer.actions.ToggleExplorerAction"
-                text="Toggle System Explorer"
-                description="Show or hide the System Explorer tool window">
+                text="Focus System Explorer"
+                description="Open and focus the System Explorer tool window">
             <keyboard-shortcut keymap="$default" first-keystroke="alt E"/>
         </action>
 
         <!-- File operation actions scoped to the System Explorer tool window -->
         <group id="SystemExplorer.ActionGroup" text="System Explorer Actions" popup="false">
+            <action id="SystemExplorer.OpenSelected"
+                    class="ro.faur.explorer.actions.OpenSelectedAction"
+                    text="Open"
+                    description="Open selected file or navigate into selected folder">
+                <keyboard-shortcut keymap="$default" first-keystroke="ENTER"/>
+            </action>
+
+            <action id="SystemExplorer.Back"
+                    class="ro.faur.explorer.actions.BackInExplorerAction"
+                    text="Back"
+                    description="Navigate back in System Explorer history">
+                <keyboard-shortcut keymap="$default" first-keystroke="BACK_SPACE"/>
+            </action>
+
             <action id="SystemExplorer.CopyFiles"
                     class="ro.faur.explorer.actions.CopyFilesAction"
                     text="Copy"

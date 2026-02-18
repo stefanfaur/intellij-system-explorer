@@ -64,10 +64,28 @@ class ExplorerActionsTest : BasePlatformTestCase() {
         assertNotNull("RefreshTree action should be registered", action)
     }
 
+    fun `test OpenSelected action is registered`() {
+        val action = actionManager.getAction("SystemExplorer.OpenSelected")
+        assertNotNull("OpenSelected action should be registered", action)
+    }
+
+    fun `test Back action is registered`() {
+        val action = actionManager.getAction("SystemExplorer.Back")
+        assertNotNull("Back action should be registered", action)
+    }
+
     // ---- Shortcut binding tests ----
 
     fun `test ToggleExplorer has Alt+E shortcut`() {
         assertShortcutBound("SystemExplorer.Toggle", "alt E")
+    }
+
+    fun `test OpenSelected has ENTER shortcut`() {
+        assertShortcutBound("SystemExplorer.OpenSelected", "ENTER")
+    }
+
+    fun `test Back has BACK_SPACE shortcut`() {
+        assertShortcutBound("SystemExplorer.Back", "BACK_SPACE")
     }
 
     fun `test CopyFiles has Ctrl+C shortcut`() {

@@ -49,7 +49,7 @@ A full-featured system file browser plugin for IntelliJ-based IDEs. Browse, copy
 
 3. **Open the tool window:**
 
-   After restart, the **System Explorer** tool window is available on the right sidebar. Click it, or press **Alt+E** to toggle it.
+   After restart, the **System Explorer** tool window is available on the right sidebar. Click it, or press **Alt+E** to open and focus it.
 
 ### Run in Development Sandbox
 
@@ -65,10 +65,11 @@ This opens a fresh IntelliJ Community Edition instance with System Explorer pre-
 
 1. **Open the tool window:** Press **Alt+E** or click **System Explorer** in the right sidebar.
 2. **Browse files:** The file tree starts at your home directory. Expand folders by clicking the arrow or double-clicking.
-3. **Navigate into a folder:** Double-click a directory to make it the new root of the tree.
-4. **Go up:** Click the **Up** button in the toolbar to go to the parent directory.
-5. **Go home:** Click the **Home** button to return to your home directory.
-6. **Open a file:** Double-click a file to open it in the editor.
+3. **Navigate into a folder:** Double-click a directory or press **Enter** on a selected directory to make it the new root of the tree.
+4. **Go back:** Press **Backspace** in the focused file tree to return to the previous location in navigation history.
+5. **Go up:** Click the **Up** button in the toolbar to go to the parent directory.
+6. **Go home:** Click the **Home** button to return to your home directory.
+7. **Open a file:** Double-click a file or press **Enter** on a selected file to open it in the editor.
 
 ## Features
 
@@ -182,7 +183,9 @@ All shortcuts are configurable via **Settings** > **Keymap** > search "System Ex
 
 | Shortcut | Action | Scope |
 |----------|--------|-------|
-| **Alt+E** | Toggle System Explorer tool window | Global (works from any view) |
+| **Alt+E** | Open and focus System Explorer tool window | Global (works from any view) |
+| **Enter** | Open selected file / navigate into selected folder | When System Explorer tree is focused |
+| **Backspace** | Go back in navigation history | When System Explorer tree is focused |
 | **Ctrl+C** | Copy selected files to clipboard | When System Explorer is focused |
 | **Ctrl+X** | Cut selected files (move on paste) | When System Explorer is focused |
 | **Ctrl+V** | Paste files from clipboard | When System Explorer is focused |
@@ -192,7 +195,7 @@ All shortcuts are configurable via **Settings** > **Keymap** > search "System Ex
 | **Delete** | Delete selected files | When System Explorer is focused |
 | **F5** | Refresh file tree | When System Explorer is focused |
 
-**Note on shortcut scoping:** Alt+E and Cmd+Shift+P work globally from anywhere in the IDE. All other shortcuts only activate when the System Explorer tool window is focused. When unfocused, they fall through to their default IDE bindings (e.g., Ctrl+C in the editor copies text as usual).
+**Note on shortcut scoping:** Alt+E and Cmd+Shift+P work globally from anywhere in the IDE. Enter/Backspace/Ctrl+C/Ctrl+X/Ctrl+V/F2/Delete/F5 only activate when the System Explorer tool window is focused. When unfocused, they fall through to their default IDE bindings (e.g., Ctrl+C in the editor copies text as usual).
 
 ## UI Layout
 

@@ -133,11 +133,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
                     val path = tree.getPathForLocation(e.x, e.y) ?: return
                     val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return
                     val vf = node.userObject as? VirtualFile ?: return
-                    if (vf.isDirectory) {
-                        onDirectoryDoubleClicked?.invoke(vf)
-                    } else {
-                        FileEditorManager.getInstance(project).openFile(vf, true)
-                    }
+                    openEntry(vf)
                 }
             }
         }
@@ -245,6 +241,15 @@ class FileTreeComponent(private val project: Project) : Disposable {
         }
     }
 
+    /**
+     * Opens the current selection when exactly one node is selected.
+     * Files are opened in editor; directories navigate into that directory.
+     */
+    fun openSelected() {
+        val selected = getSelectedFiles().singleOrNull() ?: return
+        openEntry(selected)
+    }
+
     // ---- Context menu ----
 
     /** The directory context for paste and new file/folder operations. */
@@ -263,7 +268,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
         if (singleFile != null && !singleFile.isDirectory) {
             menu.add(JMenuItem("Open").apply {
                 addActionListener {
-                    FileEditorManager.getInstance(project).openFile(singleFile, true)
+                    openEntry(singleFile)
                 }
             })
         }
@@ -451,6 +456,14 @@ class FileTreeComponent(private val project: Project) : Disposable {
         } catch (_: Exception) {
             // Service might not be available in tests
         }
+    }
+
+    private fun openEntry(file: VirtualFile) {
+        if (file.isDirectory) {
+            onDirectoryDoubleClicked?.invoke(file)
+            return
+        }
+        FileEditorManager.getInstance(project).openFile(file, true)
     }
 
     private fun loadChildren(parentNode: DefaultMutableTreeNode, parentFile: VirtualFile) {

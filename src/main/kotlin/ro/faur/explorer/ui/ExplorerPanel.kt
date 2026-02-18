@@ -7,6 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.ui.JBSplitter
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
@@ -166,6 +167,20 @@ class ExplorerPanel(private val project: Project) : Disposable {
     }
 
     /**
+     * Navigate to the previous location in history, if available.
+     */
+    fun goBack(): Boolean {
+        val previous = history.back() ?: return false
+        navigateToInternal(previous, pushHistory = false)
+        return true
+    }
+
+    /**
+     * Whether navigating back in history is currently possible.
+     */
+    fun canGoBack(): Boolean = history.canGoBack
+
+    /**
      * Internal navigation method that optionally pushes to history.
      * Used by back/forward buttons to avoid double-pushing.
      */
@@ -260,7 +275,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
 
     private fun wireActions() {
         backListener = ActionListener {
-            history.back()?.let { path -> navigateToInternal(path, pushHistory = false) }
+            goBack()
         }
         backButton.addActionListener(backListener)
 
@@ -397,6 +412,18 @@ class ExplorerPanel(private val project: Project) : Disposable {
      * Returns the current status bar text (for testing).
      */
     fun getStatusText(): String = statusLabel.text
+
+    /**
+     * Moves keyboard focus into the file tree. Ensures one row is selected when possible
+     * so navigation keys and Enter work immediately.
+     */
+    fun focusFileTree() {
+        val tree = fileTreeComponent.tree
+        if (tree.selectionCount == 0 && tree.rowCount > 0) {
+            tree.setSelectionRow(0)
+        }
+        IdeFocusManager.getInstance(project).requestFocus(tree, true)
+    }
 
     /**
      * Removes all listeners registered on buttons and fields to prevent memory leaks.

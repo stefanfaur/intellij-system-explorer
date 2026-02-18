@@ -2,26 +2,62 @@ package ro.faur.explorer.actions
 
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.wm.ToolWindowManager
 
 /**
- * Toggle the System Explorer tool window visibility (Alt+E).
+ * Opens and focuses the System Explorer tool window (Alt+E).
  */
-class ToggleExplorerAction : AnAction("Toggle System Explorer") {
+class ToggleExplorerAction : AnAction("Focus System Explorer") {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val toolWindow = ToolWindowManager.getInstance(project)
-            .getToolWindow("System Explorer") ?: return
-        if (toolWindow.isVisible) {
-            toolWindow.hide()
-        } else {
-            toolWindow.show()
-        }
+        val panel = ExplorerActionUtil.activateAndFindPanel(project)
+            ?: ExplorerActionUtil.findExplorerPanel(e)
+            ?: return
+        panel.focusFileTree()
     }
 
     override fun update(e: AnActionEvent) {
         e.presentation.isEnabledAndVisible = e.project != null
+    }
+}
+
+/**
+ * Open selected entry in the file tree (Enter).
+ */
+class OpenSelectedAction : AnAction("Open") {
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val tree = ExplorerActionUtil.findFileTreeComponent(e) ?: return
+        tree.openSelected()
+    }
+
+    override fun update(e: AnActionEvent) {
+        val tree = ExplorerActionUtil.findFileTreeComponent(e)
+        e.presentation.isEnabled = tree != null &&
+                ExplorerActionUtil.isExplorerActive(e) &&
+                tree.getSelectedFiles().size == 1
+    }
+}
+
+/**
+ * Navigate back in explorer history (Backspace when tree is focused).
+ */
+class BackInExplorerAction : AnAction("Back") {
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val panel = ExplorerActionUtil.findExplorerPanel(e) ?: return
+        if (panel.goBack()) {
+            panel.focusFileTree()
+        }
+    }
+
+    override fun update(e: AnActionEvent) {
+        val panel = ExplorerActionUtil.findExplorerPanel(e)
+        val treeHasFocus = panel?.fileTreeComponent?.tree?.isFocusOwner == true
+        e.presentation.isEnabled = panel != null &&
+                ExplorerActionUtil.isExplorerActive(e) &&
+                panel.canGoBack() &&
+                treeHasFocus
     }
 }
 
