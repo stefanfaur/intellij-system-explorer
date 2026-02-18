@@ -49,7 +49,7 @@ A full-featured system file browser plugin for IntelliJ-based IDEs. Browse, copy
 
 3. **Open the tool window:**
 
-   After restart, the **System Explorer** tool window is available on the right sidebar. Click it, or press **Alt+E** to open and focus it.
+   After restart, the **System Explorer** tool window is available on the right sidebar. Click it, or press **Alt+E** to toggle/focus it.
 
 ### Run in Development Sandbox
 
@@ -183,7 +183,7 @@ All shortcuts are configurable via **Settings** > **Keymap** > search "System Ex
 
 | Shortcut | Action | Scope |
 |----------|--------|-------|
-| **Alt+E** | Open and focus System Explorer tool window | Global (works from any view) |
+| **Alt+E** | Toggle/focus System Explorer tool window | Global (works from any view) |
 | **Enter** | Open selected file / navigate into selected folder | When System Explorer tree is focused |
 | **Backspace** | Go back in navigation history | When System Explorer tree is focused |
 | **Ctrl+C** | Copy selected files to clipboard | When System Explorer is focused |

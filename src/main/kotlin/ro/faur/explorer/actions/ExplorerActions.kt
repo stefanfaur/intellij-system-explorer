@@ -2,14 +2,23 @@ package ro.faur.explorer.actions
 
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.wm.ToolWindowManager
 
 /**
- * Opens and focuses the System Explorer tool window (Alt+E).
+ * Toggle/focus System Explorer tool window (Alt+E).
+ * - If explorer is currently active, hide it.
+ * - Otherwise, open and focus it.
  */
-class ToggleExplorerAction : AnAction("Focus System Explorer") {
+class ToggleExplorerAction : AnAction("Toggle System Explorer") {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
+        val toolWindow = ToolWindowManager.getInstance(project)
+            .getToolWindow(ExplorerActionUtil.TOOL_WINDOW_ID) ?: return
+        if (toolWindow.isVisible && toolWindow.isActive) {
+            toolWindow.hide()
+            return
+        }
         val panel = ExplorerActionUtil.activateAndFindPanel(project)
             ?: ExplorerActionUtil.findExplorerPanel(e)
             ?: return

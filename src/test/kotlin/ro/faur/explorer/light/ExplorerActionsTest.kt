@@ -77,7 +77,8 @@ class ExplorerActionsTest : BasePlatformTestCase() {
     // ---- Shortcut binding tests ----
 
     fun `test ToggleExplorer has Alt+E shortcut`() {
-        assertShortcutBound("SystemExplorer.Toggle", "alt E")
+        val toggleShortcut = if (SystemInfo.isMac) "ctrl alt E" else "alt E"
+        assertShortcutBound("SystemExplorer.Toggle", toggleShortcut)
     }
 
     fun `test OpenSelected has ENTER shortcut`() {

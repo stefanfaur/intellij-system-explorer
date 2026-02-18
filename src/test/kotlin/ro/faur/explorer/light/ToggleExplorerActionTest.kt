@@ -11,7 +11,7 @@ import ro.faur.explorer.actions.ToggleExplorerAction
 
 class ToggleExplorerActionTest : BasePlatformTestCase() {
 
-    fun `test Alt+E action does not hide tool window on repeated invocation`() {
+    fun `test Alt+E action hides tool window when invoked while explorer is active`() {
         val toolWindowManager = ToolWindowManager.getInstance(project)
         val toolWindow = toolWindowManager.registerToolWindow("System Explorer") { }
 
@@ -27,7 +27,7 @@ class ToggleExplorerActionTest : BasePlatformTestCase() {
         assertTrue("Tool window should be visible after first invocation", toolWindow.isVisible)
 
         action.actionPerformed(event)
-        assertTrue("Tool window should stay visible after second invocation", toolWindow.isVisible)
+        assertFalse("Tool window should hide after second invocation when already active", toolWindow.isVisible)
     }
 
     private fun createActionEvent(action: ToggleExplorerAction): AnActionEvent {
