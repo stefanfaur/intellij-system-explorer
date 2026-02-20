@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import ro.faur.explorer.quickopen.ranking.FrecencyStore
 
 @State(
     name = "ro.faur.explorer.model.BookmarkManager",
@@ -48,10 +49,12 @@ class BookmarkManager : PersistentStateComponent<BookmarkManager.State> {
             return
         }
         myState.bookmarks.add(BookmarkEntry(bookmark.name, bookmark.path))
+        try { FrecencyStore.getInstance().setBookmarked(bookmark.path, true) } catch (_: Exception) {}
     }
 
     fun removeBookmark(path: String) {
         myState.bookmarks.removeAll { it.path == path }
+        try { FrecencyStore.getInstance().setBookmarked(path, false) } catch (_: Exception) {}
     }
 
     fun moveBookmark(fromIndex: Int, toIndex: Int) {

@@ -22,6 +22,14 @@ class ExplorerSettings : PersistentStateComponent<ExplorerSettings.State> {
         var sortBy: String = "name",  // "name", "size", "modified"
         var expandDirectoriesOnSingleClick: Boolean = true,
         var rememberLastPath: Boolean = true,
+        var quickOpenV2Enabled: Boolean = false,
+        // Phase 6 — ripgrep and content search settings
+        var ripgrepPath: String = "",
+        var useRipgrepForExternalPaths: Boolean = false,
+        var maxIndexSize: Int = 50_000,
+        var allowNetworkMountIndexing: Boolean = false,
+        var contentSearchEnabled: Boolean = true,
+        var contentSearchScope: String = "",
     )
 
     private var myState = State()

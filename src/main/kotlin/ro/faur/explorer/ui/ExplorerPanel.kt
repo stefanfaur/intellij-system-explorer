@@ -15,6 +15,7 @@ import com.intellij.ui.components.JBPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextField
 import ro.faur.explorer.actions.NavigationActions
+import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.settings.ExplorerSettings
 import ro.faur.explorer.util.FileSizeFormatter
 import java.awt.BorderLayout
@@ -192,6 +193,9 @@ class ExplorerPanel(private val project: Project) : Disposable {
         if (pushHistory) {
             history.push(path)
         }
+        try {
+            FrecencyStore.getInstance().recordVisit(path)
+        } catch (_: Exception) {}
         updateHistoryButtons()
         updateStatus()
     }

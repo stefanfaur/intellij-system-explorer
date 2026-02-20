@@ -31,7 +31,6 @@ dependencies {
     }
 
     testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("junit:junit:4.13.2") // needed for BasePlatformTestCase (JUnit 3 based)
@@ -46,6 +45,8 @@ dependencies {
 
 kotlin {
     jvmToolchain(providers.gradleProperty("javaVersion").get().toInt())
+
+    // All phases are implemented — no test exclusions needed.
 }
 
 intellijPlatform {

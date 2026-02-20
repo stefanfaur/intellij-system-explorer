@@ -59,6 +59,8 @@ Navigate, manage, and operate on files across your entire filesystem without lea
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="ro.faur.explorer.settings.ExplorerSettings"/>
         <applicationService serviceImplementation="ro.faur.explorer.model.BookmarkManager"/>
+        <applicationService serviceImplementation="ro.faur.explorer.quickopen.ranking.FrecencyStore"/>
+        <applicationService serviceImplementation="ro.faur.explorer.quickopen.aliases.TeleportAliasStore"/>
         <toolWindow id="System Explorer"
                     anchor="right"
                     factoryClass="ro.faur.explorer.ExplorerToolWindowFactory"/>

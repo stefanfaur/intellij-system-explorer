@@ -3,10 +3,15 @@ package ro.faur.explorer.settings
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
-import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.dsl.builder.AlignX
+import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.table.JBTable
+import ro.faur.explorer.quickopen.aliases.TeleportAliasStore
+import java.awt.Dimension
 import javax.swing.JCheckBox
 import javax.swing.JComponent
+import javax.swing.table.DefaultTableModel
 
 class ExplorerConfigurable : Configurable {
 
@@ -28,6 +33,17 @@ class ExplorerConfigurable : Configurable {
         private set
     lateinit var rememberLastPathCheckBox: JCheckBox
         private set
+    lateinit var quickOpenV2CheckBox: JCheckBox
+        private set
+
+    // Phase 6 — ripgrep & content search fields
+    private lateinit var ripgrepPathField: TextFieldWithBrowseButton
+    private lateinit var useRipgrepCheckBox: JCheckBox
+    private lateinit var contentSearchCheckBox: JCheckBox
+
+    // Alias management
+    private lateinit var aliasTableModel: DefaultTableModel
+    private lateinit var aliasTable: JBTable
 
     // Keep the old field name as an alias for backward compat in existing tests
     val defaultRootField: TextFieldWithBrowseButton get() = defaultRootBrowseField
@@ -45,6 +61,7 @@ class ExplorerConfigurable : Configurable {
         showFilePermissionsCheckBox = JCheckBox("Show file permissions")
         expandOnSingleClickCheckBox = JCheckBox("Expand directories on single click")
         rememberLastPathCheckBox = JCheckBox("Remember last visited path")
+        quickOpenV2CheckBox = JCheckBox("Quick Open v2 — fuzzy search popup (experimental)")
 
         defaultRootBrowseField = TextFieldWithBrowseButton()
         defaultRootBrowseField.addBrowseFolderListener(
@@ -53,6 +70,32 @@ class ExplorerConfigurable : Configurable {
             null,
             FileChooserDescriptorFactory.createSingleFolderDescriptor()
         )
+
+        // Ripgrep settings
+        ripgrepPathField = TextFieldWithBrowseButton()
+        ripgrepPathField.addBrowseFolderListener(
+            "Select ripgrep executable",
+            "Path to the rg binary (leave blank to use system PATH)",
+            null,
+            FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor()
+        )
+        useRipgrepCheckBox = JCheckBox("Use ripgrep to enumerate external paths")
+        contentSearchCheckBox = JCheckBox("Enable /: content search mode")
+
+        // Alias table
+        aliasTableModel = DefaultTableModel(arrayOf("Alias", "Path"), 0)
+        aliasTable = JBTable(aliasTableModel).apply {
+            preferredScrollableViewportSize = Dimension(400, 120)
+            putClientProperty("terminateEditOnFocusLost", true)
+        }
+
+        val aliasDecorator = ToolbarDecorator.createDecorator(aliasTable)
+            .setAddAction { aliasTableModel.addRow(arrayOf("", "")) }
+            .setRemoveAction {
+                val row = aliasTable.selectedRow
+                if (row >= 0) aliasTableModel.removeRow(row)
+            }
+            .createPanel()
 
         myPanel = panel {
             group("Display") {
@@ -64,6 +107,7 @@ class ExplorerConfigurable : Configurable {
             group("Behavior") {
                 row { cell(expandOnSingleClickCheckBox) }
                 row { cell(rememberLastPathCheckBox) }
+                row { cell(quickOpenV2CheckBox) }
             }
             group("Delete Behavior") {
                 row { cell(confirmDeleteCheckBox) }
@@ -74,6 +118,18 @@ class ExplorerConfigurable : Configurable {
                     cell(defaultRootBrowseField).align(AlignX.FILL)
                 }
             }
+            group("Quick Open — Content Search") {
+                row("ripgrep path:") {
+                    cell(ripgrepPathField).align(AlignX.FILL)
+                }
+                row { cell(useRipgrepCheckBox) }
+                row { cell(contentSearchCheckBox) }
+            }
+            group("Quick Open — Teleport Aliases") {
+                row {
+                    cell(aliasDecorator).align(AlignX.FILL)
+                }
+            }
         }
 
         return myPanel!!
@@ -82,15 +138,43 @@ class ExplorerConfigurable : Configurable {
     override fun isModified(): Boolean {
         if (!::showHiddenFilesCheckBox.isInitialized) return false
         val settings = ExplorerSettings.getInstance()
-        return showHiddenFilesCheckBox.isSelected != settings.state.showHiddenFiles ||
-                sortFoldersFirstCheckBox.isSelected != settings.state.sortFoldersFirst ||
-                confirmDeleteCheckBox.isSelected != settings.state.confirmDelete ||
-                deleteToTrashCheckBox.isSelected != settings.state.deleteToTrash ||
-                defaultRootBrowseField.text != settings.state.defaultRoot ||
-                showFileSizeInTreeCheckBox.isSelected != settings.state.showFileSizeInTree ||
-                showFilePermissionsCheckBox.isSelected != settings.state.showFilePermissions ||
-                expandOnSingleClickCheckBox.isSelected != settings.state.expandDirectoriesOnSingleClick ||
-                rememberLastPathCheckBox.isSelected != settings.state.rememberLastPath
+        val baseModified =
+            showHiddenFilesCheckBox.isSelected != settings.state.showHiddenFiles ||
+            sortFoldersFirstCheckBox.isSelected != settings.state.sortFoldersFirst ||
+            confirmDeleteCheckBox.isSelected != settings.state.confirmDelete ||
+            deleteToTrashCheckBox.isSelected != settings.state.deleteToTrash ||
+            defaultRootBrowseField.text != settings.state.defaultRoot ||
+            showFileSizeInTreeCheckBox.isSelected != settings.state.showFileSizeInTree ||
+            showFilePermissionsCheckBox.isSelected != settings.state.showFilePermissions ||
+            expandOnSingleClickCheckBox.isSelected != settings.state.expandDirectoriesOnSingleClick ||
+            rememberLastPathCheckBox.isSelected != settings.state.rememberLastPath ||
+            quickOpenV2CheckBox.isSelected != settings.state.quickOpenV2Enabled
+        if (baseModified) return true
+        if (!::ripgrepPathField.isInitialized) return false
+        val ripgrepModified =
+            ripgrepPathField.text != settings.state.ripgrepPath ||
+            useRipgrepCheckBox.isSelected != settings.state.useRipgrepForExternalPaths ||
+            contentSearchCheckBox.isSelected != settings.state.contentSearchEnabled
+        if (ripgrepModified) return true
+        return aliasesModified()
+    }
+
+    private fun aliasesModified(): Boolean {
+        if (!::aliasTableModel.isInitialized) return false
+        val storeAliases = try { TeleportAliasStore.getInstance().getAliases() } catch (_: Exception) { return false }
+        val tableAliases = collectTableAliases()
+        if (tableAliases.size != storeAliases.size) return true
+        return tableAliases.any { (name, path) -> storeAliases[name] != path }
+    }
+
+    private fun collectTableAliases(): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        for (row in 0 until aliasTableModel.rowCount) {
+            val name = (aliasTableModel.getValueAt(row, 0) as? String)?.trim() ?: continue
+            val path = (aliasTableModel.getValueAt(row, 1) as? String)?.trim() ?: continue
+            if (name.isNotBlank()) result[name] = path
+        }
+        return result
     }
 
     override fun apply() {
@@ -104,11 +188,29 @@ class ExplorerConfigurable : Configurable {
                 defaultRoot = defaultRootBrowseField.text,
                 showFileSizeInTree = showFileSizeInTreeCheckBox.isSelected,
                 showFilePermissions = showFilePermissionsCheckBox.isSelected,
-                sortBy = settings.state.sortBy,  // preserve until UI control is added
+                sortBy = settings.state.sortBy,
                 expandDirectoriesOnSingleClick = expandOnSingleClickCheckBox.isSelected,
                 rememberLastPath = rememberLastPathCheckBox.isSelected,
+                quickOpenV2Enabled = quickOpenV2CheckBox.isSelected,
+                ripgrepPath = if (::ripgrepPathField.isInitialized) ripgrepPathField.text else settings.state.ripgrepPath,
+                useRipgrepForExternalPaths = if (::useRipgrepCheckBox.isInitialized) useRipgrepCheckBox.isSelected else settings.state.useRipgrepForExternalPaths,
+                maxIndexSize = settings.state.maxIndexSize,
+                allowNetworkMountIndexing = settings.state.allowNetworkMountIndexing,
+                contentSearchEnabled = if (::contentSearchCheckBox.isInitialized) contentSearchCheckBox.isSelected else settings.state.contentSearchEnabled,
+                contentSearchScope = settings.state.contentSearchScope,
             )
         )
+
+        // Sync alias table to TeleportAliasStore
+        if (::aliasTableModel.isInitialized) {
+            try {
+                val store = TeleportAliasStore.getInstance()
+                val existing = store.getAliases().keys.toSet()
+                val newAliases = collectTableAliases()
+                existing.filter { !newAliases.containsKey(it) }.forEach { store.removeAlias(it) }
+                newAliases.forEach { (name, path) -> store.addAlias(name, path) }
+            } catch (_: Exception) {}
+        }
     }
 
     override fun reset() {
@@ -122,6 +224,24 @@ class ExplorerConfigurable : Configurable {
         showFilePermissionsCheckBox.isSelected = settings.state.showFilePermissions
         expandOnSingleClickCheckBox.isSelected = settings.state.expandDirectoriesOnSingleClick
         rememberLastPathCheckBox.isSelected = settings.state.rememberLastPath
+        quickOpenV2CheckBox.isSelected = settings.state.quickOpenV2Enabled
+        if (::ripgrepPathField.isInitialized) {
+            ripgrepPathField.text = settings.state.ripgrepPath
+            useRipgrepCheckBox.isSelected = settings.state.useRipgrepForExternalPaths
+            contentSearchCheckBox.isSelected = settings.state.contentSearchEnabled
+        }
+        if (::aliasTableModel.isInitialized) {
+            resetAliasTable()
+        }
+    }
+
+    private fun resetAliasTable() {
+        while (aliasTableModel.rowCount > 0) aliasTableModel.removeRow(0)
+        try {
+            TeleportAliasStore.getInstance().getAliases().forEach { (name, path) ->
+                aliasTableModel.addRow(arrayOf(name, path))
+            }
+        } catch (_: Exception) {}
     }
 
     override fun disposeUIResources() {
