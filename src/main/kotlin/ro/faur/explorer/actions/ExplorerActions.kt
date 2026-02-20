@@ -19,10 +19,13 @@ class ToggleExplorerAction : AnAction("Toggle System Explorer") {
             toolWindow.hide()
             return
         }
-        val panel = ExplorerActionUtil.activateAndFindPanel(project)
-            ?: ExplorerActionUtil.findExplorerPanel(e)
-            ?: return
-        panel.focusFileTree()
+        // Use the callback form of activate() so that focusFileTree() fires *after*
+        // IntelliJ completes its own focus-transfer sequence.  Calling focusFileTree()
+        // synchronously after activate(null) races against IntelliJ's internal focus
+        // restoration and loses, leaving the tree unfocused.
+        ExplorerActionUtil.activateAndThen(project) { panel ->
+            panel.focusFileTree()
+        }
     }
 
     override fun update(e: AnActionEvent) {

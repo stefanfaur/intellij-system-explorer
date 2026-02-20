@@ -55,6 +55,26 @@ object ExplorerActionUtil {
     }
 
     /**
+     * Activates the System Explorer tool window and invokes [onReady] with the
+     * [ExplorerPanel] once focus has been fully transferred to the tool window.
+     *
+     * Unlike [activateAndFindPanel], this uses [ToolWindow.activate]'s Runnable
+     * parameter so that the callback fires *after* IntelliJ completes its own
+     * focus-transfer sequence.  This prevents IntelliJ's activation machinery from
+     * overriding a [ExplorerPanel.focusFileTree] call made immediately after
+     * activate() returns.
+     */
+    fun activateAndThen(project: Project, onReady: (ExplorerPanel) -> Unit) {
+        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID) ?: return
+        toolWindow.activate {
+            val content = toolWindow.contentManager.selectedContent ?: return@activate
+            val rootComponent = content.component ?: return@activate
+            val panel = findComponentOfType(rootComponent, ExplorerPanel::class.java) ?: return@activate
+            onReady(panel)
+        }
+    }
+
+    /**
      * Whether the System Explorer tool window is active (visible and has focus).
      */
     fun isExplorerActive(e: AnActionEvent): Boolean {

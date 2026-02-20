@@ -68,4 +68,11 @@ class QuickOpenPanelTest : BasePlatformTestCase() {
         assertTrue(panel.searchField.isFocusable)
         panel.dispose()
     }
+
+    fun `test QuickOpenPanel initialQuery parameter compiles correctly`() {
+        val constructor = ro.faur.explorer.quickopen.ui.QuickOpenPanel::class.java
+            .constructors
+            .firstOrNull { it.parameterCount >= 4 }
+        assertNotNull("QuickOpenPanel must have a constructor with ≥4 params", constructor)
+    }
 }

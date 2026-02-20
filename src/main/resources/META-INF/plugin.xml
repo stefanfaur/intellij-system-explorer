@@ -1,4 +1,4 @@
-<idea-plugin>
+<idea-plugin require-restart="true">
     <id>ro.faur.systemexplorer</id>
     <name>System Explorer</name>
     <vendor email="stefan@faur.sh" url="https://faur.sh">Stefan Faur</vendor>
@@ -12,6 +12,7 @@ Navigate, manage, and operate on files across your entire filesystem without lea
   <li>Copy, move, rename, and delete files and directories</li>
   <li>Bookmarks sidebar for quick access to frequently used directories</li>
   <li>Drag-and-drop between System Explorer and Project view</li>
+  <li>Quick Open v2 — fuzzy search popup with frecency ranking, query language, preview pane, and content search</li>
   <li>Quick Open dialog for fast directory navigation by path</li>
   <li>Context menu with all file operations</li>
   <li>Filter files by glob pattern</li>
@@ -35,7 +36,9 @@ Navigate, manage, and operate on files across your entire filesystem without lea
   <li><b>F2</b> &mdash; Rename selected file</li>
   <li><b>Delete</b> &mdash; Delete selected files</li>
   <li><b>F5</b> &mdash; Refresh file tree</li>
-  <li><b>Cmd+Shift+P</b> &mdash; Quick Open directory</li>
+  <li><b>Cmd+Shift+P</b> &mdash; Quick Open (v2: fuzzy popup with query language; v1: path dialog)</li>
+  <li><b>Tab</b> &mdash; Toggle preview pane in Quick Open v2</li>
+  <li><b>Ctrl+R</b> &mdash; Cycle recent queries in Quick Open v2</li>
   <li><b>Ctrl+Shift+C</b> &mdash; Copy file path</li>
 </ul>
 ]]></description>
@@ -55,6 +58,7 @@ Navigate, manage, and operate on files across your entire filesystem without lea
 ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.terminal</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="ro.faur.explorer.settings.ExplorerSettings"/>

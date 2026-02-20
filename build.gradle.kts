@@ -97,6 +97,62 @@ intellijPlatformTesting {
     }
 }
 
+// ── Nucleo JNI native library build ──────────────────────────────────────
+val rustFuzzyDir = file("rust-fuzzy")
+val skipCargo = project.findProperty("skipCargo")?.toString()?.toBoolean() == true
+
+/** Resolve the cargo binary, searching well-known install locations if not on PATH. */
+fun resolveCargoExecutable(): String? {
+    // Well-known locations: Homebrew (Apple Silicon / Intel), rustup default, Linux
+    val candidates = listOf(
+        "cargo",
+        "/opt/homebrew/bin/cargo",
+        "/usr/local/bin/cargo",
+        "${System.getProperty("user.home")}/.cargo/bin/cargo",
+    )
+    for (candidate in candidates) {
+        try {
+            val ok = ProcessBuilder(candidate, "--version")
+                .redirectErrorStream(true).start().waitFor() == 0
+            if (ok) return candidate
+        } catch (_: Exception) { /* try next */ }
+    }
+    return null
+}
+
+val cargoBin = if (!skipCargo && rustFuzzyDir.resolve("Cargo.toml").exists()) resolveCargoExecutable() else null
+
+val cargoRelease by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Build nucleo JNI native library (current platform only)"
+    workingDir = rustFuzzyDir
+    commandLine(cargoBin ?: "cargo", "build", "--release")
+    isIgnoreExitValue = true   // graceful: non-zero exit → native absent → fallback ranker
+    enabled = cargoBin != null
+}
+
+val copyNativeLib by tasks.registering(Copy::class) {
+    dependsOn(cargoRelease)
+    from(rustFuzzyDir.resolve("target/release")) {
+        include("*.so", "*.dylib", "*.dll")
+    }
+    into(layout.buildDirectory.dir("resources/main/natives/${detectHostPlatform()}"))
+    enabled = !skipCargo
+}
+
+tasks.processResources { dependsOn(copyNativeLib) }
+
+fun detectHostPlatform(): String {
+    val os = System.getProperty("os.name").lowercase()
+    val arch = System.getProperty("os.arch").lowercase()
+    return when {
+        os.contains("mac") && (arch.contains("aarch64") || arch.contains("arm")) -> "darwin-aarch64"
+        os.contains("mac") -> "darwin-x86_64"
+        os.contains("linux") -> "linux-x86_64"
+        else -> "win32-x86_64"
+    }
+}
+
 tasks {
     test {
         useJUnitPlatform()

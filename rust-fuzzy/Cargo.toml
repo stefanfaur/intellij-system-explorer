@@ -1,0 +1,12 @@
+[package]
+name = "fuzzy-jni"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "fuzzyjni"
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.22"
+nucleo-matcher = "0.3"

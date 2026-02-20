@@ -14,7 +14,8 @@ import java.awt.Dimension
 
 object QuickOpenPopup {
 
-    fun show(project: Project, panel: ExplorerPanel) {
+    fun show(project: Project, panel: ExplorerPanel, initialQuery: String = "") {
+        val effectiveQuery = initialQuery.ifBlank { tryReadClipboardPath() }
         val currentPath = panel.currentPath
         val candidates = buildCandidates(project, panel)
 
@@ -22,6 +23,7 @@ object QuickOpenPopup {
             project = project,
             currentPath = currentPath,
             candidates = candidates,
+            initialQuery = effectiveQuery,
             onSelected = { candidate ->
                 when (candidate.type) {
                     CandidateType.DIRECTORY, CandidateType.BOOKMARK, CandidateType.RECENT ->
@@ -54,6 +56,18 @@ object QuickOpenPopup {
 
         popup.showCenteredInCurrentWindow(project)
         IdeFocusManager.getInstance(project).requestFocus(qoPanel.searchField, true)
+    }
+
+    private fun tryReadClipboardPath(): String {
+        return try {
+            val contents = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                .getContents(null) ?: return ""
+            val text = (contents.getTransferData(java.awt.datatransfer.DataFlavor.stringFlavor) as? String)
+                ?.trim() ?: return ""
+            if ((text.startsWith("/") || text.startsWith("~")) && java.io.File(
+                    text.replace("~", System.getProperty("user.home"))
+                ).exists()) text else ""
+        } catch (_: Exception) { "" }
     }
 
     private fun buildCandidates(project: Project, panel: ExplorerPanel): List<SearchCandidate> {
@@ -117,7 +131,7 @@ object QuickOpenPopup {
                 parentPath = "",
                 type = CandidateType.ACTION,
                 extra = mapOf("handler" to ({
-                    // toggling hidden files — panel would need a public API for this
+                    panel.toggleHiddenFiles()
                 } as () -> Unit))
             ),
             SearchCandidate(

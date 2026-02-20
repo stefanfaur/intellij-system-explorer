@@ -182,6 +182,14 @@ class ExplorerPanel(private val project: Project) : Disposable {
     fun canGoBack(): Boolean = history.canGoBack
 
     /**
+     * Toggles the "show hidden files" setting and reloads the tree.
+     * Called from Quick Open v2 command mode ("> toggle hidden").
+     */
+    fun toggleHiddenFiles() {
+        hiddenCheckbox.isSelected = !hiddenCheckbox.isSelected
+    }
+
+    /**
      * Internal navigation method that optionally pushes to history.
      * Used by back/forward buttons to avoid double-pushing.
      */

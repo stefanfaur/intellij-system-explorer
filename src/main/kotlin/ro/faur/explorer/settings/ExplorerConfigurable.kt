@@ -3,11 +3,15 @@ package ro.faur.explorer.settings
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.ui.JBColor
 import com.intellij.ui.ToolbarDecorator
+import com.intellij.ui.components.JBLabel
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.table.JBTable
 import ro.faur.explorer.quickopen.aliases.TeleportAliasStore
+import ro.faur.explorer.quickopen.backend.NucleoNative
+import ro.faur.explorer.quickopen.backend.RankerSelector
 import java.awt.Dimension
 import javax.swing.JCheckBox
 import javax.swing.JComponent
@@ -40,6 +44,9 @@ class ExplorerConfigurable : Configurable {
     private lateinit var ripgrepPathField: TextFieldWithBrowseButton
     private lateinit var useRipgrepCheckBox: JCheckBox
     private lateinit var contentSearchCheckBox: JCheckBox
+
+    // Scorer status
+    private lateinit var scorerStatusLabel: JBLabel
 
     // Alias management
     private lateinit var aliasTableModel: DefaultTableModel
@@ -97,6 +104,18 @@ class ExplorerConfigurable : Configurable {
             }
             .createPanel()
 
+        val rankerName = try { RankerSelector.active.name } catch (_: Exception) { "Unknown" }
+        val scorerText = if (NucleoNative.isAvailable) {
+            val platform = System.getProperty("os.name") + " / " + System.getProperty("os.arch")
+            "Fuzzy Scorer: $rankerName  \u2713 loaded  ($platform)"
+        } else {
+            val fallbackNote = if (rankerName.contains("Minuscule")) " \u2014 nucleo unavailable, using fallback" else ""
+            "Fuzzy Scorer: $rankerName$fallbackNote"
+        }
+        scorerStatusLabel = JBLabel(scorerText).apply {
+            foreground = if (NucleoNative.isAvailable) JBColor.GREEN.darker() else JBColor.foreground()
+        }
+
         myPanel = panel {
             group("Display") {
                 row { cell(showHiddenFilesCheckBox) }
@@ -124,6 +143,9 @@ class ExplorerConfigurable : Configurable {
                 }
                 row { cell(useRipgrepCheckBox) }
                 row { cell(contentSearchCheckBox) }
+            }
+            group("Quick Open — Fuzzy Scorer") {
+                row { cell(scorerStatusLabel) }
             }
             group("Quick Open — Teleport Aliases") {
                 row {

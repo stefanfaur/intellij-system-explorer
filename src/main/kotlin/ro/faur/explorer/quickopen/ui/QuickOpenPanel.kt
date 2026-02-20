@@ -4,9 +4,15 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopup
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.ui.popup.PopupStep
+import com.intellij.openapi.ui.popup.util.BaseListPopupStep
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.CollectionListModel
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBLabel
@@ -16,6 +22,7 @@ import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.annotations.RequiresEdt
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import ro.faur.explorer.actions.FileActions
 import ro.faur.explorer.model.Bookmark
 import ro.faur.explorer.model.BookmarkManager
 import ro.faur.explorer.quickopen.backend.MinusculeMatcherRanker
@@ -33,6 +40,7 @@ import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.quickopen.ranking.Ranker
 import ro.faur.explorer.settings.ExplorerSettings
 import java.awt.BorderLayout
+import java.awt.CardLayout
 import java.awt.Dimension
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
@@ -47,6 +55,7 @@ class QuickOpenPanel(
     private val project: Project,
     private val currentPath: String,
     private val candidates: List<SearchCandidate>,
+    private val initialQuery: String = "",
     private val onSelected: (SearchCandidate) -> Unit
 ) : JPanel(BorderLayout()), Disposable {
 
@@ -79,6 +88,43 @@ class QuickOpenPanel(
     private val previewPane = PreviewPane().apply { isVisible = false }
     private var previewVisible = false
 
+    private val modeChipLabel = JBLabel("").apply {
+        font = font.deriveFont(java.awt.Font.BOLD, 11f)
+        foreground = java.awt.Color(0x6897BB)
+    }
+
+    private val hintLabel = JBLabel(
+        "↩: navigate  ⌘↩: open with  Tab: preview  ⌘D: bookmark  ⌘N: new  ⌘[: pop  Ctrl+R: recent  1–9: jump  Esc: close"
+    ).apply {
+        font = font.deriveFont(10f)
+        foreground = java.awt.Color.GRAY
+        border = javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 6)
+    }
+
+    // Speed-dial: top-6 bookmarks by recency, fallback to recent
+    private val speedDialItems: List<SearchCandidate> = run {
+        val bookmarks = candidates.filter { it.type == CandidateType.BOOKMARK }
+            .sortedByDescending { it.signals.lastUsedMs }
+            .take(6)
+        if (bookmarks.isNotEmpty()) bookmarks
+        else candidates.filter { it.type == CandidateType.RECENT }
+            .sortedByDescending { it.signals.lastUsedMs }
+            .take(6)
+    }
+
+    private val speedDialPanel: SpeedDialPanel = SpeedDialPanel(speedDialItems) { candidate ->
+        selectedId = candidate.id
+        FrecencyStore.getInstance().recordVisit(candidate.fullPath)
+        onSelected(candidate)
+        popup.closeOk(null)
+    }
+
+    private val cardLayout = CardLayout()
+    private val contentCard = JPanel(cardLayout).apply {
+        add(speedDialPanel, "speed-dial")
+        add(JBScrollPane(resultList), "results")
+    }
+
     private var pendingSearch: Future<*>? = null
     private var selectedId: String? = null
 
@@ -91,14 +137,19 @@ class QuickOpenPanel(
         val statusPanel = JPanel(BorderLayout()).apply {
             add(truncationLabel, BorderLayout.WEST)
             add(countLabel, BorderLayout.EAST)
+            add(hintLabel, BorderLayout.CENTER)
         }
 
         val centerPanel = JPanel(BorderLayout())
-        centerPanel.add(JBScrollPane(resultList), BorderLayout.CENTER)
+        centerPanel.add(contentCard, BorderLayout.CENTER)
         centerPanel.add(previewPane, BorderLayout.EAST)
         centerPanel.add(statusPanel, BorderLayout.SOUTH)
 
-        add(searchField, BorderLayout.NORTH)
+        val northPanel = JPanel(BorderLayout()).apply {
+            add(searchField, BorderLayout.CENTER)
+            add(modeChipLabel, BorderLayout.EAST)
+        }
+        add(northPanel, BorderLayout.NORTH)
         add(centerPanel, BorderLayout.CENTER)
         preferredSize = Dimension(700, 480)
 
@@ -132,6 +183,48 @@ class QuickOpenPanel(
             ), searchField
         )
 
+        // Ctrl+P: move selection up (Emacs style)
+        val upAction = DumbAwareAction.create {
+            if (resultList.selectedIndex > 0) {
+                resultList.selectedIndex = resultList.selectedIndex - 1
+                resultList.ensureIndexIsVisible(resultList.selectedIndex)
+            }
+        }
+        listOf(searchField, resultList).forEach {
+            upAction.registerCustomShortcutSet(
+                com.intellij.openapi.actionSystem.CustomShortcutSet(
+                    KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK)
+                ), it
+            )
+        }
+
+        // Ctrl+N: move selection down (Emacs style)
+        val downAction = DumbAwareAction.create {
+            resultList.requestFocus()
+            val next = resultList.selectedIndex + 1
+            if (next < listModel.size) {
+                resultList.selectedIndex = next
+                resultList.ensureIndexIsVisible(next)
+            }
+        }
+        listOf(searchField, resultList).forEach {
+            downAction.registerCustomShortcutSet(
+                com.intellij.openapi.actionSystem.CustomShortcutSet(
+                    KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK)
+                ), it
+            )
+        }
+
+        // Cmd+N: create new file/folder
+        val createAction = DumbAwareAction.create { createNewEntry() }
+        listOf(searchField, resultList).forEach {
+            createAction.registerCustomShortcutSet(
+                com.intellij.openapi.actionSystem.CustomShortcutSet(
+                    KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.META_DOWN_MASK)
+                ), it
+            )
+        }
+
         // ResultList key handler
         resultList.addKeyListener(object : java.awt.event.KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
@@ -140,9 +233,14 @@ class QuickOpenPanel(
                     e.keyCode == KeyEvent.VK_UP && resultList.selectedIndex == 0 ->
                         searchField.requestFocus()
 
-                    // Cmd+Enter: reveal in Finder/Files
+                    // Cmd+Enter: open with sub-menu
                     e.keyCode == KeyEvent.VK_ENTER && (e.modifiersEx and InputEvent.META_DOWN_MASK) != 0 -> {
-                        revealInFinder(); e.consume()
+                        showOpenWithMenu(); e.consume()
+                    }
+
+                    // Alt+Enter: context mini-menu
+                    e.keyCode == KeyEvent.VK_ENTER && (e.modifiersEx and InputEvent.ALT_DOWN_MASK) != 0 -> {
+                        showContextMenu(); e.consume()
                     }
 
                     // Enter: activate selected (single or multi)
@@ -164,9 +262,15 @@ class QuickOpenPanel(
                         navigateToPrevGroup(); e.consume()
                     }
 
-                    // Number keys 1-9: speed-dial activate Nth visible result
+                    // Number keys 1-9: speed-dial when query blank, else activate Nth result
                     e.keyCode in KeyEvent.VK_1..KeyEvent.VK_9 && e.modifiersEx == 0 -> {
-                        activateAtIndex(e.keyCode - KeyEvent.VK_1); e.consume()
+                        val idx = e.keyCode - KeyEvent.VK_1
+                        if (searchField.text.isBlank() && !speedDialPanel.isEmpty()) {
+                            speedDialPanel.activateAt(idx)
+                        } else {
+                            activateAtIndex(idx)
+                        }
+                        e.consume()
                     }
                 }
             }
@@ -194,11 +298,36 @@ class QuickOpenPanel(
             ), resultList
         )
 
+        // Cmd+Shift+C: copy relative path
+        DumbAwareAction.create { copyRelativePath() }.registerCustomShortcutSet(
+            com.intellij.openapi.actionSystem.CustomShortcutSet(
+                KeyStroke.getKeyStroke(KeyEvent.VK_C, InputEvent.META_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK)
+            ), resultList
+        )
+
+        // Cmd+[: pop one path segment from query
+        val popSegmentAction = DumbAwareAction.create { popPathSegment() }
+        listOf(searchField, resultList).forEach { component ->
+            popSegmentAction.registerCustomShortcutSet(
+                com.intellij.openapi.actionSystem.CustomShortcutSet(
+                    KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET, InputEvent.META_DOWN_MASK)
+                ), component
+            )
+        }
+
         // Start background enumeration; onUpdate fires on background thread — dispatch to EDT
         candidatePool.refreshAsync(currentPath) {
             ApplicationManager.getApplication().invokeLater({
                 truncationLabel.isVisible = candidatePool.isTruncated
                 scheduleSearch()
+            }, ModalityState.any())
+        }
+
+        // Pre-populate from editor cursor (Jump From Editor feature)
+        if (initialQuery.isNotBlank()) {
+            searchField.text = initialQuery
+            ApplicationManager.getApplication().invokeLater({
+                searchField.textEditor.selectAll()
             }, ModalityState.any())
         }
 
@@ -248,6 +377,25 @@ class QuickOpenPanel(
         pendingSearch?.cancel(false)
         val raw = searchField.text.trim()
         resultList.setPaintBusy(true)
+
+        // Switch between speed-dial and results card
+        if (raw.isBlank() && !speedDialPanel.isEmpty()) {
+            cardLayout.show(contentCard, "speed-dial")
+        } else {
+            cardLayout.show(contentCard, "results")
+        }
+
+        // Update mode chip immediately (synchronous, no search needed)
+        modeChipLabel.text = when (QueryParser.parse(raw).mode) {
+            QueryMode.DIRS_ONLY -> "  [d:]  "
+            QueryMode.FILES_ONLY -> "  [f:]  "
+            QueryMode.BOOKMARKS_ONLY -> "  [b:]  "
+            QueryMode.RECENT_ONLY -> "  [r:]  "
+            QueryMode.COMMAND -> "  [>]  "
+            QueryMode.REGEX -> "  [~]  "
+            QueryMode.CONTENT_SEARCH -> "  [/:]  "
+            QueryMode.UNIFIED -> ""
+        }
 
         pendingSearch = AppExecutorUtil.getAppExecutorService().submit {
             val results = performSearch(raw)
@@ -371,6 +519,10 @@ class QuickOpenPanel(
         val realCount = results.count { !it.isGroupHeader }
         countLabel.text = if (realCount > 0) "$realCount results" else ""
 
+        if (realCount == 0) {
+            resultList.emptyText.setText(smartEmptyMessage(QueryParser.parse(query).mode))
+        }
+
         if (prevId != null) {
             val idx = results.indexOfFirst { it.scored?.candidate?.id == prevId }
             if (idx >= 0) resultList.selectedIndex = idx
@@ -388,6 +540,19 @@ class QuickOpenPanel(
     private fun selectFirstNonHeader() {
         val idx = (0 until listModel.size).firstOrNull { !listModel.getElementAt(it).isGroupHeader } ?: 0
         resultList.selectedIndex = idx
+    }
+
+    // ─── Smart empty-state messages ───────────────────────────────────────────
+
+    private fun smartEmptyMessage(mode: QueryMode): String = when (mode) {
+        QueryMode.DIRS_ONLY      -> "No directories match — try without d: to search all types"
+        QueryMode.FILES_ONLY     -> "No files match — try without f: to include directories"
+        QueryMode.BOOKMARKS_ONLY -> "No bookmarks match — press ⌘D to bookmark a path first"
+        QueryMode.RECENT_ONLY    -> "No recent paths match — navigate somewhere first"
+        QueryMode.COMMAND        -> "No actions match — try typing 'toggle' or 'home'"
+        QueryMode.REGEX          -> "No paths match that regex pattern"
+        QueryMode.CONTENT_SEARCH -> "No files contain that pattern (rg not found or no matches)"
+        QueryMode.UNIFIED        -> "No results — try a shorter query or ⌘[ to pop a segment"
     }
 
     // ─── Actions ──────────────────────────────────────────────────────────────
@@ -447,6 +612,148 @@ class QuickOpenPanel(
         val path = resultList.selectedValue?.scored?.candidate?.fullPath ?: return
         val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
         clipboard.setContents(java.awt.datatransfer.StringSelection(path), null)
+    }
+
+    private fun copyRelativePath() {
+        val absolutePath = resultList.selectedValue?.scored?.candidate?.fullPath ?: return
+        val projectRoot = project.basePath ?: ""
+        val relativePath = if (projectRoot.isNotBlank() && absolutePath.startsWith("$projectRoot/")) {
+            absolutePath.removePrefix("$projectRoot/")
+        } else {
+            absolutePath
+        }
+        val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+        clipboard.setContents(java.awt.datatransfer.StringSelection(relativePath), null)
+    }
+
+    private fun popPathSegment() {
+        val current = searchField.text.trimEnd('/')
+        if (current.isEmpty()) return
+        val lastSlash = current.lastIndexOf('/')
+        searchField.text = when {
+            lastSlash < 0 -> ""
+            lastSlash == 0 -> "/"
+            else -> current.substring(0, lastSlash)
+        }
+    }
+
+    // ─── Alt+Enter context mini-menu ──────────────────────────────────────────
+
+    private fun showContextMenu() {
+        val candidate = resultList.selectedValue?.scored?.candidate ?: return
+        val vf = LocalFileSystem.getInstance().findFileByPath(candidate.fullPath)
+
+        val items = buildList {
+            if (vf != null) {
+                add("Rename")
+                add("Delete")
+            }
+            add("Copy Path")
+            add("Copy Relative Path")
+            val isBookmarked = BookmarkManager.getInstance().getBookmarks().any { it.path == candidate.fullPath }
+            add(if (isBookmarked) "Remove Bookmark ⭐" else "Add Bookmark ⭐")
+        }
+
+        val step = object : BaseListPopupStep<String>("Actions for ${candidate.displayName}", items) {
+            override fun onChosen(value: String, finalChoice: Boolean): PopupStep<*>? {
+                when {
+                    value == "Rename" && vf != null -> {
+                        val newName = Messages.showInputDialog(project, "New name:", "Rename", null, vf.name, null)
+                        if (!newName.isNullOrBlank()) {
+                            FileActions.rename(vf, newName)
+                            scheduleSearch()
+                        }
+                    }
+                    value == "Delete" && vf != null -> {
+                        val toTrash = ExplorerSettings.getInstance().state.deleteToTrash
+                        val confirm = ExplorerSettings.getInstance().state.confirmDelete
+                        if (!confirm || Messages.showYesNoDialog(project, "Delete ${vf.name}?", "Delete", null) == Messages.YES) {
+                            FileActions.delete(vf, toTrash)
+                            scheduleSearch()
+                        }
+                    }
+                    value == "Copy Path" -> copySelectedPath()
+                    value == "Copy Relative Path" -> copyRelativePath()
+                    value.startsWith("Add Bookmark") || value.startsWith("Remove Bookmark") -> toggleBookmark()
+                }
+                return PopupStep.FINAL_CHOICE
+            }
+        }
+        JBPopupFactory.getInstance().createListPopup(step).showUnderneathOf(resultList)
+    }
+
+    // ─── Cmd+N create file/folder ─────────────────────────────────────────────
+
+    private fun createNewEntry() {
+        val candidate = resultList.selectedValue?.scored?.candidate
+        val dirPath = when {
+            candidate == null -> currentPath
+            java.io.File(candidate.fullPath).isDirectory -> candidate.fullPath
+            else -> candidate.fullPath.substringBeforeLast('/')
+        }
+        val parentVf = LocalFileSystem.getInstance().findFileByPath(dirPath) ?: return
+
+        val typeStep = object : BaseListPopupStep<String>("Create in $dirPath", listOf("New File", "New Folder")) {
+            override fun onChosen(value: String, finalChoice: Boolean): PopupStep<*>? {
+                val isFile = value == "New File"
+                val name = Messages.showInputDialog(
+                    project,
+                    if (isFile) "File name:" else "Folder name:",
+                    if (isFile) "New File" else "New Folder",
+                    null, "", null
+                ) ?: return PopupStep.FINAL_CHOICE
+                if (name.isBlank()) return PopupStep.FINAL_CHOICE
+                if (isFile) FileActions.createFile(parentVf, name)
+                else FileActions.createFolder(parentVf, name)
+                scheduleSearch()
+                return PopupStep.FINAL_CHOICE
+            }
+        }
+        JBPopupFactory.getInstance().createListPopup(typeStep).showUnderneathOf(resultList)
+    }
+
+    // ─── Cmd+Enter open-with sub-menu ─────────────────────────────────────────
+
+    private fun showOpenWithMenu() {
+        val candidate = resultList.selectedValue?.scored?.candidate ?: return
+        val isDir = java.io.File(candidate.fullPath).isDirectory
+
+        val options = buildList {
+            add("Navigate Explorer")
+            if (!isDir) add("Open in Editor")
+            add("Reveal in Finder")
+            add("Open in Terminal")
+        }
+
+        val step = object : BaseListPopupStep<String>("Open '${candidate.displayName}' With…", options) {
+            override fun onChosen(value: String, finalChoice: Boolean): PopupStep<*>? {
+                when (value) {
+                    "Navigate Explorer" -> {
+                        onSelected(candidate)
+                        popup.closeOk(null)
+                    }
+                    "Open in Editor" -> {
+                        val vf = LocalFileSystem.getInstance().findFileByPath(candidate.fullPath)
+                        if (vf != null) FileEditorManager.getInstance(project).openFile(vf, true)
+                        popup.closeOk(null)
+                    }
+                    "Reveal in Finder" -> revealInFinder()
+                    "Open in Terminal" -> openInTerminal(candidate.fullPath)
+                }
+                return PopupStep.FINAL_CHOICE
+            }
+        }
+        JBPopupFactory.getInstance().createListPopup(step).showUnderneathOf(resultList)
+    }
+
+    private fun openInTerminal(path: String) {
+        try {
+            val workDir = if (java.io.File(path).isDirectory) path
+                          else path.substringBeforeLast('/')
+            org.jetbrains.plugins.terminal.TerminalToolWindowManager
+                .getInstance(project)
+                .createLocalShellWidget(workDir, "Explorer")
+        } catch (_: Exception) {}
     }
 
     override fun dispose() {
