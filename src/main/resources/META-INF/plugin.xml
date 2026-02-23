@@ -70,6 +70,8 @@ Navigate, manage, and operate on files across your entire filesystem without lea
         <projectService serviceImplementation="ro.faur.explorer.remote.settings.RemoteConnectionSettings"/>
         <projectService serviceImplementation="ro.faur.explorer.remote.RemoteBookmarkManager"/>
         <projectService serviceImplementation="ro.faur.explorer.remote.git.RemoteGitVcsManager"/>
+        <projectService serviceImplementation="ro.faur.explorer.gitpanel.GitRepositoryRegistry"/>
+        <projectService serviceImplementation="ro.faur.explorer.gitpanel.ActiveBrowserTracker"/>
 
         <!-- Remote SFTP notifications -->
         <notificationGroup id="SftpBrowser.Notifications" displayType="BALLOON"/>
@@ -96,6 +98,10 @@ Navigate, manage, and operate on files across your entire filesystem without lea
         <toolWindow id="System Explorer"
                     anchor="right"
                     factoryClass="ro.faur.explorer.ExplorerToolWindowFactory"/>
+        <toolWindow id="System Explorer Git"
+                    anchor="left"
+                    factoryClass="ro.faur.explorer.gitpanel.ui.GitPanelToolWindowFactory"
+                    icon="AllIcons.Vcs.Branch"/>
         <applicationConfigurable id="ro.faur.explorer.settings"
                                  displayName="System Explorer"
                                  parentId="tools"

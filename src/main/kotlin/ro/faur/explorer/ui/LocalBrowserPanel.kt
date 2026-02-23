@@ -1,6 +1,7 @@
 package ro.faur.explorer.ui
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -8,6 +9,10 @@ import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.ui.JBSplitter
 import com.intellij.ui.components.JBScrollPane
 import ro.faur.explorer.actions.NavigationActions
+import ro.faur.explorer.gitpanel.ActiveBrowserTracker
+import ro.faur.explorer.gitpanel.BackendType
+import ro.faur.explorer.gitpanel.GitRepositoryRegistry
+import ro.faur.explorer.gitpanel.LocalGitBackend
 import ro.faur.explorer.model.BookmarkManager
 import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.settings.ExplorerSettings
@@ -108,6 +113,32 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
         bookmarksPanel.highlightForPath(path)
         try { FrecencyStore.getInstance().recordVisit(path) } catch (_: Exception) {}
         updateStatus()
+        autoDetectLocalGitRepo(path)
+        ActiveBrowserTracker.getInstance(project).reportNavigation(null, path)
+    }
+
+    private fun autoDetectLocalGitRepo(startPath: String) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            var dir = java.io.File(startPath)
+            while (true) {
+                if (java.io.File(dir, ".git").isDirectory) {
+                    val repoPath = dir.absolutePath
+                    val registry = GitRepositoryRegistry.getInstance(project)
+                    val alreadyRegistered = registry.getAll().any {
+                        it.id.type == BackendType.LOCAL && it.repoPath == repoPath
+                    }
+                    if (!alreadyRegistered) {
+                        ApplicationManager.getApplication().invokeLater {
+                            registry.register(LocalGitBackend(repoPath))
+                        }
+                    }
+                    break
+                }
+                val parent = dir.parentFile ?: break
+                if (parent == dir) break
+                dir = parent
+            }
+        }
     }
 
     override fun navigateUp() {

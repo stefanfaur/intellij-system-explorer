@@ -37,6 +37,9 @@ import ro.faur.explorer.remote.git.RemoteGitStatusCache
 import ro.faur.explorer.remote.git.RemoteGitTreeDecorator
 import ro.faur.explorer.remote.git.RemoteGitVcs
 import ro.faur.explorer.remote.git.RemoteGitVcsManager
+import ro.faur.explorer.gitpanel.ActiveBrowserTracker
+import ro.faur.explorer.gitpanel.GitRepositoryRegistry
+import ro.faur.explorer.gitpanel.RemoteGitBackend
 import ro.faur.explorer.ui.BrowserPanel
 import java.awt.Color
 import java.awt.event.InputEvent
@@ -176,6 +179,7 @@ class RemoteBrowserPanel(
         val connKey = connectionName ?: return
         _currentPath   = path
         pathField.text = path
+        ActiveBrowserTracker.getInstance(project).reportNavigation(connKey, path)
 
         sftpFileTreeModel.loadDirectory(
             connKey  = connKey,
@@ -239,6 +243,7 @@ class RemoteBrowserPanel(
         fileOps           = null
         gitAvailable      = null
         if (oldName != null) {
+            GitRepositoryRegistry.getInstance(project).unregisterByConnection(oldName)
             directoryCache.invalidateAll(oldName)
             ActiveConnectionRegistry.clear(oldName)
             RemoteGitVcsManager.getInstance(project).clearConnection(oldName)
@@ -295,6 +300,9 @@ class RemoteBrowserPanel(
                 vcs.configure(connectionManager, connKey, path)
                 ActiveConnectionRegistry.set(ActiveConnectionInfo(connectionManager, connKey, path))
                 startGitStatusPolling(connKey)
+                val panelExecutor = RemoteGitCommandExecutor(connectionManager!!, connKey)
+                val backend = RemoteGitBackend(connKey, path, panelExecutor)
+                GitRepositoryRegistry.getInstance(project).register(backend)
             }
         }
     }

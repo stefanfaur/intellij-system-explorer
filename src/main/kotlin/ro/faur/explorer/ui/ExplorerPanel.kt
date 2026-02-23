@@ -7,6 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.util.ui.JBUI
 import ro.faur.explorer.actions.NavigationActions
+import ro.faur.explorer.gitpanel.ActiveBrowserTracker
 import ro.faur.explorer.remote.ConnectionProfile
 import ro.faur.explorer.remote.SftpConnectionManager
 import ro.faur.explorer.remote.ui.RemoteBrowserPanel
@@ -74,10 +75,12 @@ class ExplorerPanel(private val project: Project) : Disposable {
         }
         connectBtn.addActionListener { showConnectDropdown(connectBtn) }
 
-        // Keep nav state fresh when panel switches
+        // Keep nav state fresh when panel switches; also sync git panel to new active panel
         browserHost.onActivePanelChanged = { panel ->
             bindNavCallbackToPanel(panel)
             refreshNavButtons()
+            val connName = (panel as? RemoteBrowserPanel)?.getConnectionName()
+            ActiveBrowserTracker.getInstance(project).reportNavigation(connName, panel.currentPath())
         }
 
         // Bind callback to the initial local panel
