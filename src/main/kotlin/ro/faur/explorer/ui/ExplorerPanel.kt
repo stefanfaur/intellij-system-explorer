@@ -11,7 +11,11 @@ import ro.faur.explorer.remote.ConnectionProfile
 import ro.faur.explorer.remote.SftpConnectionManager
 import ro.faur.explorer.remote.ui.RemoteBrowserPanel
 import java.awt.BorderLayout
+import java.awt.Dimension
 import java.awt.FlowLayout
+import java.awt.Graphics
+import java.awt.Graphics2D
+import javax.swing.Icon
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -19,9 +23,9 @@ import javax.swing.JPanel
 /**
  * Thin outer shell for the System Explorer tool window.
  *
- * Owns only: a [BrowserHost] (CENTER) and a small toolbar (NORTH) with
- * Settings and Connect buttons. All browser logic lives in [BrowserHost]
- * and the [BrowserPanel] subclasses it manages.
+ * Owns: a [BrowserHost] (CENTER), a unified icon-only toolbar row (NORTH) with
+ * nav buttons and action buttons, and the tab strip (SOUTH).
+ * All browser logic lives in [BrowserHost] and the [BrowserPanel] subclasses it manages.
  */
 class ExplorerPanel(private val project: Project) : Disposable {
 
@@ -43,41 +47,83 @@ class ExplorerPanel(private val project: Project) : Disposable {
     fun getStatusText(): String      = browserHost.localPanel.getStatusText()
     internal fun updateStatus()      = browserHost.localPanel.updateStatus()
 
-    // ── Outer toolbar ──────────────────────────────────────────────────────
-    private val settingsButton = JButton(AllIcons.General.Settings).apply { toolTipText = "Settings" }
-    private val connectButton  = JButton("Connect ▾", AllIcons.Nodes.DataTables)
+    // ── Icon buttons ────────────────────────────────────────────────────────
+    private val backBtn     = iconButton(AllIcons.Actions.Back,           "Back (Alt+Left)")
+    private val forwardBtn  = iconButton(AllIcons.Actions.Forward,        "Forward (Alt+Right)")
+    private val upBtn       = iconButton(AllIcons.Actions.MoveUp,         "Up")
+    private val homeBtn     = iconButton(AllIcons.Nodes.HomeFolder,       "Home")
+    private val refreshBtn  = iconButton(AllIcons.Actions.Refresh,        "Refresh (F5)")
+    private val connectBtn  = iconButton(AllIcons.Webreferences.Server,   "Connect to SSH\u2026")
+    private val settingsBtn = iconButton(AllIcons.General.Settings,       "Settings")
 
     val component: JComponent
 
     init {
         Disposer.register(this, browserHost)
 
-        settingsButton.addActionListener {
+        // Wire nav buttons to active panel
+        backBtn.addActionListener    { browserHost.activePanel.navigateBack() }
+        forwardBtn.addActionListener { browserHost.activePanel.navigateForward() }
+        upBtn.addActionListener      { browserHost.activePanel.navigateUp() }
+        homeBtn.addActionListener    { browserHost.activePanel.navigateHome() }
+        refreshBtn.addActionListener { browserHost.activePanel.refresh() }
+
+        // Wire action buttons
+        settingsBtn.addActionListener {
             ShowSettingsUtil.getInstance().showSettingsDialog(project, "System Explorer")
         }
-        connectButton.addActionListener { showConnectDropdown(connectButton) }
+        connectBtn.addActionListener { showConnectDropdown(connectBtn) }
 
-        // Compact right-side action buttons — transparent so the header background shows through
-        val actionButtons = JPanel(FlowLayout(FlowLayout.RIGHT, 2, 0)).apply {
+        // Keep nav state fresh when panel switches
+        browserHost.onActivePanelChanged = { panel ->
+            bindNavCallbackToPanel(panel)
+            refreshNavButtons()
+        }
+
+        // Bind callback to the initial local panel
+        bindNavCallbackToPanel(browserHost.localPanel)
+        refreshNavButtons()
+
+        // ── Unified toolbar row ──────────────────────────────────────────────
+        val navGroup = JPanel(FlowLayout(FlowLayout.LEFT, 2, 0)).apply {
             isOpaque = false
-            add(connectButton)
-            add(settingsButton)
+            add(backBtn); add(forwardBtn); add(upBtn); add(homeBtn); add(refreshBtn)
         }
-
-        // Single combined header row: scrollable tabs (left) + action buttons (right)
-        val headerRow = JPanel(BorderLayout()).apply {
-            isOpaque = true
+        val actionGroup = JPanel(FlowLayout(FlowLayout.LEFT, 2, 0)).apply {
+            isOpaque = false
+            add(connectBtn); add(settingsBtn)
+        }
+        val toolbarLeft = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            add(navGroup); add(ToolbarSeparator()); add(actionGroup)
+        }
+        val toolbarRow = JPanel(BorderLayout()).apply {
+            isOpaque   = true
             background = JBUI.CurrentTheme.ToolWindow.headerBackground(true)
-            add(browserHost.tabScrollPane, BorderLayout.CENTER)
-            add(actionButtons,             BorderLayout.EAST)
+            border     = JBUI.Borders.empty(1, 2)
+            add(toolbarLeft, BorderLayout.WEST)
         }
 
+        // ── Root assembly ────────────────────────────────────────────────────
         val root = JPanel(BorderLayout())
-        root.add(headerRow,   BorderLayout.NORTH)
-        root.add(browserHost, BorderLayout.CENTER)
+        root.add(toolbarRow,                BorderLayout.NORTH)
+        root.add(browserHost,               BorderLayout.CENTER)
+        root.add(browserHost.tabScrollPane, BorderLayout.SOUTH)
 
         component = root
-        (root as javax.swing.JComponent).putClientProperty(ExplorerPanel::class.java.name, this)
+        (root as JComponent).putClientProperty(ExplorerPanel::class.java.name, this)
+    }
+
+    // ── Nav state helpers ──────────────────────────────────────────────────
+
+    private fun refreshNavButtons() {
+        val p = browserHost.activePanel
+        backBtn.isEnabled    = p.canGoBack()
+        forwardBtn.isEnabled = p.canGoForward()
+    }
+
+    private fun bindNavCallbackToPanel(panel: BrowserPanel) {
+        panel.onNavStateChanged = { refreshNavButtons() }
     }
 
     // ── Connect dropdown ───────────────────────────────────────────────────
@@ -130,20 +176,21 @@ class ExplorerPanel(private val project: Project) : Disposable {
     // ── Connect / disconnect ───────────────────────────────────────────────
 
     fun connectToRemote(profile: ConnectionProfile, preloadedPassword: String? = null) {
-        connectButton.isEnabled   = false
-        connectButton.toolTipText = "Connecting to ${profile.name}…"
+        connectBtn.isEnabled   = false
+        connectBtn.toolTipText = "Connecting to ${profile.name}…"
 
         fun onSuccess(ops: ro.faur.explorer.remote.SftpFileOperations, gitManager: SftpConnectionManager?) {
             val panel = RemoteBrowserPanel(project, connectionManager = gitManager)
             panel.connect(profile.name, ops, profile)
+            bindNavCallbackToPanel(panel)
             browserHost.addPanel(panel)
-            connectButton.isEnabled   = true
-            connectButton.toolTipText = null
+            connectBtn.isEnabled   = true
+            connectBtn.toolTipText = null
         }
 
         fun onError(e: Exception) {
-            connectButton.isEnabled   = true
-            connectButton.toolTipText = null
+            connectBtn.isEnabled   = true
+            connectBtn.toolTipText = null
             com.intellij.notification.NotificationGroupManager.getInstance()
                 .getNotificationGroup("SftpBrowser.Notifications")
                 .createNotification("Failed to connect to ${profile.name}",
@@ -151,7 +198,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
                 .notify(project)
         }
 
-        fun onCancelled() { connectButton.isEnabled = true; connectButton.toolTipText = null }
+        fun onCancelled() { connectBtn.isEnabled = true; connectBtn.toolTipText = null }
 
         fun connectGitManager(password: String?, keyPassphrase: String?): SftpConnectionManager? {
             return try { SftpConnectionManager().also { it.connect(profile, password, keyPassphrase) } }
@@ -232,5 +279,30 @@ class ExplorerPanel(private val project: Project) : Disposable {
 
     override fun dispose() {
         // browserHost is registered as child disposable via Disposer.register above
+    }
+}
+
+private fun iconButton(icon: Icon, tooltip: String): JButton = JButton(icon).apply {
+    isBorderPainted     = false
+    isContentAreaFilled = false
+    isFocusPainted      = false
+    isRolloverEnabled   = true
+    preferredSize       = JBUI.size(24, 24)
+    margin              = JBUI.emptyInsets()
+    toolTipText         = tooltip
+}
+
+private class ToolbarSeparator : JComponent() {
+    init {
+        preferredSize = JBUI.size(8, 16)
+        maximumSize   = Dimension(JBUI.scale(8), JBUI.scale(16))
+        isOpaque      = false
+    }
+    override fun paintComponent(g: Graphics) {
+        val g2 = g.create() as Graphics2D
+        g2.color = JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground()
+        val x = width / 2
+        g2.drawLine(x, 2, x, height - 2)
+        g2.dispose()
     }
 }
