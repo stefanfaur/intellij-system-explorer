@@ -213,16 +213,18 @@ class ExplorerPanel(private val project: Project) : Disposable {
                         ?: ro.faur.explorer.remote.security.CredentialHandler.getPassword(profile.name)
                     if (resolved == null) {
                         var cancelled = false
+                        var shouldRememberPassword = false
                         javax.swing.SwingUtilities.invokeAndWait {
                             val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, profile.name)
                             if (dialog.showAndGet()) {
                                 resolved = dialog.getPassword()
-                                if (dialog.rememberPassword.isSelected)
-                                    ro.faur.explorer.remote.security.CredentialHandler
-                                        .storePassword(profile.name, profile.username, resolved!!)
+                                shouldRememberPassword = dialog.rememberPassword.isSelected
                             } else cancelled = true
                         }
                         if (cancelled) { javax.swing.SwingUtilities.invokeLater { onCancelled() }; return@submit }
+                        if (shouldRememberPassword && resolved != null)
+                            ro.faur.explorer.remote.security.CredentialHandler
+                                .storePassword(profile.name, profile.username, resolved!!)
                     }
                     resolved
                 }
@@ -237,15 +239,16 @@ class ExplorerPanel(private val project: Project) : Disposable {
                 javax.swing.SwingUtilities.invokeLater { onSuccess(ops, gm) }
             } catch (e: Exception) {
                 if (profile.authMethod == ConnectionProfile.AuthMethod.KEY_FILE && storedKP == null) {
-                    var kp: String? = null; var cancelled = false
+                    var kp: String? = null; var cancelled = false; var shouldRememberKp = false
                     javax.swing.SwingUtilities.invokeAndWait {
                         val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, "'${profile.name}' key file")
                         if (dialog.showAndGet()) {
                             kp = dialog.getPassword()
-                            if (dialog.rememberPassword.isSelected)
-                                ro.faur.explorer.remote.security.CredentialHandler.storeKeyPassphrase(profile.name, kp!!)
+                            shouldRememberKp = dialog.rememberPassword.isSelected
                         } else cancelled = true
                     }
+                    if (shouldRememberKp && kp != null)
+                        ro.faur.explorer.remote.security.CredentialHandler.storeKeyPassphrase(profile.name, kp!!)
                     if (cancelled || kp == null) javax.swing.SwingUtilities.invokeLater { onCancelled() }
                     else try {
                         val ops = ro.faur.explorer.remote.SftpFileOperations.create(profile, password, kp)

@@ -5,7 +5,10 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
+import com.intellij.util.ui.JBUI
+import java.awt.Cursor
 import java.awt.FlowLayout
+import java.awt.Font
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
@@ -59,10 +62,13 @@ class PasswordPromptDialog(
     }
 
     private fun rememberPasswordRow(): JPanel {
-        val hint = JLabel("?").apply {
-            toolTipText = "Stored securely via IntelliJ's credential store (OS keychain on macOS/Windows, KWallet/GNOME Keyring on Linux). Never saved as plain text."
-            foreground = java.awt.Color(128, 128, 128)
-            font = font.deriveFont(font.size2D - 1f)
+        val hint = JLabel(" ?").apply {
+            toolTipText = "Stored securely via IntelliJ's credential store (OS keychain on macOS/Windows, " +
+                          "KWallet/GNOME Keyring on Linux). Never saved as plain text."
+            foreground  = JBUI.CurrentTheme.Label.disabledForeground()
+            font        = font.deriveFont(Font.BOLD, font.size2D - 1f)
+            border      = JBUI.Borders.empty(0, 4)
+            cursor      = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
         }
         return JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
             isOpaque = false

@@ -41,7 +41,7 @@ abstract class BrowserPanel : JPanel(BorderLayout()), Disposable {
 
     // ── Toggle buttons (replaces checkboxes) ──────────────────────────────
     val hiddenToggle      = iconToggle(AllIcons.Actions.Show, "Show hidden files")
-    val permissionsToggle: JButton? = if (!SystemInfo.isWindows) iconToggle(AllIcons.Actions.Properties, "Show permissions") else null
+    val permissionsToggle: JButton? = if (!SystemInfo.isWindows) iconToggle(AllIcons.Nodes.SecurityRole, "Show permissions") else null
 
     var showHidden: Boolean      = false ; protected set
     var showPermissions: Boolean = false ; protected set
