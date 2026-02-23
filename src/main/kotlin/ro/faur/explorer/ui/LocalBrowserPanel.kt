@@ -67,14 +67,11 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
 
         // Restore persisted toggle state
         val settings = ExplorerSettings.getInstance()
-        permissionsCheckbox?.isSelected  = settings.state.showFilePermissions
         fileTreeComponent.showPermissions = settings.state.showFilePermissions
         showPermissions                   = settings.state.showFilePermissions
+        refreshToggleAppearance()
 
-        wireSharedToolbarListeners(
-            onUp   = { NavigationActions.goToParent(_currentPath).let { if (it != _currentPath) navigateTo(it) } },
-            onHome = { navigateTo(NavigationActions.goHome(project)) }
-        )
+        wireSharedListeners()
 
         wireToggleListeners(
             onHiddenChanged = { hidden ->
@@ -99,7 +96,7 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
         fileTreeComponent.setRoot(_currentPath)
         loadBookmarks()
         updateStatus()
-        updateHistoryButtons()
+        notifyNavStateChanged()
     }
 
     // ── Abstract contract ──────────────────────────────────────────────────
@@ -115,6 +112,10 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
 
     override fun navigateUp() {
         NavigationActions.goToParent(_currentPath).let { if (it != _currentPath) navigateTo(it) }
+    }
+
+    override fun navigateHome() {
+        navigateTo(NavigationActions.goHome(project))
     }
 
     override fun refresh() {
@@ -136,7 +137,7 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
     }
 
     fun toggleHiddenFiles() {
-        hiddenCheckbox.isSelected = !hiddenCheckbox.isSelected
+        hiddenToggle.doClick()
     }
 
     fun getStatusText(): String = statusLabel.text

@@ -156,10 +156,7 @@ class RemoteBrowserPanel(
 
         assemblePanelUI(JBScrollPane(tree))
 
-        wireSharedToolbarListeners(
-            onUp   = { RemotePathUtils.parentPath(_currentPath).let { if (it != _currentPath) navigateTo(it) } },
-            onHome = { navigateTo("/") }
-        )
+        wireSharedListeners()
 
         wireToggleListeners(
             onHiddenChanged      = { doNavigateTo(_currentPath) },
@@ -197,6 +194,10 @@ class RemoteBrowserPanel(
         RemotePathUtils.parentPath(_currentPath).let { if (it != _currentPath) navigateTo(it) }
     }
 
+    override fun navigateHome() {
+        navigateTo("/")
+    }
+
     override fun refresh() {
         val connKey = connectionName ?: return
         directoryCache.invalidate(connKey, _currentPath)
@@ -226,7 +227,7 @@ class RemoteBrowserPanel(
         history.push("/")
         doNavigateTo("/")
         pathField.text = "/"
-        updateHistoryButtons()
+        notifyNavStateChanged()
     }
 
     fun disconnect() {
