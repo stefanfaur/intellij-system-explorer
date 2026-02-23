@@ -6,6 +6,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileEditor.impl.NonProjectFileWritingAccessProvider
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
@@ -516,6 +517,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
             onDirectoryDoubleClicked?.invoke(file)
             return
         }
+        NonProjectFileWritingAccessProvider.allowWriting(listOf(file))
         FileEditorManager.getInstance(project).openFile(file, true)
     }
 

@@ -18,6 +18,7 @@ import ro.faur.explorer.remote.CrossPanelTransferService
 import ro.faur.explorer.remote.DirectoryCache
 import ro.faur.explorer.remote.RemoteBookmark
 import ro.faur.explorer.remote.RemoteBookmarkManager
+import ro.faur.explorer.remote.RemoteEditorManager
 import ro.faur.explorer.remote.RemoteFileClipboardData
 import ro.faur.explorer.remote.RemoteFileTransferable
 import ro.faur.explorer.remote.RemotePathUtils
@@ -26,6 +27,7 @@ import ro.faur.explorer.remote.SftpEntry
 import ro.faur.explorer.remote.SftpFileOperations
 import ro.faur.explorer.remote.SftpFileTreeModel
 import ro.faur.explorer.remote.SshTerminalAction
+import ro.faur.explorer.remote.security.SecureTempFileManager
 import ro.faur.explorer.remote.git.ActiveConnectionInfo
 import ro.faur.explorer.remote.git.ActiveConnectionRegistry
 import ro.faur.explorer.remote.git.RemoteGitCommandExecutor
@@ -53,6 +55,8 @@ import javax.swing.JOptionPane
 import javax.swing.JPopupMenu
 import javax.swing.JSeparator
 import javax.swing.SwingUtilities
+import javax.swing.event.TreeExpansionEvent
+import javax.swing.event.TreeWillExpandListener
 import javax.swing.tree.DefaultMutableTreeNode
 
 /**
@@ -92,6 +96,8 @@ class RemoteBrowserPanel(
     override val panelLabel: String get() = connectionProfile?.name ?: connectionName ?: "Remote"
     override val panelIcon: Icon = AllIcons.Nodes.DataTables
 
+    private val editorManager = RemoteEditorManager(project, SecureTempFileManager())
+
     init {
         tree.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
@@ -99,10 +105,7 @@ class RemoteBrowserPanel(
                     e.keyCode == KeyEvent.VK_BACK_SPACE -> navigateBack()
                     e.keyCode == KeyEvent.VK_ENTER -> {
                         val entries = getSelectedEntries()
-                        if (entries.size == 1) {
-                            val entry = entries.first()
-                            if (entry.isDirectory) navigateTo(entry.path)
-                        }
+                        if (entries.size == 1) openEntry(entries.first())
                     }
                     e.keyCode == KeyEvent.VK_C && (e.modifiersEx and InputEvent.CTRL_DOWN_MASK) != 0 ->
                         copySelectedToClipboard()
@@ -115,11 +118,37 @@ class RemoteBrowserPanel(
                 if (e.clickCount == 2 && SwingUtilities.isLeftMouseButton(e)) {
                     val node = getNodeAt(e) ?: return
                     val entry = node.userObject as? SftpEntry ?: return
-                    if (entry.isDirectory) navigateTo(entry.path)
+                    openEntry(entry)
                 }
             }
             override fun mousePressed(e: MouseEvent)  { if (e.isPopupTrigger) showContextMenu(e) }
             override fun mouseReleased(e: MouseEvent) { if (e.isPopupTrigger) showContextMenu(e) }
+        })
+
+        tree.addTreeWillExpandListener(object : TreeWillExpandListener {
+            override fun treeWillExpand(event: TreeExpansionEvent) {
+                val node  = event.path.lastPathComponent as? DefaultMutableTreeNode ?: return
+                val entry = node.userObject as? SftpEntry ?: return
+                if (!entry.isDirectory) return
+                // Only trigger if still showing the loading placeholder
+                val isPlaceholder = node.childCount == 1 &&
+                    (node.firstChild as? DefaultMutableTreeNode)?.userObject == SftpFileTreeModel.LOADING_PLACEHOLDER
+                if (!isPlaceholder) return
+
+                val ops     = fileOps ?: return
+                val connKey = connectionName ?: return
+                sftpFileTreeModel.loadChildren(
+                    connKey    = connKey,
+                    parentNode = node,
+                    path       = entry.path,
+                    fileOps    = ops,
+                    filter     = { entries ->
+                        val visible = applyFilters(entries)
+                        visible
+                    }
+                )
+            }
+            override fun treeWillCollapse(event: TreeExpansionEvent) {}
         })
 
         tree.transferHandler = RemoteTreeTransferHandler(this)
@@ -155,11 +184,12 @@ class RemoteBrowserPanel(
             connKey  = connKey,
             path     = path,
             fileOps  = ops,
-            onLoaded = { entries ->
+            filter   = { entries ->
                 val visible = applyFilters(entries)
-                onDirectoryLoaded(connKey, path, entries)
                 updateStatusFromEntries(visible)
-            }
+                visible
+            },
+            onLoaded = { entries -> onDirectoryLoaded(connKey, path, entries) }
         )
     }
 
@@ -315,7 +345,7 @@ class RemoteBrowserPanel(
             isEnabled = selected.size == 1
             addActionListener {
                 val entry = selected.firstOrNull() ?: return@addActionListener
-                if (entry.isDirectory) navigateTo(entry.path)
+                openEntry(entry)
             }
         }
         menu.add(openItem)
@@ -458,6 +488,14 @@ class RemoteBrowserPanel(
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
+    private fun openEntry(entry: SftpEntry) {
+        if (entry.isDirectory) { navigateTo(entry.path); return }
+        val ops  = fileOps ?: return
+        val host = connectionProfile?.host ?: return
+        val conn = connectionName ?: return
+        editorManager.openRemoteFile(conn, host, entry.path, ops)
+    }
+
     private fun getNodeAt(e: MouseEvent): DefaultMutableTreeNode? {
         val treePath = tree.getPathForLocation(e.x, e.y) ?: return null
         return treePath.lastPathComponent as? DefaultMutableTreeNode
@@ -517,7 +555,12 @@ class RemoteBrowserPanel(
             setIcon(when { entry.isDirectory -> AllIcons.Nodes.Folder; entry.isSymlink -> AllIcons.Nodes.Symlink; else -> AllIcons.FileTypes.Any_type })
             append(if (entry.isSymlink) "${entry.name} →" else entry.name, mainAttrs)
             if (!entry.isDirectory) append("  ${formatSize(entry.size)}", SimpleTextAttributes.GRAY_ATTRIBUTES)
-            if (showPermissions && entry.permissions != null) append("  ${entry.permissions}", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+            if (showPermissions && entry.permissions != null) {
+                val treeWidth = tree.visibleRect.width
+                val permissionsWidth = 120
+                appendTextPadding(treeWidth - permissionsWidth)
+                append(entry.permissions!!, SimpleTextAttributes.GRAYED_ATTRIBUTES)
+            }
             if (entry.isSymlink && !entry.isBrokenSymlink) toolTipText = "Symlink: ${entry.name}"
             else if (entry.isBrokenSymlink) toolTipText = "Broken symlink: ${entry.name}"
         }

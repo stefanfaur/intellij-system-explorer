@@ -5,10 +5,12 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
+import java.awt.FlowLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
 import javax.swing.JComponent
+import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.JPasswordField
 
@@ -44,7 +46,7 @@ class PasswordPromptDialog(
         panel.add(passwordField, gbc)
 
         gbc.gridy = 2; gbc.gridwidth = 2; gbc.weightx = 0.0
-        panel.add(rememberPassword, gbc)
+        panel.add(rememberPasswordRow(), gbc)
 
         return panel
     }
@@ -54,6 +56,19 @@ class PasswordPromptDialog(
             return ValidationInfo("Password is required", passwordField)
         }
         return null
+    }
+
+    private fun rememberPasswordRow(): JPanel {
+        val hint = JLabel("?").apply {
+            toolTipText = "Stored securely via IntelliJ's credential store (OS keychain on macOS/Windows, KWallet/GNOME Keyring on Linux). Never saved as plain text."
+            foreground = java.awt.Color(128, 128, 128)
+            font = font.deriveFont(font.size2D - 1f)
+        }
+        return JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            add(rememberPassword)
+            add(hint)
+        }
     }
 
     fun getPassword(): String = String(passwordField.password)

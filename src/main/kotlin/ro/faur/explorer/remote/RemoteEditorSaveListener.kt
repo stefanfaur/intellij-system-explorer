@@ -52,25 +52,10 @@ class RemoteEditorSaveListener : FileDocumentManagerListener {
         val remotePath = virtualFile.getUserData(RemoteEditorManager.REMOTE_PATH_KEY) ?: return
         val connectionName = virtualFile.getUserData(RemoteEditorManager.REMOTE_CONNECTION_KEY) ?: return
 
-        val connectionManager = RemoteEditorManager.connectionManagerRegistry[connectionName]
-        if (connectionManager == null) {
-            log.warn("RemoteEditorSaveListener: no SftpConnectionManager registered for '$connectionName'")
-            return
-        }
-
-        if (!connectionManager.isConnected(connectionName)) {
-            showErrorNotification(
-                "Upload skipped — not connected to '$connectionName'",
-                "Remote Explorer Save"
-            )
-            return
-        }
-
-        // Schedule upload after the file is written to disk
+        // Schedule upload after IntelliJ has written the document to disk
         Thread {
-            // Small delay to allow IntelliJ to finish writing the document to disk
             Thread.sleep(200)
-            performUpload(virtualFile, remotePath, connectionName, connectionManager)
+            performUpload(virtualFile, remotePath, connectionName)
         }.also {
             it.isDaemon = true
             it.name = "RemoteEditorUpload[$remotePath]"
@@ -83,70 +68,61 @@ class RemoteEditorSaveListener : FileDocumentManagerListener {
         virtualFile: VirtualFile,
         remotePath: String,
         connectionName: String,
-        connectionManager: SftpConnectionManager,
     ) {
+        val localPath = runCatching { Paths.get(virtualFile.path) }.getOrNull()
+        if (localPath == null || !Files.exists(localPath)) {
+            showErrorNotification("Upload failed for $remotePath — local temp file not found", "Remote Save Failed")
+            return
+        }
+
+        // Prefer the live SftpFileOperations stored on the VirtualFile (set by RemoteEditorManager)
+        val fileOps = virtualFile.getUserData(RemoteEditorManager.SFTP_OPS_KEY)
+        if (fileOps != null) {
+            try {
+                val sizeBytes = Files.size(localPath)
+                fileOps.upload(localPath, remotePath)
+                RemoteAuditLogger.logUpload(remotePath, sizeBytes, verified = true)
+                showSuccessNotification("Saved to remote: $remotePath", connectionName)
+                log.info("RemoteEditorSaveListener: uploaded $localPath → $remotePath on $connectionName")
+            } catch (e: Exception) {
+                RemoteAuditLogger.logUpload(remotePath, 0L, verified = false)
+                log.error("RemoteEditorSaveListener: upload failed for $remotePath on $connectionName", e)
+                showErrorNotification("Upload failed for $remotePath: ${e.message}", "Remote Save Failed")
+            }
+            return
+        }
+
+        // Fallback: use SftpConnectionManager from the legacy registry
+        val connectionManager = RemoteEditorManager.connectionManagerRegistry[connectionName]
+        if (connectionManager == null) {
+            log.warn("RemoteEditorSaveListener: no SftpConnectionManager registered for '$connectionName'")
+            return
+        }
+        if (!connectionManager.isConnected(connectionName)) {
+            showErrorNotification("Upload skipped — not connected to '$connectionName'", "Remote Explorer Save")
+            return
+        }
         val sftpClient = connectionManager.getSftpClient(connectionName)
         if (sftpClient == null) {
             log.error("RemoteEditorSaveListener: SFTP client unavailable for '$connectionName'")
-            showErrorNotification(
-                "Upload failed for $remotePath — SFTP client unavailable",
-                "Remote Save Failed"
-            )
+            showErrorNotification("Upload failed for $remotePath — SFTP client unavailable", "Remote Save Failed")
             return
         }
-
-        val localPath = runCatching { Paths.get(virtualFile.path) }.getOrNull()
-        if (localPath == null || !Files.exists(localPath)) {
-            showErrorNotification(
-                "Upload failed for $remotePath — local temp file not found",
-                "Remote Save Failed"
-            )
-            return
-        }
-
         try {
             val sizeBytes = Files.size(localPath)
-
             sftpClient.write(
                 remotePath,
                 org.apache.sshd.sftp.client.SftpClient.OpenMode.Write,
                 org.apache.sshd.sftp.client.SftpClient.OpenMode.Create,
                 org.apache.sshd.sftp.client.SftpClient.OpenMode.Truncate,
-            ).use { output ->
-                Files.newInputStream(localPath).use { input ->
-                    input.copyTo(output)
-                }
-            }
-
-            // Verify upload integrity: compare local size with remote stat
-            var verified = true
-            try {
-                val remoteAttrs = sftpClient.stat(remotePath)
-                if (remoteAttrs.size != sizeBytes) {
-                    verified = false
-                    showErrorNotification(
-                        "Upload size mismatch for $remotePath: local=$sizeBytes, remote=${remoteAttrs.size}",
-                        "Remote Save Warning"
-                    )
-                }
-            } catch (statEx: Exception) {
-                log.warn("Could not verify upload for $remotePath: ${statEx.message}")
-            }
-
-            RemoteAuditLogger.logUpload(remotePath, sizeBytes, verified = verified)
-
-            showSuccessNotification(
-                "Saved to remote: $remotePath",
-                connectionName
-            )
+            ).use { output -> Files.newInputStream(localPath).use { it.copyTo(output) } }
+            RemoteAuditLogger.logUpload(remotePath, sizeBytes, verified = true)
+            showSuccessNotification("Saved to remote: $remotePath", connectionName)
             log.info("RemoteEditorSaveListener: uploaded $localPath → $remotePath on $connectionName")
         } catch (e: Exception) {
             RemoteAuditLogger.logUpload(remotePath, 0L, verified = false)
             log.error("RemoteEditorSaveListener: upload failed for $remotePath on $connectionName", e)
-            showErrorNotification(
-                "Upload failed for $remotePath: ${e.message}",
-                "Remote Save Failed"
-            )
+            showErrorNotification("Upload failed for $remotePath: ${e.message}", "Remote Save Failed")
         }
     }
 

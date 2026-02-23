@@ -15,6 +15,11 @@ import javax.swing.tree.DefaultTreeModel
 class SftpFileTreeModel(
     private val cache: DirectoryCache,
 ) {
+    companion object {
+        /** Placeholder userObject inserted into unexpanded directory nodes. */
+        const val LOADING_PLACEHOLDER = "loading..."
+    }
+
     private val root = DefaultMutableTreeNode("(not connected)")
     val treeModel: DefaultTreeModel = DefaultTreeModel(root)
 
@@ -28,19 +33,25 @@ class SftpFileTreeModel(
     }
 
     /**
-     * Loads directory contents for [path] using [fileOps], updating the tree model on the EDT.
+     * Loads directory contents for [path] using [fileOps], replacing the tree root on the EDT.
+     * Directory nodes are given a [LOADING_PLACEHOLDER] child so the expand arrow is shown.
      *
      * @param connKey   The connection name (used as cache key).
      * @param path      The remote directory path to list.
      * @param fileOps   The SFTP operations handle for listing.
+     * @param filter    Optional function applied to raw entries before building tree nodes.
+     *                  Receives all entries; returns the subset to display. Callers can
+     *                  perform side-effects (e.g. update status bar) inside this lambda.
      * @param onLoaded  Optional callback invoked on the I/O thread with the raw entries
-     *                  (before sorting), for callers that need to inspect them (e.g. git root detection).
+     *                  (before filtering/sorting), for callers that need to inspect them
+     *                  (e.g. git root detection).
      * @param onError   Optional callback invoked on the I/O thread when listing fails.
      */
     fun loadDirectory(
         connKey: String,
         path: String,
         fileOps: SftpFileOperations,
+        filter: ((List<SftpEntry>) -> List<SftpEntry>)? = null,
         onLoaded: ((List<SftpEntry>) -> Unit)? = null,
         onError: ((Exception) -> Unit)? = null,
     ) {
@@ -51,13 +62,14 @@ class SftpFileTreeModel(
 
                 onLoaded?.invoke(entries)
 
-                val sorted = entries.sortedWith(
+                val toDisplay = filter?.invoke(entries) ?: entries
+                val sorted = toDisplay.sortedWith(
                     compareBy<SftpEntry> { !it.isDirectory }.thenBy { it.name.lowercase() }
                 )
 
                 ApplicationManager.getApplication().invokeLater {
                     val newRoot = DefaultMutableTreeNode(path)
-                    sorted.forEach { entry -> newRoot.add(DefaultMutableTreeNode(entry)) }
+                    sorted.forEach { entry -> newRoot.add(makeNode(entry)) }
                     treeModel.setRoot(newRoot)
                     treeModel.reload()
                 }
@@ -70,5 +82,59 @@ class SftpFileTreeModel(
                 }
             }
         }.also { it.isDaemon = true; it.name = "RemoteTree[$path]" }.start()
+    }
+
+    /**
+     * Lazily loads children of an already-visible directory node.
+     *
+     * Intended for use by a [javax.swing.event.TreeWillExpandListener]: called when the
+     * user clicks the expand arrow on a directory node that still has the
+     * [LOADING_PLACEHOLDER] child.
+     *
+     * Guards against concurrent expansions: if the node has already been populated
+     * (childCount != 1 or child is not the placeholder) the update is skipped.
+     */
+    fun loadChildren(
+        connKey: String,
+        parentNode: DefaultMutableTreeNode,
+        path: String,
+        fileOps: SftpFileOperations,
+        filter: ((List<SftpEntry>) -> List<SftpEntry>)? = null,
+        onLoaded: ((List<SftpEntry>) -> Unit)? = null,
+        onError: ((Exception) -> Unit)? = null,
+    ) {
+        Thread {
+            try {
+                val entries: List<SftpEntry> = cache.get(connKey, path)
+                    ?: fileOps.listDirectory(path, includeHidden = true).also { cache.put(connKey, path, it) }
+
+                onLoaded?.invoke(entries)
+
+                val toDisplay = filter?.invoke(entries) ?: entries
+                val sorted = toDisplay.sortedWith(
+                    compareBy<SftpEntry> { !it.isDirectory }.thenBy { it.name.lowercase() }
+                )
+
+                ApplicationManager.getApplication().invokeLater {
+                    // Skip if another expansion already populated this node
+                    val isStillPlaceholder = parentNode.childCount == 1 &&
+                            (parentNode.firstChild as? DefaultMutableTreeNode)?.userObject == LOADING_PLACEHOLDER
+                    if (!isStillPlaceholder) return@invokeLater
+
+                    parentNode.removeAllChildren()
+                    sorted.forEach { entry -> parentNode.add(makeNode(entry)) }
+                    treeModel.nodeStructureChanged(parentNode)
+                }
+            } catch (e: Exception) {
+                onError?.invoke(e)
+            }
+        }.also { it.isDaemon = true; it.name = "RemoteExpand[$path]" }.start()
+    }
+
+    /** Creates a tree node for [entry], adding a placeholder child if it is a directory. */
+    private fun makeNode(entry: SftpEntry): DefaultMutableTreeNode {
+        val node = DefaultMutableTreeNode(entry)
+        if (entry.isDirectory) node.add(DefaultMutableTreeNode(LOADING_PLACEHOLDER))
+        return node
     }
 }

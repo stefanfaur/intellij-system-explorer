@@ -9,6 +9,7 @@ import ro.faur.explorer.remote.ConnectionProfile
 import ro.faur.explorer.remote.SftpFileOperations
 import java.awt.Color
 import java.awt.Dimension
+import java.awt.FlowLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
@@ -147,7 +148,7 @@ class ConnectionDialog(
 
         // Remember password checkbox (indented under password)
         gbc.gridx = 1; gbc.gridy = row; gbc.gridwidth = 2; gbc.fill = GridBagConstraints.NONE
-        panel.add(rememberPasswordCheck, gbc)
+        panel.add(rememberPasswordRow(), gbc)
         row++
 
         // Separator before test area
@@ -215,6 +216,19 @@ class ConnectionDialog(
     override fun doCancelAction() {
         testExecutor?.shutdownNow()
         super.doCancelAction()
+    }
+
+    private fun rememberPasswordRow(): JPanel {
+        val hint = JLabel("?").apply {
+            toolTipText = "Stored securely via IntelliJ's credential store (OS keychain on macOS/Windows, KWallet/GNOME Keyring on Linux). Never saved as plain text."
+            foreground = Color(128, 128, 128)
+            font = font.deriveFont(font.size2D - 1f)
+        }
+        return JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            add(rememberPasswordCheck)
+            add(hint)
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

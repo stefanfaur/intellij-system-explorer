@@ -5,6 +5,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.util.ui.JBUI
 import ro.faur.explorer.actions.NavigationActions
 import ro.faur.explorer.remote.ConnectionProfile
 import ro.faur.explorer.remote.SftpConnectionManager
@@ -56,14 +57,24 @@ class ExplorerPanel(private val project: Project) : Disposable {
         }
         connectButton.addActionListener { showConnectDropdown(connectButton) }
 
-        val outerToolbar = JPanel(FlowLayout(FlowLayout.RIGHT, 2, 2)).apply {
+        // Compact right-side action buttons — transparent so the header background shows through
+        val actionButtons = JPanel(FlowLayout(FlowLayout.RIGHT, 2, 0)).apply {
+            isOpaque = false
             add(connectButton)
             add(settingsButton)
         }
 
+        // Single combined header row: scrollable tabs (left) + action buttons (right)
+        val headerRow = JPanel(BorderLayout()).apply {
+            isOpaque = true
+            background = JBUI.CurrentTheme.ToolWindow.headerBackground(true)
+            add(browserHost.tabScrollPane, BorderLayout.CENTER)
+            add(actionButtons,             BorderLayout.EAST)
+        }
+
         val root = JPanel(BorderLayout())
-        root.add(outerToolbar, BorderLayout.NORTH)
-        root.add(browserHost,  BorderLayout.CENTER)
+        root.add(headerRow,   BorderLayout.NORTH)
+        root.add(browserHost, BorderLayout.CENTER)
 
         component = root
         (root as javax.swing.JComponent).putClientProperty(ExplorerPanel::class.java.name, this)

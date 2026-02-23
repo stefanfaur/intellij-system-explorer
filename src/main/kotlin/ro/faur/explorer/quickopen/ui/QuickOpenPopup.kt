@@ -1,5 +1,6 @@
 package ro.faur.explorer.quickopen.ui
 
+import com.intellij.openapi.fileEditor.impl.NonProjectFileWritingAccessProvider
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
@@ -208,6 +209,7 @@ object QuickOpenPopup {
 
     private fun openFile(project: Project, path: String) {
         val vf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(path) ?: return
+        NonProjectFileWritingAccessProvider.allowWriting(listOf(vf))
         FileEditorManager.getInstance(project).openFile(vf, true)
     }
 }

@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.fileEditor.impl.NonProjectFileWritingAccessProvider
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
@@ -771,7 +772,10 @@ class QuickOpenPanel(
                     }
                     "Open in Editor" -> {
                         val vf = LocalFileSystem.getInstance().findFileByPath(candidate.fullPath)
-                        if (vf != null) FileEditorManager.getInstance(project).openFile(vf, true)
+                        if (vf != null) {
+                            NonProjectFileWritingAccessProvider.allowWriting(listOf(vf))
+                            FileEditorManager.getInstance(project).openFile(vf, true)
+                        }
                         popup.closeOk(null)
                     }
                     "Reveal in Finder" -> revealInFinder()
