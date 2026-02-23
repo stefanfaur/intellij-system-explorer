@@ -1,0 +1,191 @@
+package ro.faur.explorer.ui
+
+import com.intellij.icons.AllIcons
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.wm.IdeFocusManager
+import com.intellij.ui.JBSplitter
+import com.intellij.ui.components.JBScrollPane
+import ro.faur.explorer.actions.NavigationActions
+import ro.faur.explorer.model.BookmarkManager
+import ro.faur.explorer.quickopen.ranking.FrecencyStore
+import ro.faur.explorer.settings.ExplorerSettings
+import ro.faur.explorer.util.FileSizeFormatter
+import javax.swing.Icon
+
+/**
+ * Browser panel backed by the local filesystem (IntelliJ VFS).
+ *
+ * Wraps [FileTreeComponent] and [BookmarksPanel].
+ * This panel is always present as panel #0 in [BrowserHost].
+ */
+class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
+
+    companion object {
+        private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(LocalBrowserPanel::class.java)
+    }
+
+    override val panelLabel: String = "Local"
+    override val panelIcon: Icon    = AllIcons.Nodes.HomeFolder
+
+    internal val fileTreeComponent = FileTreeComponent(project)
+
+    private val bookmarksPanel = BookmarksPanel(
+        onBookmarkSelected = { path -> navigateTo(path) },
+        onBookmarkMoved = { from, to ->
+            try { BookmarkManager.getInstance().moveBookmark(from, to) }
+            catch (e: Exception) { LOG.warn("Failed to move bookmark", e) }
+        },
+        onBookmarkDeleted = { index ->
+            try {
+                val mgr = BookmarkManager.getInstance()
+                val bookmarks = mgr.getBookmarks()
+                if (index in bookmarks.indices) {
+                    mgr.removeBookmark(bookmarks[index].path)
+                    loadBookmarks()
+                }
+            } catch (e: Exception) { LOG.warn("Failed to delete bookmark", e) }
+        }
+    )
+
+    private var _currentPath: String = NavigationActions.goHome(project)
+
+    init {
+        history.push(_currentPath)
+        Disposer.register(this, fileTreeComponent)
+
+        fileTreeComponent.onDirectoryDoubleClicked = { vf -> navigateTo(vf.path) }
+        fileTreeComponent.onSelectionChanged       = { updateStatus() }
+        fileTreeComponent.onFilesModified          = { updateStatus(); loadBookmarks() }
+
+        val splitter = JBSplitter(false, 0.2f).apply {
+            firstComponent  = bookmarksPanel.component
+            secondComponent = JBScrollPane(fileTreeComponent.tree)
+        }
+        assemblePanelUI(splitter)
+
+        // Restore persisted toggle state
+        val settings = ExplorerSettings.getInstance()
+        permissionsCheckbox?.isSelected  = settings.state.showFilePermissions
+        fileTreeComponent.showPermissions = settings.state.showFilePermissions
+        showPermissions                   = settings.state.showFilePermissions
+
+        wireSharedToolbarListeners(
+            onUp   = { NavigationActions.goToParent(_currentPath).let { if (it != _currentPath) navigateTo(it) } },
+            onHome = { navigateTo(NavigationActions.goHome(project)) }
+        )
+
+        wireToggleListeners(
+            onHiddenChanged = { hidden ->
+                fileTreeComponent.showHidden = hidden
+                fileTreeComponent.setRoot(_currentPath)
+                updateStatus()
+            },
+            onPermissionsChanged = { perms ->
+                ExplorerSettings.getInstance().state.showFilePermissions = perms
+                fileTreeComponent.showPermissions = perms
+                fileTreeComponent.tree.repaint()
+            }
+        )
+
+        filterField.addActionListener {
+            fileTreeComponent.filterPattern = filterField.text.trim()
+            fileTreeComponent.setRoot(_currentPath)
+            updateStatus()
+        }
+
+        pathField.text = _currentPath
+        fileTreeComponent.setRoot(_currentPath)
+        loadBookmarks()
+        updateStatus()
+        updateHistoryButtons()
+    }
+
+    // ── Abstract contract ──────────────────────────────────────────────────
+
+    override fun doNavigateTo(path: String) {
+        _currentPath   = path
+        pathField.text = path
+        fileTreeComponent.setRoot(path)
+        bookmarksPanel.highlightForPath(path)
+        try { FrecencyStore.getInstance().recordVisit(path) } catch (_: Exception) {}
+        updateStatus()
+    }
+
+    override fun navigateUp() {
+        NavigationActions.goToParent(_currentPath).let { if (it != _currentPath) navigateTo(it) }
+    }
+
+    override fun refresh() {
+        fileTreeComponent.setRoot(_currentPath)
+        updateStatus()
+    }
+
+    override fun currentPath(): String = _currentPath
+
+    override fun getSelectedPaths(): List<String> =
+        fileTreeComponent.getSelectedFiles().map { it.path }
+
+    // ── Local-specific public API ──────────────────────────────────────────
+
+    fun focusFileTree() {
+        val tree = fileTreeComponent.tree
+        if (tree.selectionCount == 0 && tree.rowCount > 0) tree.setSelectionRow(0)
+        IdeFocusManager.getInstance(project).requestFocus(tree, true)
+    }
+
+    fun toggleHiddenFiles() {
+        hiddenCheckbox.isSelected = !hiddenCheckbox.isSelected
+    }
+
+    fun getStatusText(): String = statusLabel.text
+
+    // ── Overridden path-field handler (validates VFS path) ─────────────────
+
+    override fun onPathEntered(path: String) {
+        val vf = LocalFileSystem.getInstance().findFileByPath(path) ?: return
+        if (vf.isDirectory) navigateTo(path)
+    }
+
+    // ── Internal ───────────────────────────────────────────────────────────
+
+    private fun loadBookmarks() {
+        try {
+            val mgr = BookmarkManager.getInstance()
+            bookmarksPanel.setBookmarks(mgr.getBookmarks())
+            bookmarksPanel.highlightForPath(_currentPath)
+        } catch (e: Exception) { LOG.warn("Failed to load bookmarks", e) }
+    }
+
+    internal fun updateStatus() {
+        val selected = fileTreeComponent.getSelectedFiles()
+        if (selected.isNotEmpty()) {
+            val dirs  = selected.filter { it.isDirectory }
+            val files = selected.filter { !it.isDirectory }
+            val fileSizeBytes  = files.sumOf { it.length }
+            val dirChildCount  = dirs.sumOf { FileSizeFormatter.countDirectChildren(it) }
+            statusLabel.text = when {
+                dirs.isEmpty()  -> "${selected.size} selected -- ${FileSizeFormatter.format(fileSizeBytes)}"
+                files.isEmpty() -> {
+                    val dirSizeBytes = dirs.sumOf { FileSizeFormatter.computeDirectoryImmediateSize(it) }
+                    "${selected.size} selected -- $dirChildCount items, ${FileSizeFormatter.format(dirSizeBytes)}"
+                }
+                else -> if (dirChildCount > 0)
+                    "${selected.size} selected -- $dirChildCount items in dirs, ${FileSizeFormatter.format(fileSizeBytes)} in files"
+                else
+                    "${selected.size} selected -- ${FileSizeFormatter.format(fileSizeBytes)}"
+            }
+        } else {
+            val children    = fileTreeComponent.getRootChildren()
+            val folderCount = children.count { it.isDirectory }
+            val fileCount   = children.count { !it.isDirectory }
+            statusLabel.text = "$folderCount folders, $fileCount files"
+        }
+    }
+
+    override fun dispose() {
+        super.dispose()
+        // FileTreeComponent is registered as child disposable via Disposer.register above
+    }
+}

@@ -65,6 +65,34 @@ Navigate, manage, and operate on files across your entire filesystem without lea
         <applicationService serviceImplementation="ro.faur.explorer.model.BookmarkManager"/>
         <applicationService serviceImplementation="ro.faur.explorer.quickopen.ranking.FrecencyStore"/>
         <applicationService serviceImplementation="ro.faur.explorer.quickopen.aliases.TeleportAliasStore"/>
+        <applicationService serviceImplementation="ro.faur.explorer.remote.settings.RemoteExplorerSettings"/>
+        <applicationService serviceImplementation="ro.faur.explorer.remote.git.RemoteGitSettings"/>
+        <projectService serviceImplementation="ro.faur.explorer.remote.settings.RemoteConnectionSettings"/>
+        <projectService serviceImplementation="ro.faur.explorer.remote.RemoteBookmarkManager"/>
+        <projectService serviceImplementation="ro.faur.explorer.remote.git.RemoteGitVcsManager"/>
+
+        <!-- Remote SFTP notifications -->
+        <notificationGroup id="SftpBrowser.Notifications" displayType="BALLOON"/>
+        <notificationGroup id="SftpBrowser.StickyNotifications" displayType="STICKY_BALLOON"/>
+
+        <!-- Remote settings hierarchy: Tools > System Explorer > Remote > Git -->
+        <applicationConfigurable
+            instance="ro.faur.explorer.remote.settings.RemoteExplorerConfigurable"
+            id="ro.faur.explorer.remote.settings"
+            displayName="Remote"
+            parentId="ro.faur.explorer.settings"/>
+        <applicationConfigurable
+            instance="ro.faur.explorer.remote.git.RemoteGitConfigurable"
+            id="ro.faur.explorer.remote.git.settings"
+            displayName="Git"
+            parentId="ro.faur.explorer.remote.settings"/>
+
+        <!-- Remote Git VCS type and status bar widget -->
+        <vcs name="RemoteGit" vcsClass="ro.faur.explorer.remote.git.RemoteGitVcs"/>
+        <statusBarWidgetFactory
+            id="RemoteGitBranch"
+            implementation="ro.faur.explorer.remote.git.RemoteGitBranchWidgetFactory"/>
+
         <toolWindow id="System Explorer"
                     anchor="right"
                     factoryClass="ro.faur.explorer.ExplorerToolWindowFactory"/>
@@ -73,6 +101,13 @@ Navigate, manage, and operate on files across your entire filesystem without lea
                                  parentId="tools"
                                  instance="ro.faur.explorer.settings.ExplorerConfigurable"/>
     </extensions>
+
+    <applicationListeners>
+        <listener class="ro.faur.explorer.remote.RemoteEditorSaveListener"
+                  topic="com.intellij.openapi.fileEditor.FileDocumentManagerListener"/>
+        <listener class="ro.faur.explorer.remote.TempFileCleanupListener"
+                  topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
 
     <actions>
         <!-- Toggle/focus System Explorer tool window (global shortcut) -->
@@ -83,8 +118,8 @@ Navigate, manage, and operate on files across your entire filesystem without lea
             <keyboard-shortcut keymap="$default" first-keystroke="alt E"/>
             <keyboard-shortcut keymap="Mac OS X" first-keystroke="alt E" remove="true"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="alt E" remove="true"/>
-            <keyboard-shortcut keymap="Mac OS X" first-keystroke="ctrl alt E"/>
-            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="ctrl alt E"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta alt E"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta alt E"/>
         </action>
 
         <!-- File operation actions scoped to the System Explorer tool window -->
@@ -160,6 +195,33 @@ Navigate, manage, and operate on files across your entire filesystem without lea
                 text="Quick Open Directory"
                 description="Open a directory in System Explorer by typing its path">
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift P"/>
+        </action>
+
+        <!-- Panel switching: Cmd+1 = Local, Cmd+2 = first SSH, etc. -->
+        <action id="SystemExplorer.SwitchPanel1" class="ro.faur.explorer.actions.SwitchPanel1Action"
+                text="Switch to Panel 1" description="Switch to Local browser panel">
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta 1"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta 1"/>
+        </action>
+        <action id="SystemExplorer.SwitchPanel2" class="ro.faur.explorer.actions.SwitchPanel2Action"
+                text="Switch to Panel 2" description="Switch to first SSH panel">
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta 2"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta 2"/>
+        </action>
+        <action id="SystemExplorer.SwitchPanel3" class="ro.faur.explorer.actions.SwitchPanel3Action"
+                text="Switch to Panel 3" description="Switch to second SSH panel">
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta 3"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta 3"/>
+        </action>
+        <action id="SystemExplorer.SwitchPanel4" class="ro.faur.explorer.actions.SwitchPanel4Action"
+                text="Switch to Panel 4" description="Switch to third SSH panel">
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta 4"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta 4"/>
+        </action>
+        <action id="SystemExplorer.SwitchPanel5" class="ro.faur.explorer.actions.SwitchPanel5Action"
+                text="Switch to Panel 5" description="Switch to fourth SSH panel">
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta 5"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta 5"/>
         </action>
     </actions>
 </idea-plugin>

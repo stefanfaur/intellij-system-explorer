@@ -5,50 +5,22 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.SystemInfo
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.wm.IdeFocusManager
-import com.intellij.ui.JBSplitter
-import com.intellij.ui.components.JBCheckBox
-import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBPanel
-import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.components.JBTextField
 import ro.faur.explorer.actions.NavigationActions
-import ro.faur.explorer.quickopen.ranking.FrecencyStore
-import ro.faur.explorer.settings.ExplorerSettings
-import ro.faur.explorer.util.FileSizeFormatter
+import ro.faur.explorer.remote.ConnectionProfile
+import ro.faur.explorer.remote.SftpConnectionManager
+import ro.faur.explorer.remote.ui.RemoteBrowserPanel
 import java.awt.BorderLayout
-import java.awt.Component
-import java.awt.Dimension
 import java.awt.FlowLayout
-import java.awt.event.ActionListener
-import java.awt.event.ItemEvent
-import java.awt.event.ItemListener
-import javax.swing.Box
-import javax.swing.BoxLayout
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
 
 /**
- * The main panel for the System Explorer tool window.
+ * Thin outer shell for the System Explorer tool window.
  *
- * Contains:
- * - A toolbar at the top with navigation buttons (Back, Forward, Up, Home, Refresh, Settings) and an editable path bar
- * - A filter text field for glob pattern filtering
- * - A splitter with bookmarks sidebar on the left and a file tree on the right
- * - A status bar at the bottom with file counts on the left and toggle checkboxes on the right
- *
- * Properties:
- * - [currentPath]: The currently displayed directory path
- * - [component]: The root Swing component to embed in the tool window
- *
- * Methods:
- * - [navigateTo]: Changes the current directory to the given path
- *
- * Implements [Disposable] so that all registered listeners are cleaned up when the panel
- * is disposed, preventing memory leaks.
+ * Owns only: a [BrowserHost] (CENTER) and a small toolbar (NORTH) with
+ * Settings and Connect buttons. All browser logic lives in [BrowserHost]
+ * and the [BrowserPanel] subclasses it manages.
  */
 class ExplorerPanel(private val project: Project) : Disposable {
 
@@ -56,408 +28,198 @@ class ExplorerPanel(private val project: Project) : Disposable {
         private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(ExplorerPanel::class.java)
     }
 
+    val browserHost = BrowserHost(LocalBrowserPanel(project))
+
+    // ── Backward-compat shims (used by existing IDE actions) ───────────────
+    internal val fileTreeComponent  get() = browserHost.localPanel.fileTreeComponent
+    val currentPath: String          get() = browserHost.activePanel.currentPath()
+    fun getNavigationHistory(): NavigationActions.NavigationHistory = browserHost.localPanel.history
+    fun navigateTo(path: String)     = browserHost.activePanel.navigateTo(path)
+    fun goBack(): Boolean            = browserHost.activePanel.navigateBack()
+    fun canGoBack(): Boolean         = browserHost.activePanel.canGoBack()
+    fun focusFileTree()              = browserHost.localPanel.focusFileTree()
+    fun toggleHiddenFiles()          = browserHost.localPanel.toggleHiddenFiles()
+    fun getStatusText(): String      = browserHost.localPanel.getStatusText()
+    internal fun updateStatus()      = browserHost.localPanel.updateStatus()
+
+    // ── Outer toolbar ──────────────────────────────────────────────────────
+    private val settingsButton = JButton(AllIcons.General.Settings).apply { toolTipText = "Settings" }
+    private val connectButton  = JButton("Connect ▾", AllIcons.Nodes.DataTables)
+
     val component: JComponent
 
-    var currentPath: String
-        private set
-
-    private val history = NavigationActions.NavigationHistory()
-
-    /**
-     * Returns the navigation history for use by the Quick Open dialog.
-     */
-    fun getNavigationHistory(): NavigationActions.NavigationHistory = history
-    internal val fileTreeComponent = FileTreeComponent(project)
-    private val bookmarksPanel = BookmarksPanel(
-        onBookmarkSelected = { path -> navigateTo(path) },
-        onBookmarkMoved = { from, to ->
-            try {
-                ro.faur.explorer.model.BookmarkManager.getInstance().moveBookmark(from, to)
-            } catch (e: Exception) {
-                LOG.warn("Failed to move bookmark", e)
-            }
-        },
-        onBookmarkDeleted = { index ->
-            try {
-                val manager = ro.faur.explorer.model.BookmarkManager.getInstance()
-                val bookmarks = manager.getBookmarks()
-                if (index in bookmarks.indices) {
-                    manager.removeBookmark(bookmarks[index].path)
-                    loadBookmarks()
-                }
-            } catch (e: Exception) {
-                LOG.warn("Failed to delete bookmark", e)
-            }
-        }
-    )
-    private val pathField = JBTextField()
-    private val filterField = JBTextField()
-    private val statusLabel = JBLabel("Ready")
-
-    // Toolbar buttons
-    private val backButton = JButton("<")
-    private val forwardButton = JButton(">")
-    private val upButton = JButton("Up", AllIcons.Actions.MoveUp)
-    private val homeButton = JButton("Home", AllIcons.Nodes.HomeFolder)
-    private val refreshButton = JButton("Refresh", AllIcons.Actions.Refresh)
-    private val settingsButton = JButton(AllIcons.General.Settings).apply {
-        toolTipText = "Settings"
-    }
-
-    // Status bar checkboxes
-    private val hiddenCheckbox = JBCheckBox("Hidden")
-    private val permissionsCheckbox = if (!SystemInfo.isWindows) JBCheckBox("Permissions") else null
-
-    private var showHidden: Boolean = false
-
-    // Store listener references for cleanup in dispose()
-    private lateinit var backListener: ActionListener
-    private lateinit var forwardListener: ActionListener
-    private lateinit var upListener: ActionListener
-    private lateinit var homeListener: ActionListener
-    private lateinit var refreshListener: ActionListener
-    private lateinit var settingsListener: ActionListener
-    private lateinit var pathListener: ActionListener
-    private lateinit var filterListener: ActionListener
-    private lateinit var hiddenListener: ItemListener
-    private var permissionsListener: ItemListener? = null
-
     init {
-        currentPath = NavigationActions.goHome()
-        history.push(currentPath)
+        Disposer.register(this, browserHost)
 
-        // Register FileTreeComponent as a child disposable
-        Disposer.register(this, fileTreeComponent)
-
-        // Wire double-click on directories to navigate into them
-        fileTreeComponent.onDirectoryDoubleClicked = { vf ->
-            navigateTo(vf.path)
-        }
-
-        // Wire selection changes to update the status bar
-        fileTreeComponent.onSelectionChanged = {
-            updateStatus()
-        }
-
-        // Wire file modification callback to refresh status and bookmarks
-        fileTreeComponent.onFilesModified = {
-            updateStatus()
-            loadBookmarks() // refresh bookmarks in case one was added
-        }
-
-        component = buildUI()
-
-        // Store this ExplorerPanel as a client property so actions can find it
-        (component as? javax.swing.JComponent)?.putClientProperty(
-            ExplorerPanel::class.java.name, this
-        )
-
-        // Set initial state
-        pathField.text = currentPath
-        fileTreeComponent.setRoot(currentPath)
-        loadBookmarks()
-        updateStatus()
-    }
-
-    /**
-     * Navigates to the given directory path, updating the tree and path bar.
-     * Pushes the path onto the navigation history.
-     */
-    fun navigateTo(path: String) {
-        navigateToInternal(path, pushHistory = true)
-    }
-
-    /**
-     * Navigate to the previous location in history, if available.
-     */
-    fun goBack(): Boolean {
-        val previous = history.back() ?: return false
-        navigateToInternal(previous, pushHistory = false)
-        return true
-    }
-
-    /**
-     * Whether navigating back in history is currently possible.
-     */
-    fun canGoBack(): Boolean = history.canGoBack
-
-    /**
-     * Toggles the "show hidden files" setting and reloads the tree.
-     * Called from Quick Open v2 command mode ("> toggle hidden").
-     */
-    fun toggleHiddenFiles() {
-        hiddenCheckbox.isSelected = !hiddenCheckbox.isSelected
-    }
-
-    /**
-     * Internal navigation method that optionally pushes to history.
-     * Used by back/forward buttons to avoid double-pushing.
-     */
-    private fun navigateToInternal(path: String, pushHistory: Boolean) {
-        currentPath = path
-        pathField.text = path
-        fileTreeComponent.setRoot(path)
-        bookmarksPanel.highlightForPath(path)
-        if (pushHistory) {
-            history.push(path)
-        }
-        try {
-            FrecencyStore.getInstance().recordVisit(path)
-        } catch (_: Exception) {}
-        updateHistoryButtons()
-        updateStatus()
-    }
-
-    /**
-     * Updates the enabled state of back/forward buttons based on history.
-     */
-    private fun updateHistoryButtons() {
-        backButton.isEnabled = history.canGoBack
-        forwardButton.isEnabled = history.canGoForward
-    }
-
-    private fun buildUI(): JComponent {
-        val mainPanel = JBPanel<JBPanel<*>>(BorderLayout())
-
-        // --- NORTH: Toolbar + Path bar + Filter ---
-        val toolbar = buildToolbar()
-        mainPanel.add(toolbar, BorderLayout.NORTH)
-
-        // --- CENTER: Splitter (bookmarks | tree) ---
-        val splitter = JBSplitter(false, 0.2f)
-        splitter.firstComponent = bookmarksPanel.component
-        splitter.secondComponent = JBScrollPane(fileTreeComponent.tree)
-        mainPanel.add(splitter, BorderLayout.CENTER)
-
-        // --- SOUTH: Status bar ---
-        val statusBar = JPanel(BorderLayout())
-        statusBar.add(statusLabel, BorderLayout.LINE_START)
-
-        // Right side: checkboxes panel
-        val checkboxPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 5, 0))
-        checkboxPanel.add(hiddenCheckbox)
-        if (permissionsCheckbox != null) {
-            checkboxPanel.add(permissionsCheckbox)
-        }
-        statusBar.add(checkboxPanel, BorderLayout.LINE_END)
-
-        mainPanel.add(statusBar, BorderLayout.SOUTH)
-
-        return mainPanel
-    }
-
-    private fun buildToolbar(): JComponent {
-        val toolbarPanel = JPanel()
-        toolbarPanel.layout = BoxLayout(toolbarPanel, BoxLayout.Y_AXIS)
-
-        // Row 1: navigation buttons with Settings on the far right
-        val buttonsPanel = JPanel(BorderLayout())
-
-        // Left side: navigation buttons
-        val leftButtons = JPanel(FlowLayout(FlowLayout.LEFT, 2, 2))
-        leftButtons.add(backButton)
-        leftButtons.add(forwardButton)
-        leftButtons.add(upButton)
-        leftButtons.add(homeButton)
-        leftButtons.add(refreshButton)
-        buttonsPanel.add(leftButtons, BorderLayout.LINE_START)
-
-        // Right side: settings button
-        val rightButtons = JPanel(FlowLayout(FlowLayout.RIGHT, 2, 2))
-        rightButtons.add(settingsButton)
-        buttonsPanel.add(rightButtons, BorderLayout.LINE_END)
-
-        buttonsPanel.alignmentX = Component.LEFT_ALIGNMENT
-        buttonsPanel.maximumSize = Dimension(Int.MAX_VALUE, buttonsPanel.preferredSize.height)
-        toolbarPanel.add(buttonsPanel)
-
-        // Row 2: current path (full width)
-        pathField.alignmentX = Component.LEFT_ALIGNMENT
-        pathField.maximumSize = Dimension(Int.MAX_VALUE, pathField.preferredSize.height)
-        toolbarPanel.add(pathField)
-
-        // Row 3: filter field
-        filterField.emptyText.text = "Filter (e.g. *.kt)"
-        filterField.alignmentX = Component.LEFT_ALIGNMENT
-        filterField.maximumSize = Dimension(Int.MAX_VALUE, filterField.preferredSize.height)
-        toolbarPanel.add(filterField)
-
-        return toolbarPanel
-    }
-
-    private fun wireActions() {
-        backListener = ActionListener {
-            goBack()
-        }
-        backButton.addActionListener(backListener)
-
-        forwardListener = ActionListener {
-            history.forward()?.let { path -> navigateToInternal(path, pushHistory = false) }
-        }
-        forwardButton.addActionListener(forwardListener)
-
-        upListener = ActionListener {
-            val parent = NavigationActions.goToParent(currentPath)
-            if (parent != currentPath) {
-                navigateTo(parent)
-            }
-        }
-        upButton.addActionListener(upListener)
-
-        homeListener = ActionListener {
-            navigateTo(NavigationActions.goHome())
-        }
-        homeButton.addActionListener(homeListener)
-
-        refreshListener = ActionListener {
-            fileTreeComponent.setRoot(currentPath)
-            updateStatus()
-        }
-        refreshButton.addActionListener(refreshListener)
-
-        settingsListener = ActionListener {
+        settingsButton.addActionListener {
             ShowSettingsUtil.getInstance().showSettingsDialog(project, "System Explorer")
         }
-        settingsButton.addActionListener(settingsListener)
+        connectButton.addActionListener { showConnectDropdown(connectButton) }
 
-        pathListener = ActionListener {
-            val typed = pathField.text.trim()
-            if (typed.isNotEmpty()) {
-                val vf = LocalFileSystem.getInstance().findFileByPath(typed)
-                if (vf != null && vf.isDirectory) {
-                    navigateTo(typed)
-                }
-            }
-        }
-        pathField.addActionListener(pathListener)
-
-        filterListener = ActionListener {
-            fileTreeComponent.filterPattern = filterField.text.trim()
-            fileTreeComponent.setRoot(currentPath)
-            updateStatus()
-        }
-        filterField.addActionListener(filterListener)
-
-        // Wire checkbox listeners
-        hiddenListener = ItemListener { e ->
-            showHidden = e.stateChange == ItemEvent.SELECTED
-            fileTreeComponent.showHidden = showHidden
-            fileTreeComponent.setRoot(currentPath)
-            updateStatus()
-        }
-        hiddenCheckbox.addItemListener(hiddenListener)
-
-        if (permissionsCheckbox != null) {
-            permissionsListener = ItemListener { e ->
-                val settings = ExplorerSettings.getInstance()
-                val enabled = e.stateChange == ItemEvent.SELECTED
-                settings.state.showFilePermissions = enabled
-                fileTreeComponent.showPermissions = enabled
-                fileTreeComponent.tree.repaint()
-            }
-            permissionsCheckbox.addItemListener(permissionsListener!!)
-
-            // Initialize checkbox state from settings
-            val settings = ExplorerSettings.getInstance()
-            permissionsCheckbox.isSelected = settings.state.showFilePermissions
-            fileTreeComponent.showPermissions = settings.state.showFilePermissions
+        val outerToolbar = JPanel(FlowLayout(FlowLayout.RIGHT, 2, 2)).apply {
+            add(connectButton)
+            add(settingsButton)
         }
 
-        // Set initial button state
-        updateHistoryButtons()
+        val root = JPanel(BorderLayout())
+        root.add(outerToolbar, BorderLayout.NORTH)
+        root.add(browserHost,  BorderLayout.CENTER)
+
+        component = root
+        (root as javax.swing.JComponent).putClientProperty(ExplorerPanel::class.java.name, this)
     }
 
-    private fun loadBookmarks() {
-        try {
-            val manager = ro.faur.explorer.model.BookmarkManager.getInstance()
-            bookmarksPanel.setBookmarks(manager.getBookmarks())
-            bookmarksPanel.highlightForPath(currentPath)
-        } catch (e: Exception) {
-            LOG.warn("Failed to load bookmarks", e)
-        }
-    }
+    // ── Connect dropdown ───────────────────────────────────────────────────
 
-    /**
-     * Updates the status bar based on the current state.
-     *
-     * When nothing is selected: shows child count like "3 folders, 2 files"
-     * When only files selected: shows "N selected -- SIZE"
-     * When only directories selected: shows "N selected -- X items, SIZE"
-     * When mixed selection: shows "N selected -- X items in dirs, SIZE"
-     */
-    internal fun updateStatus() {
-        val selected = fileTreeComponent.getSelectedFiles()
-        if (selected.isNotEmpty()) {
-            val dirs = selected.filter { it.isDirectory }
-            val files = selected.filter { !it.isDirectory }
-            val fileSizeBytes = files.sumOf { it.length }
-            val dirChildCount = dirs.sumOf { FileSizeFormatter.countDirectChildren(it) }
+    private fun showConnectDropdown(anchor: JButton) {
+        val menu = javax.swing.JPopupMenu()
 
-            statusLabel.text = when {
-                dirs.isEmpty() -> {
-                    // Only files selected
-                    "${selected.size} selected -- ${FileSizeFormatter.format(fileSizeBytes)}"
-                }
-                files.isEmpty() -> {
-                    // Only directories selected
-                    val dirSizeBytes = dirs.sumOf { FileSizeFormatter.computeDirectoryImmediateSize(it) }
-                    "${selected.size} selected -- $dirChildCount items, ${FileSizeFormatter.format(dirSizeBytes)}"
-                }
-                else -> {
-                    // Mixed selection
-                    if (dirChildCount > 0) {
-                        "${selected.size} selected -- $dirChildCount items in dirs, ${FileSizeFormatter.format(fileSizeBytes)} in files"
-                    } else {
-                        "${selected.size} selected -- ${FileSizeFormatter.format(fileSizeBytes)}"
-                    }
-                }
-            }
+        val profiles = ro.faur.explorer.remote.settings.RemoteConnectionSettings
+            .getInstance(project).state.connections
+        if (profiles.isEmpty()) {
+            val emptyItem = javax.swing.JMenuItem("No saved connections").apply { isEnabled = false }
+            menu.add(emptyItem)
         } else {
-            val children = fileTreeComponent.getRootChildren()
-            val folderCount = children.count { it.isDirectory }
-            val fileCount = children.count { !it.isDirectory }
-            statusLabel.text = "$folderCount folders, $fileCount files"
+            profiles.forEach { profile ->
+                val item = javax.swing.JMenuItem(
+                    "<html><b>${profile.name}</b>&nbsp;&nbsp;" +
+                    "<font color='gray'>${profile.username}@${profile.host}</font></html>"
+                ).apply {
+                    icon = AllIcons.Nodes.DataTables
+                    addActionListener { connectToRemote(profile) }
+                }
+                menu.add(item)
+            }
+        }
+        menu.addSeparator()
+
+        val newItem = javax.swing.JMenuItem("+ New Connection...").apply {
+            addActionListener {
+                val dialog = ro.faur.explorer.remote.ui.ConnectionDialog(project)
+                if (dialog.showAndGet()) {
+                    val profile  = dialog.getProfile()
+                    val password = dialog.getPassword()?.let { String(it) }
+                    if (dialog.shouldRememberPassword() && password != null)
+                        ro.faur.explorer.remote.security.CredentialHandler
+                            .storePassword(profile.name, profile.username, password)
+                    ro.faur.explorer.remote.settings.RemoteConnectionSettings.getInstance(project).addConnection(profile)
+                }
+            }
+        }
+        menu.add(newItem)
+
+        val manageItem = javax.swing.JMenuItem("🔧 Manage Connections...").apply {
+            addActionListener { ro.faur.explorer.remote.ui.ManageConnectionsDialog(project).show() }
+        }
+        menu.add(manageItem)
+
+        menu.show(anchor, 0, anchor.height)
+    }
+
+    // ── Connect / disconnect ───────────────────────────────────────────────
+
+    fun connectToRemote(profile: ConnectionProfile, preloadedPassword: String? = null) {
+        connectButton.isEnabled   = false
+        connectButton.toolTipText = "Connecting to ${profile.name}…"
+
+        fun onSuccess(ops: ro.faur.explorer.remote.SftpFileOperations, gitManager: SftpConnectionManager?) {
+            val panel = RemoteBrowserPanel(project, connectionManager = gitManager)
+            panel.connect(profile.name, ops, profile)
+            browserHost.addPanel(panel)
+            connectButton.isEnabled   = true
+            connectButton.toolTipText = null
+        }
+
+        fun onError(e: Exception) {
+            connectButton.isEnabled   = true
+            connectButton.toolTipText = null
+            com.intellij.notification.NotificationGroupManager.getInstance()
+                .getNotificationGroup("SftpBrowser.Notifications")
+                .createNotification("Failed to connect to ${profile.name}",
+                    e.message ?: "Unknown error", com.intellij.notification.NotificationType.ERROR)
+                .notify(project)
+        }
+
+        fun onCancelled() { connectButton.isEnabled = true; connectButton.toolTipText = null }
+
+        fun connectGitManager(password: String?, keyPassphrase: String?): SftpConnectionManager? {
+            return try { SftpConnectionManager().also { it.connect(profile, password, keyPassphrase) } }
+            catch (_: Exception) { null }
+        }
+
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        executor.submit {
+            val password: String? = when (profile.authMethod) {
+                ConnectionProfile.AuthMethod.PASSWORD -> {
+                    var resolved = preloadedPassword
+                        ?: ro.faur.explorer.remote.security.CredentialHandler.getPassword(profile.name)
+                    if (resolved == null) {
+                        var cancelled = false
+                        javax.swing.SwingUtilities.invokeAndWait {
+                            val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, profile.name)
+                            if (dialog.showAndGet()) {
+                                resolved = dialog.getPassword()
+                                if (dialog.rememberPassword.isSelected)
+                                    ro.faur.explorer.remote.security.CredentialHandler
+                                        .storePassword(profile.name, profile.username, resolved!!)
+                            } else cancelled = true
+                        }
+                        if (cancelled) { javax.swing.SwingUtilities.invokeLater { onCancelled() }; return@submit }
+                    }
+                    resolved
+                }
+                else -> null
+            }
+            val storedKP = if (profile.authMethod == ConnectionProfile.AuthMethod.KEY_FILE)
+                ro.faur.explorer.remote.security.CredentialHandler.getKeyPassphrase(profile.name) else null
+
+            try {
+                val ops = ro.faur.explorer.remote.SftpFileOperations.create(profile, password, storedKP)
+                val gm  = connectGitManager(password, storedKP)
+                javax.swing.SwingUtilities.invokeLater { onSuccess(ops, gm) }
+            } catch (e: Exception) {
+                if (profile.authMethod == ConnectionProfile.AuthMethod.KEY_FILE && storedKP == null) {
+                    var kp: String? = null; var cancelled = false
+                    javax.swing.SwingUtilities.invokeAndWait {
+                        val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, "'${profile.name}' key file")
+                        if (dialog.showAndGet()) {
+                            kp = dialog.getPassword()
+                            if (dialog.rememberPassword.isSelected)
+                                ro.faur.explorer.remote.security.CredentialHandler.storeKeyPassphrase(profile.name, kp!!)
+                        } else cancelled = true
+                    }
+                    if (cancelled || kp == null) javax.swing.SwingUtilities.invokeLater { onCancelled() }
+                    else try {
+                        val ops = ro.faur.explorer.remote.SftpFileOperations.create(profile, password, kp)
+                        val gm  = connectGitManager(password, kp)
+                        javax.swing.SwingUtilities.invokeLater { onSuccess(ops, gm) }
+                    } catch (e2: Exception) { javax.swing.SwingUtilities.invokeLater { onError(e2) } }
+                } else javax.swing.SwingUtilities.invokeLater { onError(e) }
+            } finally { executor.shutdown() }
         }
     }
 
-    /**
-     * Returns the current status bar text (for testing).
-     */
-    fun getStatusText(): String = statusLabel.text
+    // ── Backward-compat stubs ──────────────────────────────────────────────
+    fun getRemoteTreePanel() = null
+    val isRemotePanelVisible: Boolean get() = browserHost.panelCount > 1
 
-    /**
-     * Moves keyboard focus into the file tree. Ensures one row is selected when possible
-     * so navigation keys and Enter work immediately.
-     */
-    fun focusFileTree() {
-        val tree = fileTreeComponent.tree
-        if (tree.selectionCount == 0 && tree.rowCount > 0) {
-            tree.setSelectionRow(0)
+    /** Returns the name of the first active remote connection, or null if none. */
+    fun getActiveConnectionName(): String? =
+        browserHost.getPanels().drop(1)
+            .filterIsInstance<RemoteBrowserPanel>()
+            .mapNotNull { it.getConnectionName() }
+            .firstOrNull()
+
+    /** Disconnects all remote panels and removes them from BrowserHost. */
+    fun disconnectRemote() {
+        val toRemove = (browserHost.panelCount - 1 downTo 1).toList()
+        for (i in toRemove) {
+            (browserHost.getPanels().getOrNull(i) as? RemoteBrowserPanel)?.disconnect()
+            browserHost.removePanel(i)
         }
-        IdeFocusManager.getInstance(project).requestFocus(tree, true)
     }
 
-    /**
-     * Removes all listeners registered on buttons and fields to prevent memory leaks.
-     * Child disposables (FileTreeComponent) are disposed automatically by the Disposer framework.
-     */
     override fun dispose() {
-        backButton.removeActionListener(backListener)
-        forwardButton.removeActionListener(forwardListener)
-        upButton.removeActionListener(upListener)
-        homeButton.removeActionListener(homeListener)
-        refreshButton.removeActionListener(refreshListener)
-        settingsButton.removeActionListener(settingsListener)
-        pathField.removeActionListener(pathListener)
-        filterField.removeActionListener(filterListener)
-        hiddenCheckbox.removeItemListener(hiddenListener)
-        if (permissionsCheckbox != null && permissionsListener != null) {
-            permissionsCheckbox.removeItemListener(permissionsListener!!)
-        }
-    }
-
-    // Wire actions after all fields are initialized
-    init {
-        wireActions()
+        // browserHost is registered as child disposable via Disposer.register above
     }
 }

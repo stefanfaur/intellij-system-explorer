@@ -94,7 +94,7 @@ class QuickOpenPanel(
     }
 
     private val hintLabel = JBLabel(
-        "↩: navigate  ⌘↩: open with  Tab: preview  ⌘D: bookmark  ⌘N: new  ⌘[: pop  Ctrl+R: recent  1–9: jump  Esc: close"
+        "↩: navigate  ⌘↩: open with  Tab: preview  ⌘D: bookmark  ⌘N: new  ⌘[: pop  Ctrl+R: recent  ⌘1–9: jump  /: search  Esc: close"
     ).apply {
         font = font.deriveFont(10f)
         foreground = java.awt.Color.GRAY
@@ -112,12 +112,16 @@ class QuickOpenPanel(
             .take(6)
     }
 
-    private val speedDialPanel: SpeedDialPanel = SpeedDialPanel(speedDialItems) { candidate ->
-        selectedId = candidate.id
-        FrecencyStore.getInstance().recordVisit(candidate.fullPath)
-        onSelected(candidate)
-        popup.closeOk(null)
-    }
+    private val speedDialPanel: SpeedDialPanel = SpeedDialPanel(
+        items = speedDialItems,
+        onActivated = { candidate ->
+            selectedId = candidate.id
+            FrecencyStore.getInstance().recordVisit(candidate.fullPath)
+            onSelected(candidate)
+            popup.closeOk(null)
+        },
+        onEscapeUp = { searchField.requestFocus() },
+    )
 
     private val cardLayout = CardLayout()
     private val contentCard = JPanel(cardLayout).apply {
@@ -159,13 +163,26 @@ class QuickOpenPanel(
             override fun changedUpdate(e: DocumentEvent) = scheduleSearch()
         })
 
-        // Down arrow from search field: focus list
+        // Down arrow from search field: focus speed-dial or result list depending on active card
         DumbAwareAction.create {
-            resultList.requestFocus()
-            if (resultList.selectedIndex < 0 && listModel.size > 0) selectFirstNonHeader()
+            if (searchField.text.isBlank() && !speedDialPanel.isEmpty()) {
+                speedDialPanel.focusAndSelectFirst()
+            } else {
+                resultList.requestFocus()
+                if (resultList.selectedIndex < 0 && listModel.size > 0) selectFirstNonHeader()
+            }
         }.registerCustomShortcutSet(
             com.intellij.openapi.actionSystem.CustomShortcutSet(
                 KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0)
+            ), searchField
+        )
+
+        // Up arrow from search field: no-op (already at top), but needed to prevent beep
+        DumbAwareAction.create {
+            // Already at the search field — nothing to do
+        }.registerCustomShortcutSet(
+            com.intellij.openapi.actionSystem.CustomShortcutSet(
+                KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0)
             ), searchField
         )
 
@@ -225,6 +242,31 @@ class QuickOpenPanel(
             )
         }
 
+        // Cmd+1–9: speed-dial when query blank, else activate Nth result
+        // Registered on both searchField and resultList so digits don't type into the search bar
+        for (digit in 1..9) {
+            val vk = KeyEvent.VK_0 + digit
+            val idx = digit - 1
+            val digitAction = DumbAwareAction.create {
+                if (searchField.text.isBlank() && !speedDialPanel.isEmpty()) {
+                    speedDialPanel.activateAt(idx)
+                } else {
+                    activateAtIndex(idx)
+                }
+            }
+            listOf(searchField, resultList).forEach { component ->
+                digitAction.registerCustomShortcutSet(
+                    com.intellij.openapi.actionSystem.CustomShortcutSet(
+                        KeyStroke.getKeyStroke(vk, InputEvent.META_DOWN_MASK)
+                    ), component
+                )
+            }
+        }
+
+        // Down arrow from search field: focus speed-dial or result list depending on card
+        // (The existing VK_DOWN DumbAwareAction on searchField focuses resultList;
+        //  we also need arrow-key navigation within the speed-dial panel when it is showing.)
+
         // ResultList key handler
         resultList.addKeyListener(object : java.awt.event.KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
@@ -262,14 +304,9 @@ class QuickOpenPanel(
                         navigateToPrevGroup(); e.consume()
                     }
 
-                    // Number keys 1-9: speed-dial when query blank, else activate Nth result
-                    e.keyCode in KeyEvent.VK_1..KeyEvent.VK_9 && e.modifiersEx == 0 -> {
-                        val idx = e.keyCode - KeyEvent.VK_1
-                        if (searchField.text.isBlank() && !speedDialPanel.isEmpty()) {
-                            speedDialPanel.activateAt(idx)
-                        } else {
-                            activateAtIndex(idx)
-                        }
+                    // /: refocus search field
+                    e.keyCode == KeyEvent.VK_SLASH && e.modifiersEx == 0 -> {
+                        searchField.requestFocus()
                         e.consume()
                     }
                 }

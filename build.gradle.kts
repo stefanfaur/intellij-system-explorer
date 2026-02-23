@@ -41,6 +41,14 @@ dependencies {
 
     testImplementation("com.intellij.remoterobot:remote-robot:0.11.23")
     testImplementation("com.intellij.remoterobot:remote-fixtures:0.11.23")
+
+    // === SFTP Remote Browser: Apache MINA SSHD for SSH/SFTP operations ===
+    implementation("org.apache.sshd:sshd-core:2.17.1")
+    implementation("org.apache.sshd:sshd-sftp:2.17.1")
+    implementation("org.apache.sshd:sshd-common:2.17.1")
+
+    // === Coroutine testing ===
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
 }
 
 kotlin {
@@ -157,11 +165,15 @@ tasks {
     test {
         useJUnitPlatform()
         val includeIdeTests = project.findProperty("includeIdeTests")?.toString()?.toBoolean() == true
+        val includeSftpTests = project.findProperty("includeSftpTests")?.toString()?.toBoolean() == true
         // Default: keep :test headless-safe.
         // Opt-in for light/heavy suites with -PincludeIdeTests=true.
         if (!includeIdeTests) {
             exclude("ro/faur/explorer/light/**")
             exclude("ro/faur/explorer/heavy/**")
+        }
+        if (!includeSftpTests) {
+            exclude("ro/faur/explorer/sftp/**")  // Embedded SSH tests opt-in
         }
         exclude("ro/faur/explorer/ui/**")
     }

@@ -117,44 +117,93 @@ object QuickOpenPopup {
         } catch (_: Exception) {}
 
         // Explorer actions
-        result.addAll(buildActionCandidates(panel))
+        result.addAll(buildActionCandidates(project, panel))
 
         return result
     }
 
-    private fun buildActionCandidates(panel: ExplorerPanel): List<SearchCandidate> {
-        return listOf(
-            SearchCandidate(
-                id = "action:toggle-hidden",
-                displayName = "Toggle Hidden Files",
-                fullPath = "action:toggle-hidden",
-                parentPath = "",
-                type = CandidateType.ACTION,
-                extra = mapOf("handler" to ({
-                    panel.toggleHiddenFiles()
-                } as () -> Unit))
-            ),
-            SearchCandidate(
-                id = "action:go-home",
-                displayName = "Go Home",
-                fullPath = "action:go-home",
-                parentPath = "",
-                type = CandidateType.ACTION,
-                extra = mapOf("handler" to ({
-                    panel.navigateTo(NavigationActions.goHome())
-                } as () -> Unit))
-            ),
-            SearchCandidate(
-                id = "action:go-root",
-                displayName = "Go to Root /",
-                fullPath = "action:go-root",
-                parentPath = "",
-                type = CandidateType.ACTION,
-                extra = mapOf("handler" to ({
-                    panel.navigateTo("/")
-                } as () -> Unit))
-            )
+    private fun buildActionCandidates(project: Project, panel: ExplorerPanel): List<SearchCandidate> {
+        val candidates = mutableListOf<SearchCandidate>()
+
+        // Existing actions
+        candidates += SearchCandidate(
+            id = "action:toggle-hidden",
+            displayName = "Toggle Hidden Files",
+            fullPath = "action:toggle-hidden",
+            parentPath = "",
+            type = CandidateType.ACTION,
+            extra = mapOf("handler" to ({ panel.toggleHiddenFiles() } as () -> Unit))
         )
+        candidates += SearchCandidate(
+            id = "action:go-home",
+            displayName = "Go Home",
+            fullPath = "action:go-home",
+            parentPath = "",
+            type = CandidateType.ACTION,
+            extra = mapOf("handler" to ({ panel.navigateTo(NavigationActions.goHome(project)) } as () -> Unit))
+        )
+        candidates += SearchCandidate(
+            id = "action:go-root",
+            displayName = "Go to Root /",
+            fullPath = "action:go-root",
+            parentPath = "",
+            type = CandidateType.ACTION,
+            extra = mapOf("handler" to ({ panel.navigateTo("/") } as () -> Unit))
+        )
+
+        // Remote: one connect candidate per saved profile
+        try {
+            val profiles = ro.faur.explorer.remote.settings.RemoteConnectionSettings
+                .getInstance(project).state.connections
+            profiles.forEach { profile ->
+                candidates += SearchCandidate(
+                    id = "action:connect:${profile.name}",
+                    displayName = "Connect to ${profile.name}",
+                    fullPath = "action:connect:${profile.name}",
+                    parentPath = "",
+                    type = CandidateType.ACTION,
+                    extra = mapOf("handler" to ({ panel.connectToRemote(profile) } as () -> Unit))
+                )
+            }
+        } catch (_: Exception) {}
+
+        // Remote: new connection
+        candidates += SearchCandidate(
+            id = "action:new-remote-connection",
+            displayName = "New Remote Connection",
+            fullPath = "action:new-remote-connection",
+            parentPath = "",
+            type = CandidateType.ACTION,
+            extra = mapOf("handler" to ({
+                val dialog = ro.faur.explorer.remote.ui.ConnectionDialog(project)
+                if (dialog.showAndGet()) {
+                    val prof = dialog.getProfile()
+                    val pw = dialog.getPassword()?.let { String(it) }
+                    if (dialog.shouldRememberPassword() && pw != null) {
+                        ro.faur.explorer.remote.security.CredentialHandler
+                            .storePassword(prof.name, prof.username, pw)
+                    }
+                    ro.faur.explorer.remote.settings.RemoteConnectionSettings
+                        .getInstance(project).addConnection(prof)
+                    panel.connectToRemote(prof, pw)
+                }
+            } as () -> Unit))
+        )
+
+        // Remote: disconnect (only when connected)
+        if (panel.isRemotePanelVisible) {
+            val activeName = panel.getActiveConnectionName() ?: "remote"
+            candidates += SearchCandidate(
+                id = "action:disconnect",
+                displayName = "Disconnect from $activeName",
+                fullPath = "action:disconnect",
+                parentPath = "",
+                type = CandidateType.ACTION,
+                extra = mapOf("handler" to ({ panel.disconnectRemote() } as () -> Unit))
+            )
+        }
+
+        return candidates
     }
 
     private fun openFile(project: Project, path: String) {

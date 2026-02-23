@@ -3,6 +3,8 @@ package ro.faur.explorer.ui
 import com.intellij.icons.AllIcons
 import com.intellij.ide.dnd.DnDManager
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.ide.CopyPasteManager
@@ -11,6 +13,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import java.util.concurrent.atomic.AtomicInteger
 import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.TreeSpeedSearch
@@ -85,6 +88,16 @@ class FileTreeComponent(private val project: Project) : Disposable {
     var currentRootPath: String? = null
         private set
 
+    /**
+     * Monotonically increasing counter for root-load operations.
+     * Each [setRoot] call increments this; background callbacks discard results
+     * that don't match the latest generation, preventing stale updates.
+     */
+    private val loadGeneration = AtomicInteger(0)
+
+    /** Set to true in [dispose]; background callbacks check this before touching the model. */
+    @Volatile private var isDisposed = false
+
     /** Files marked for move (cut). Cleared after paste or copy. */
     internal var cutFiles: List<VirtualFile>? = null
 
@@ -107,18 +120,36 @@ class FileTreeComponent(private val project: Project) : Disposable {
             vf?.name ?: node?.userObject?.toString() ?: ""
         }
 
-        // Lazy directory expansion
+        // Lazy directory expansion — VFS read happens off the EDT to avoid SlowOperations errors.
         expandListener = object : TreeWillExpandListener {
             override fun treeWillExpand(event: TreeExpansionEvent) {
                 val node = event.path.lastPathComponent as DefaultMutableTreeNode
                 val file = node.userObject as? VirtualFile ?: return
-                if (file.isDirectory && node.childCount == 1 &&
-                    (node.firstChild as? DefaultMutableTreeNode)?.userObject is String
-                ) {
-                    // Replace placeholder with actual children
-                    node.removeAllChildren()
-                    loadChildren(node, file)
-                    treeModel.nodeStructureChanged(node)
+                if (!file.isDirectory || node.childCount != 1 ||
+                    (node.firstChild as? DefaultMutableTreeNode)?.userObject !is String
+                ) return
+
+                // Snapshot mutable state before leaving the EDT.
+                val capturedHidden = showHidden
+                val capturedFilter = filterPattern
+                val capturedRoot = currentRootPath
+
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    val children = ReadAction.compute<List<VirtualFile>, Throwable> {
+                        val model = FileTreeModel(showHidden = capturedHidden, foldersFirst = true)
+                        if (capturedFilter.isNotBlank()) model.getFilteredChildren(file, capturedFilter)
+                        else model.getChildren(file)
+                    }
+                    ApplicationManager.getApplication().invokeLater {
+                        if (isDisposed || currentRootPath != capturedRoot) return@invokeLater
+                        // Guard: skip if the node was already populated by a concurrent expansion.
+                        if (node.childCount != 1 ||
+                            (node.firstChild as? DefaultMutableTreeNode)?.userObject !is String
+                        ) return@invokeLater
+                        node.removeAllChildren()
+                        populateNode(node, children)
+                        treeModel.nodeStructureChanged(node)
+                    }
                 }
             }
 
@@ -189,17 +220,39 @@ class FileTreeComponent(private val project: Project) : Disposable {
 
     /**
      * Sets the root directory for the tree and populates the first level of children.
+     *
+     * Clears the tree immediately on the EDT (no flicker), then reads the directory
+     * entries on a background thread to avoid VFS slow-operation errors, and
+     * repopulates the model back on the EDT.  Stale background results are discarded
+     * via a monotonic [loadGeneration] counter.
      */
     fun setRoot(path: String) {
         currentRootPath = path
         permissionsCache.clear()
         iconCache.clear()
         rootNode.removeAllChildren()
-        val dir = LocalFileSystem.getInstance().findFileByPath(path)
-        if (dir != null && dir.isDirectory) {
-            loadChildren(rootNode, dir)
+        treeModel.reload()   // show empty tree immediately
+
+        val dir = LocalFileSystem.getInstance().findFileByPath(path) ?: return
+        if (!dir.isDirectory) return
+
+        // Snapshot mutable state and grab a generation token before leaving the EDT.
+        val gen = loadGeneration.incrementAndGet()
+        val capturedHidden = showHidden
+        val capturedFilter = filterPattern
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val children = ReadAction.compute<List<VirtualFile>, Throwable> {
+                val model = FileTreeModel(showHidden = capturedHidden, foldersFirst = true)
+                if (capturedFilter.isNotBlank()) model.getFilteredChildren(dir, capturedFilter)
+                else model.getChildren(dir)
+            }
+            ApplicationManager.getApplication().invokeLater {
+                if (isDisposed || loadGeneration.get() != gen) return@invokeLater
+                populateNode(rootNode, children)
+                treeModel.reload()
+            }
         }
-        treeModel.reload()
     }
 
     /**
@@ -466,18 +519,15 @@ class FileTreeComponent(private val project: Project) : Disposable {
         FileEditorManager.getInstance(project).openFile(file, true)
     }
 
-    private fun loadChildren(parentNode: DefaultMutableTreeNode, parentFile: VirtualFile) {
-        val model = FileTreeModel(showHidden = showHidden, foldersFirst = true)
-        val children = if (filterPattern.isNotBlank()) {
-            model.getFilteredChildren(parentFile, filterPattern)
-        } else {
-            model.getChildren(parentFile)
-        }
-
+    /**
+     * Adds [children] to [parentNode] as tree nodes (pure model work, no VFS I/O).
+     * Directories get a "loading..." placeholder child so the expander arrow appears.
+     * Must be called on the EDT.
+     */
+    private fun populateNode(parentNode: DefaultMutableTreeNode, children: List<VirtualFile>) {
         for (child in children) {
             val childNode = DefaultMutableTreeNode(child)
             if (child.isDirectory) {
-                // Add a placeholder child so the node is expandable
                 childNode.add(DefaultMutableTreeNode("loading..."))
             } else {
                 childNode.allowsChildren = false
@@ -490,6 +540,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
      * Removes all listeners registered on the tree to prevent memory leaks.
      */
     override fun dispose() {
+        isDisposed = true
         tree.removeTreeWillExpandListener(expandListener)
         tree.removeMouseListener(mouseListener)
         tree.removeMouseListener(popupMouseListener)

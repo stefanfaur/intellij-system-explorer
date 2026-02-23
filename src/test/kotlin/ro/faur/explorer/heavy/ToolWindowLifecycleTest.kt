@@ -13,13 +13,12 @@ class ToolWindowLifecycleTest : BasePlatformTestCase() {
 
     fun `test ExplorerPanel has currentPath`() {
         val panel = ExplorerPanel(project)
-        val path = panel.currentPath
-        assertTrue(path.isNotEmpty())
+        assertTrue(panel.currentPath.isNotEmpty())
     }
 
-    fun `test ExplorerPanel currentPath defaults to user home`() {
+    fun `test ExplorerPanel currentPath defaults to project base path`() {
         val panel = ExplorerPanel(project)
-        assertEquals(System.getProperty("user.home"), panel.currentPath)
+        assertEquals(project.basePath, panel.currentPath)
     }
 
     fun `test ExplorerPanel navigateTo changes currentPath`() {
@@ -30,8 +29,18 @@ class ToolWindowLifecycleTest : BasePlatformTestCase() {
 
     fun `test tool window factory creates ExplorerPanel content`() {
         val factory = ro.faur.explorer.ExplorerToolWindowFactory()
-        // Verify the factory class exists and can be instantiated
         assertNotNull(factory)
         assertTrue(factory is com.intellij.openapi.wm.ToolWindowFactory)
+    }
+
+    fun `test BrowserHost starts with one local panel`() {
+        val panel = ExplorerPanel(project)
+        assertEquals(1, panel.browserHost.panelCount)
+        assertEquals("Local", panel.browserHost.localPanel.panelLabel)
+    }
+
+    fun `test BrowserHost activePanel is localPanel by default`() {
+        val panel = ExplorerPanel(project)
+        assertSame(panel.browserHost.localPanel, panel.browserHost.activePanel)
     }
 }
