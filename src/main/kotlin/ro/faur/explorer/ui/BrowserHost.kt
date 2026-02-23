@@ -1,31 +1,33 @@
 package ro.faur.explorer.ui
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.CardLayout
-import java.awt.Dimension
 import java.awt.event.MouseWheelListener
+import javax.swing.BorderFactory
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
-import javax.swing.ScrollPaneConstants
 import javax.swing.JScrollPane
+import javax.swing.ScrollPaneConstants
+import javax.swing.SwingConstants
+import javax.swing.UIManager
 
 /**
  * Manages a list of [BrowserPanel] instances and renders a compact tab strip for switching.
  *
  * Panel 0 is always the [LocalBrowserPanel] and cannot be closed.
- * Remote panels (index >= 1) show a × close button.
+ * Remote panels (index >= 1) show an × close button.
  *
- * The [tabScrollPane] is designed to be embedded in the header row of [ExplorerPanel]
- * alongside the Connect and Settings buttons. It scrolls horizontally on mouse wheel
- * without showing a scrollbar.
+ * The [tabScrollPane] is designed to be placed at the SOUTH of [ExplorerPanel].
+ * It scrolls horizontally on mouse wheel without showing a scrollbar.
  *
- * Tab strip format:  [1 Local]  [● 2 dev-server ×]  [● 3 staging ×]
+ * Tab strip format: folder-icon [Local]  server-icon [dev-server ×]  server-icon [staging ×]
  */
 class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Disposable {
 
@@ -35,6 +37,9 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
     private val tabInner    = JPanel().apply { layout = BoxLayout(this, BoxLayout.X_AXIS) }
     private var activeIndex = 0
 
+    /** Called on EDT after the active panel changes. ExplorerPanel uses this to refresh nav button states. */
+    var onActivePanelChanged: ((BrowserPanel) -> Unit)? = null
+
     val localPanel: LocalBrowserPanel get() = panels[0] as LocalBrowserPanel
     val activePanel: BrowserPanel     get() = panels[activeIndex]
     val panelCount: Int               get() = panels.size
@@ -43,7 +48,7 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
     fun getPanels(): List<BrowserPanel> = panels.toList()
 
     /**
-     * Scrollable tab strip — embed this in the header row of [ExplorerPanel].
+     * Scrollable tab strip — embed this at the SOUTH of [ExplorerPanel].
      * Scrolls horizontally via mouse wheel; scrollbar is never rendered.
      */
     val tabScrollPane: JScrollPane = JScrollPane(tabInner).apply {
@@ -56,7 +61,7 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
 
     init {
         tabInner.isOpaque = true
-        tabInner.background = JBUI.CurrentTheme.ToolWindow.headerBackground(true)
+        tabInner.background = JBUI.CurrentTheme.ToolWindow.headerBackground(false)
 
         // Forward mouse-wheel events to the hidden horizontal scroll bar
         val scroller = MouseWheelListener { e ->
@@ -109,6 +114,7 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
         panels[activeIndex].isFocused = true
         rebuildTabStrip()
         showActive()
+        onActivePanelChanged?.invoke(panels[activeIndex])
     }
 
     // ── Internal ───────────────────────────────────────────────────────────
@@ -137,48 +143,53 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
     }
 
     private fun buildTab(index: Int, panel: BrowserPanel): JComponent {
-        val isActive  = index == activeIndex
-        val isRemote  = index > 0
-        val tabFont   = font.deriveFont(11f)
-        val activeBg  = JBUI.CurrentTheme.ActionButton.pressedBackground()
-        val fgActive  = JBUI.CurrentTheme.Label.foreground()
-        val fgDim     = JBUI.CurrentTheme.Label.disabledForeground()
+        val isActive    = index == activeIndex
+        val isRemote    = index > 0
+        val tabFont     = font.deriveFont(10f)
+        val accentColor = UIManager.getColor("TabbedPane.underlineColor")
+            ?: UIManager.getColor("Component.focusColor")
+            ?: JBUI.CurrentTheme.ActionButton.pressedBackground()
+        val fgActive    = JBUI.CurrentTheme.Label.foreground()
+        val fgDim       = JBUI.CurrentTheme.Label.disabledForeground()
+        val tabIcon     = if (isRemote) AllIcons.Webreferences.Server else AllIcons.Nodes.Folder
 
-        val dot   = if (isRemote) "● " else ""
-        val label = "$dot${index + 1} ${panel.panelLabel}"
-
-        val nameBtn = JButton(label).apply {
-            isBorderPainted     = false
-            isContentAreaFilled = isActive
-            isFocusPainted      = false
-            font                = tabFont
-            margin              = JBUI.insets(2, 8, 2, if (isRemote) 2 else 8)
-            foreground          = if (isActive) fgActive else fgDim
-            if (isActive) background = activeBg
-            toolTipText         = panel.panelLabel
-            addActionListener   { switchToPanel(index) }
+        val nameBtn = JButton(panel.panelLabel, tabIcon).apply {
+            isBorderPainted        = false
+            isContentAreaFilled    = false
+            isFocusPainted         = false
+            isRolloverEnabled      = true
+            font                   = tabFont
+            foreground             = if (isActive) fgActive else fgDim
+            margin                 = JBUI.insets(1, 6, 1, if (isRemote) 2 else 6)
+            horizontalTextPosition = SwingConstants.RIGHT
+            border                 = if (isActive)
+                BorderFactory.createMatteBorder(0, 0, 2, 0, accentColor)
+            else
+                BorderFactory.createEmptyBorder(0, 0, 2, 0)
+            toolTipText            = panel.panelLabel
+            addActionListener      { switchToPanel(index) }
         }
 
         if (!isRemote) return nameBtn
 
-        val closeBtn = JButton("×").apply {
+        val closeBtn = JButton(AllIcons.Actions.Close).apply {
             isBorderPainted     = false
             isContentAreaFilled = false
             isFocusPainted      = false
-            font                = tabFont
-            margin              = JBUI.insets(2, 2, 2, 6)
-            foreground          = fgDim
+            isRolloverEnabled   = true
+            preferredSize       = JBUI.size(16, 16)
+            margin              = JBUI.emptyInsets()
+            border              = if (isActive)
+                BorderFactory.createMatteBorder(0, 0, 2, 0, accentColor)
+            else
+                BorderFactory.createEmptyBorder(0, 0, 2, 0)
             toolTipText         = "Close ${panel.panelLabel}"
-            preferredSize       = Dimension(18, preferredSize.height.coerceAtLeast(1))
-            maximumSize         = Dimension(18, Int.MAX_VALUE)
             addActionListener   { removePanel(index) }
         }
 
-        // Group label + close into one visual unit sharing the active background
         return JPanel().apply {
             layout   = BoxLayout(this, BoxLayout.X_AXIS)
-            isOpaque = isActive
-            if (isActive) background = activeBg
+            isOpaque = false
             add(nameBtn)
             add(closeBtn)
         }
