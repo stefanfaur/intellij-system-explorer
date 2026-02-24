@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assumptions.assumeTrue
+import ro.faur.explorer.quickopen.backend.ContentMatch
 import ro.faur.explorer.quickopen.backend.RipgrepContentSearch
 import java.io.File
 
@@ -95,8 +96,8 @@ class Phase6RipgrepContentSearchTest {
             val results = searcher.search("match line").toList()
 
             assertTrue(
-                results.size <= RipgrepContentSearch.MAX_CONTENT_RESULTS,
-                "Results should be capped at ${RipgrepContentSearch.MAX_CONTENT_RESULTS}, got ${results.size}"
+                results.size <= RipgrepContentSearch.DEFAULT_MAX_CONTENT_RESULTS,
+                "Results should be capped at ${RipgrepContentSearch.DEFAULT_MAX_CONTENT_RESULTS}, got ${results.size}"
             )
         } finally {
             tempDir.deleteRecursively()
@@ -128,5 +129,55 @@ class Phase6RipgrepContentSearchTest {
         } finally {
             tempDir.deleteRecursively()
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // JSON parsing and matchRanges
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `ContentMatch parse returns matchRanges from JSON submatch`() {
+        val json = """{"type":"match","data":{"path":{"text":"/tmp/foo.kt"},"lines":{"text":"fun navigateTo(path: String)\n"},"line_number":42,"absolute_offset":0,"submatches":[{"match":{"text":"navigateTo"},"start":4,"end":14}]}}"""
+        val match = ContentMatch.parseJson(json)
+        assertNotNull(match)
+        assertEquals("/tmp/foo.kt", match!!.filePath)
+        assertEquals(42, match.lineNumber)
+        assertTrue(match.snippet.contains("navigateTo"))
+        assertEquals(1, match.matchRanges.size)
+        assertEquals(4, match.matchRanges[0].first)
+        assertEquals(13, match.matchRanges[0].last)  // end=14 exclusive → last=13
+    }
+
+    @Test
+    fun `ContentMatch parseJson returns null for non-match type`() {
+        val json = """{"type":"begin","data":{"path":{"text":"/tmp/foo.kt"}}}"""
+        assertNull(ContentMatch.parseJson(json))
+    }
+
+    @Test
+    fun `ContentMatch parseJson handles multibyte chars in byte-to-char conversion`() {
+        // "café" is 5 bytes (c=1, a=1, f=1, é=2) but 4 chars
+        // submatch at bytes 3..5 (é) should map to chars 3..4
+        val json = """{"type":"match","data":{"path":{"text":"/tmp/f.kt"},"lines":{"text":"café\n"},"line_number":1,"absolute_offset":0,"submatches":[{"match":{"text":"é"},"start":3,"end":5}]}}"""
+        val match = ContentMatch.parseJson(json)
+        assertNotNull(match)
+        assertEquals(1, match!!.matchRanges.size)
+        assertEquals(3, match.matchRanges[0].first)
+        assertEquals(3, match.matchRanges[0].last)  // é is one char at index 3
+    }
+
+    @Test
+    fun `search results contain non-empty matchRanges for real rg`() = runBlocking {
+        val rg = rgAvailable()
+        assumeTrue(rg != null, "rg not installed")
+        val tempDir = File(System.getProperty("java.io.tmpdir"), "rg_ranges_${System.currentTimeMillis()}")
+        tempDir.mkdirs()
+        try {
+            File(tempDir, "sample.kt").writeText("fun navigateTo(path: String) {}\n")
+            val results = RipgrepContentSearch(rgPath = rg!!, scope = tempDir.absolutePath)
+                .search("navigateTo").toList()
+            assertTrue(results.isNotEmpty())
+            assertTrue(results.all { it.matchRanges.isNotEmpty() }, "matchRanges should be populated from JSON")
+        } finally { tempDir.deleteRecursively() }
     }
 }
