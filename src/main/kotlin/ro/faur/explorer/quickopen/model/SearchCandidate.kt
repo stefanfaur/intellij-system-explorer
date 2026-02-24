@@ -8,5 +8,6 @@ data class SearchCandidate(
     val type: CandidateType,
     val signals: UsageSignals = UsageSignals(),
     val contentSnippet: String? = null,      // for CONTENT_MATCH results
+    val contentMatchRanges: List<IntRange>? = null, // char-offset ranges of matched term in snippet
     val extra: Map<String, Any> = emptyMap() // extension, childCount, gitStatus…
 )

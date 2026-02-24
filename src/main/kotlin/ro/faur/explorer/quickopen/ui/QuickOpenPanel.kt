@@ -21,8 +21,12 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.annotations.RequiresEdt
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.launch
 import ro.faur.explorer.actions.FileActions
 import ro.faur.explorer.model.Bookmark
 import ro.faur.explorer.model.BookmarkManager
@@ -40,12 +44,15 @@ import ro.faur.explorer.quickopen.query.RelativePathResolver
 import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.quickopen.ranking.Ranker
 import ro.faur.explorer.settings.ExplorerSettings
+import ro.faur.explorer.settings.QuickOpenSettings
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Dimension
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
-import java.util.concurrent.Future
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 import javax.swing.JPanel
 import javax.swing.KeyStroke
 import javax.swing.ListSelectionModel
@@ -63,6 +70,10 @@ class QuickOpenPanel(
     private val textScorer = MinusculeMatcherRanker()
     private val ranker = Ranker(textScorer)
     private val candidatePool = CandidatePool(VfsEnumerator())
+
+    companion object {
+        private const val MAX_CONTENT_RESULTS = 200
+    }
 
     val searchField = SearchTextField(true).apply {
         isFocusable = true
@@ -82,9 +93,7 @@ class QuickOpenPanel(
         font = font.deriveFont(11f)
     }
 
-    private val truncationLabel = JBLabel("⚠ Index truncated at 50,000 files. Narrow your root.").apply {
-        isVisible = false
-    }
+    private val truncationLabel = JBLabel("").apply { isVisible = false }
 
     private val previewPane = PreviewPane().apply { isVisible = false }
     private var previewVisible = false
@@ -130,7 +139,8 @@ class QuickOpenPanel(
         add(JBScrollPane(resultList), "results")
     }
 
-    private var pendingSearch: Future<*>? = null
+    private val searchScheduler = AppExecutorUtil.createBoundedScheduledExecutorService("QuickOpenSearch", 1)
+    private var pendingSearch: ScheduledFuture<*>? = null
     private var selectedId: String? = null
 
     private val recentQueries = mutableListOf<String>()
@@ -356,7 +366,13 @@ class QuickOpenPanel(
         // Start background enumeration; onUpdate fires on background thread — dispatch to EDT
         candidatePool.refreshAsync(currentPath) {
             ApplicationManager.getApplication().invokeLater({
-                truncationLabel.isVisible = candidatePool.isTruncated
+                if (candidatePool.isTruncated) {
+                    val cap = try { QuickOpenSettings.getInstance().state.maxIndexSize } catch (_: Exception) { 50_000 }
+                    truncationLabel.text = "\u26a0 Index truncated at $cap files. Narrow your root."
+                    truncationLabel.isVisible = true
+                } else {
+                    truncationLabel.isVisible = false
+                }
                 scheduleSearch()
             }, ModalityState.any())
         }
@@ -412,7 +428,7 @@ class QuickOpenPanel(
     // ─── Search scheduling ────────────────────────────────────────────────────
 
     private fun scheduleSearch() {
-        pendingSearch?.cancel(false)
+        pendingSearch?.cancel(true)   // true = interrupt if running
         val raw = searchField.text.trim()
         resultList.setPaintBusy(true)
 
@@ -435,12 +451,12 @@ class QuickOpenPanel(
             QueryMode.UNIFIED -> ""
         }
 
-        pendingSearch = AppExecutorUtil.getAppExecutorService().submit {
+        pendingSearch = searchScheduler.schedule({
             val results = performSearch(raw)
             ApplicationManager.getApplication().invokeLater({
                 updateList(results, raw)
             }, ModalityState.any())
-        }
+        }, 150, TimeUnit.MILLISECONDS)
     }
 
     // ─── Search logic ─────────────────────────────────────────────────────────
@@ -479,20 +495,28 @@ class QuickOpenPanel(
             return performRegexSearch(query.searchText, allCandidates)
         }
 
-        val scored = ranker.rank(query.searchText, allCandidates, currentPath, limit = 50)
+        val limit = try { QuickOpenSettings.getInstance().state.maxDisplayedResults } catch (_: Exception) { 50 }
+        val scored = ranker.rank(query.searchText, allCandidates, currentPath, limit = limit)
         return enrichWithGitStatus(scored.map { SearchResult(it) })
     }
 
     private fun performContentSearch(pattern: String): List<SearchResult> {
         if (pattern.isBlank()) return emptyList()
-        val settings = ExplorerSettings.getInstance()
-        if (!settings.state.contentSearchEnabled) return emptyList()
-        val scope = settings.state.contentSearchScope.ifBlank { currentPath }
-        val rgPath = settings.state.ripgrepPath.ifBlank { "rg" }
+        val qs = try { QuickOpenSettings.getInstance().state } catch (_: Exception) { null }
+        if (qs?.contentSearchEnabled == false) return emptyList()
+        val searchScope = currentPath
+        val rgPath = qs?.ripgrepPath?.ifBlank { "rg" } ?: "rg"
         return try {
-            val matches = runBlocking {
-                RipgrepContentSearch(rgPath, scope).search(pattern).toList()
+            val matches = mutableListOf<ro.faur.explorer.quickopen.backend.ContentMatch>()
+            val latch = CountDownLatch(1)
+            CoroutineScope(Dispatchers.IO + Job()).launch {
+                try {
+                    RipgrepContentSearch(rgPath, searchScope).search(pattern)
+                        .take(MAX_CONTENT_RESULTS)
+                        .collect { matches.add(it) }
+                } finally { latch.countDown() }
             }
+            latch.await(10, TimeUnit.SECONDS)
             matches.map { match ->
                 SearchResult(ScoredCandidate(
                     SearchCandidate(
@@ -501,7 +525,8 @@ class QuickOpenPanel(
                         fullPath = match.filePath,
                         parentPath = match.filePath.substringBeforeLast('/'),
                         type = CandidateType.CONTENT_MATCH,
-                        contentSnippet = match.snippet
+                        contentSnippet = match.snippet,
+                        contentMatchRanges = match.matchRanges.takeIf { it.isNotEmpty() }
                     ),
                     score = 1.0
                 ))
@@ -540,9 +565,10 @@ class QuickOpenPanel(
 
     private fun performRegexSearch(pattern: String, candidates: List<SearchCandidate>): List<SearchResult> {
         val regex = try { Regex(pattern, RegexOption.IGNORE_CASE) } catch (_: Exception) { return emptyList() }
+        val limit = try { QuickOpenSettings.getInstance().state.maxDisplayedResults } catch (_: Exception) { 50 }
         return candidates
             .filter { regex.containsMatchIn(it.fullPath) }
-            .take(50)
+            .take(limit)
             .map { SearchResult(ScoredCandidate(it, 1.0)) }
     }
 
@@ -570,7 +596,8 @@ class QuickOpenPanel(
         // Track non-empty queries for Ctrl+R
         if (query.isNotBlank() && (recentQueries.isEmpty() || recentQueries.last() != query)) {
             recentQueries.add(query)
-            if (recentQueries.size > 20) recentQueries.removeAt(0)
+            val historyLimit = try { QuickOpenSettings.getInstance().state.recentQueryHistory } catch (_: Exception) { 20 }
+            if (recentQueries.size > historyLimit) recentQueries.removeAt(0)
             recentQueryIndex = recentQueries.size
         }
     }
@@ -800,5 +827,6 @@ class QuickOpenPanel(
     override fun dispose() {
         candidatePool.cancel()
         pendingSearch?.cancel(true)
+        searchScheduler.shutdownNow()
     }
 }
