@@ -40,12 +40,12 @@ class Phase4PreviewPaneTest : BasePlatformTestCase() {
     )
 
     fun `test PreviewPane can be instantiated without throwing`() {
-        val pane = PreviewPane()
+        val pane = PreviewPane(project)
         assertNotNull(pane)
     }
 
     fun `test update with non-existent path does not throw`() {
-        val pane = PreviewPane()
+        val pane = PreviewPane(project)
         val candidate = directoryCandidate("/this/path/does/not/exist/xyz")
         pane.update(candidate)  // must not throw
     }
@@ -56,7 +56,7 @@ class Phase4PreviewPaneTest : BasePlatformTestCase() {
             File(tempDir, "child1.txt").createNewFile()
             File(tempDir, "child2.txt").createNewFile()
             val candidate = directoryCandidate(tempDir.absolutePath)
-            val pane = PreviewPane()
+            val pane = PreviewPane(project)
             pane.update(candidate)  // must not throw
         } finally {
             tempDir.deleteRecursively()
@@ -68,7 +68,7 @@ class Phase4PreviewPaneTest : BasePlatformTestCase() {
         try {
             tempFile.writeText("Hello, World!\nLine two.\n")
             val candidate = fileCandidate(tempFile.absolutePath)
-            val pane = PreviewPane()
+            val pane = PreviewPane(project)
             pane.update(candidate)  // must not throw
         } finally {
             tempFile.delete()
@@ -76,7 +76,7 @@ class Phase4PreviewPaneTest : BasePlatformTestCase() {
     }
 
     fun `test clear does not throw on fresh pane`() {
-        val pane = PreviewPane()
+        val pane = PreviewPane(project)
         pane.clear()  // must not throw
     }
 
@@ -84,7 +84,7 @@ class Phase4PreviewPaneTest : BasePlatformTestCase() {
         val tempDir = createTempDir("preview_pane_clear_test")
         try {
             val candidate = directoryCandidate(tempDir.absolutePath)
-            val pane = PreviewPane()
+            val pane = PreviewPane(project)
             pane.update(candidate)
             pane.clear()  // must not throw
         } finally {
@@ -93,7 +93,7 @@ class Phase4PreviewPaneTest : BasePlatformTestCase() {
     }
 
     fun `test update can be called multiple times without error`() {
-        val pane = PreviewPane()
+        val pane = PreviewPane(project)
         val candidate = directoryCandidate("/non/existent/path")
         pane.update(candidate)
         pane.update(candidate)
@@ -101,7 +101,7 @@ class Phase4PreviewPaneTest : BasePlatformTestCase() {
     }
 
     fun `test PreviewPane has positive preferred width`() {
-        val pane = PreviewPane()
+        val pane = PreviewPane(project)
         assertTrue(
             "PreviewPane should have a positive preferred width",
             pane.preferredSize.width > 0
