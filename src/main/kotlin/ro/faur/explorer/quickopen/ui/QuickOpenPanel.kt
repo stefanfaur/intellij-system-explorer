@@ -197,11 +197,24 @@ class QuickOpenPanel(
             ), searchField
         )
 
-        // Tab on search field: toggle preview pane
-        DumbAwareAction.create { togglePreview() }.registerCustomShortcutSet(
+        // Tab: toggle preview pane — registered on both searchField and resultList as
+        // DumbAwareAction so IntelliJ's dispatcher fires before Swing focus traversal.
+        // A KeyAdapter on resultList would never fire because Tab is a Swing focus-traversal
+        // key and is consumed by KeyboardFocusManager before key listeners see it.
+        val togglePreviewAction = DumbAwareAction.create { togglePreview() }
+        listOf(searchField, resultList).forEach {
+            togglePreviewAction.registerCustomShortcutSet(
+                com.intellij.openapi.actionSystem.CustomShortcutSet(
+                    KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0)
+                ), it
+            )
+        }
+
+        // Shift+Tab on resultList: navigate to previous group
+        DumbAwareAction.create { navigateToPrevGroup() }.registerCustomShortcutSet(
             com.intellij.openapi.actionSystem.CustomShortcutSet(
-                KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0)
-            ), searchField
+                KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.SHIFT_DOWN_MASK)
+            ), resultList
         )
 
         // Ctrl+R on search field: cycle recent queries
@@ -303,16 +316,6 @@ class QuickOpenPanel(
                     // Cmd+D: toggle bookmark
                     e.keyCode == KeyEvent.VK_D && (e.modifiersEx and InputEvent.META_DOWN_MASK) != 0 -> {
                         toggleBookmark(); e.consume()
-                    }
-
-                    // Tab: toggle preview pane
-                    e.keyCode == KeyEvent.VK_TAB && e.modifiersEx == 0 -> {
-                        togglePreview(); e.consume()
-                    }
-
-                    // Shift+Tab: navigate to previous group
-                    e.keyCode == KeyEvent.VK_TAB && (e.modifiersEx and InputEvent.SHIFT_DOWN_MASK) != 0 -> {
-                        navigateToPrevGroup(); e.consume()
                     }
 
                     // /: refocus search field
