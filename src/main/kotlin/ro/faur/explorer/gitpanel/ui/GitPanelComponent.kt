@@ -303,6 +303,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
 
     private fun doCommit(message: String, push: Boolean) {
         val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
         val paths = changedFilesPanel.getCheckedPaths()
 
         // Validate on EDT before going to background
@@ -333,7 +334,8 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
             val stageResult = backend.stageFiles(paths)
             if (!stageResult.isSuccess) {
                 ApplicationManager.getApplication().invokeLater {
-                    if (!disposed) commitDetailsPanel.showError("Stage failed: ${stageResult.stderr.take(200)}")
+                    if (!disposed && System.identityHashCode(selectedBackend) == snapshotKey)
+                        commitDetailsPanel.showError("Stage failed: ${stageResult.stderr.takeLast(200)}")
                 }
                 return@executeOnPooledThread
             }
@@ -341,7 +343,8 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
             val commitResult = backend.commit(message)
             if (!commitResult.isSuccess) {
                 ApplicationManager.getApplication().invokeLater {
-                    if (!disposed) commitDetailsPanel.showError("Commit failed: ${commitResult.stderr.take(200)}")
+                    if (!disposed && System.identityHashCode(selectedBackend) == snapshotKey)
+                        commitDetailsPanel.showError("Commit failed: ${commitResult.stderr.takeLast(200)}")
                 }
                 return@executeOnPooledThread
             }
@@ -350,9 +353,9 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
                 val pushResult = backend.push()
                 if (!pushResult.isSuccess) {
                     ApplicationManager.getApplication().invokeLater {
-                        if (!disposed) {
+                        if (!disposed && System.identityHashCode(selectedBackend) == snapshotKey) {
                             commitDetailsPanel.showError(
-                                "Committed locally. Push failed: ${pushResult.stderr.take(200)}. " +
+                                "Committed locally. Push failed: ${pushResult.stderr.takeLast(200)}. " +
                                 "Retry with the Push toolbar button."
                             )
                             reloadData()
@@ -363,7 +366,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
             }
 
             ApplicationManager.getApplication().invokeLater {
-                if (!disposed) {
+                if (!disposed && System.identityHashCode(selectedBackend) == snapshotKey) {
                     commitDetailsPanel.clearEditor()
                     reloadData()
                 }
@@ -374,6 +377,9 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     private fun doPush() {
         val backend = selectedBackend ?: return
 
+        // Confirmation is required only for REMOTE backends: SSH pushes cross a network boundary
+        // and may involve credentials/access controls that the user should consciously approve.
+        // Local pushes go to a local upstream and are trivially recoverable.
         if (backend.id.type == BackendType.REMOTE) {
             val confirmed = javax.swing.JOptionPane.showConfirmDialog(
                 this,
@@ -394,7 +400,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
                         Notification(
                             "SystemExplorer",
                             "Push Failed",
-                            result.stderr.take(300).ifBlank { "Unknown error" },
+                            result.stderr.takeLast(300).ifBlank { "Unknown error" },
                             NotificationType.ERROR
                         ), project
                     )

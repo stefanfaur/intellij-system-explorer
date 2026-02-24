@@ -41,10 +41,10 @@ class ChangedFilesPanel : JPanel(BorderLayout()) {
                 val allPaths = stagingFiles().map { it.path }
                 if (checkedPaths.containsAll(allPaths)) {
                     checkedPaths.clear()
-                    label.text = "☑ All"
+                    label.text = "☐ All"
                 } else {
                     checkedPaths.addAll(allPaths)
-                    label.text = "☐ None"
+                    label.text = "☑ All"
                 }
                 list.repaint()
             }
@@ -60,7 +60,7 @@ class ChangedFilesPanel : JPanel(BorderLayout()) {
                 val idx = list.locationToIndex(e.point)
                 if (idx < 0) return
                 val file = listModel.getElementAt(idx)
-                if (file.status == GitFileStatus.UNMERGED) return
+                if (file.status == GitFileStatus.UNMERGED || file.status == GitFileStatus.IGNORED) return
                 if (checkedPaths.contains(file.path)) checkedPaths.remove(file.path)
                 else checkedPaths.add(file.path)
                 list.repaint()
@@ -93,8 +93,8 @@ class ChangedFilesPanel : JPanel(BorderLayout()) {
         listModel.clear()
         files.forEach { listModel.addElement(it) }
         if (stagingMode) {
-            // All non-UNMERGED files checked by default
-            files.filter { it.status != GitFileStatus.UNMERGED }
+            // UNMERGED and IGNORED files cannot be staged — exclude from defaults
+            files.filter { it.status != GitFileStatus.UNMERGED && it.status != GitFileStatus.IGNORED }
                  .forEach { checkedPaths.add(it.path) }
         }
         list.emptyText.text = "No changes"
@@ -111,7 +111,7 @@ class ChangedFilesPanel : JPanel(BorderLayout()) {
 
     private fun stagingFiles(): List<CommitFile> =
         (0 until listModel.size).map { listModel.getElementAt(it) }
-            .filter { it.status != GitFileStatus.UNMERGED }
+            .filter { it.status != GitFileStatus.UNMERGED && it.status != GitFileStatus.IGNORED }
 
     private fun statusLetter(status: GitFileStatus): String = when (status) {
         GitFileStatus.MODIFIED  -> "M"
@@ -171,12 +171,12 @@ class ChangedFilesPanel : JPanel(BorderLayout()) {
             }
 
             // Staging mode
-            val isUnmerged = value.status == GitFileStatus.UNMERGED
+            val isUnstageble = value.status == GitFileStatus.UNMERGED || value.status == GitFileStatus.IGNORED
             checkBox.isSelected = checkedPaths.contains(value.path)
-            checkBox.isEnabled = !isUnmerged
+            checkBox.isEnabled = !isUnstageble
             checkBox.background = if (isSelected) list.selectionBackground else list.background
 
-            val color: Color? = if (isUnmerged) list.foreground.let {
+            val color: Color? = if (isUnstageble) list.foreground.let {
                 java.awt.Color(it.red, it.green, it.blue, 100)
             } else RemoteGitTreeDecorator.colorFor(value.status)
 
@@ -185,11 +185,12 @@ class ChangedFilesPanel : JPanel(BorderLayout()) {
                 append("  ")
                 append(value.path)
                 if (value.oldPath != null) append("  \u2190 ${value.oldPath}")
-                if (isUnmerged) append("  [resolve conflicts first]")
+                if (value.status == GitFileStatus.UNMERGED) append("  [resolve conflicts first]")
+                if (value.status == GitFileStatus.IGNORED) append("  [ignored]")
             }
             checkLabel.text = text
             checkLabel.foreground = color ?: list.foreground
-            checkLabel.isEnabled = !isUnmerged
+            checkLabel.isEnabled = !isUnstageble
 
             checkRow.background = if (isSelected) list.selectionBackground else list.background
             return checkRow

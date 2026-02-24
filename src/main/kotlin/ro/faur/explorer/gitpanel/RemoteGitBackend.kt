@@ -1,6 +1,7 @@
 package ro.faur.explorer.gitpanel
 
 import com.intellij.openapi.diagnostic.Logger
+import ro.faur.explorer.gitpanel.exec.GitCommandResult
 import ro.faur.explorer.remote.git.GitLogEntry
 import ro.faur.explorer.remote.git.GitLogParser
 import ro.faur.explorer.remote.git.GitStatusParser
@@ -64,22 +65,22 @@ class RemoteGitBackend(
         return parseCommitInfo(result.stdout)
     }
 
-    override fun stageFiles(paths: List<String>): ro.faur.explorer.gitpanel.exec.GitCommandResult {
-        if (paths.isEmpty()) return ro.faur.explorer.gitpanel.exec.GitCommandResult(0, "", "")
+    override fun stageFiles(paths: List<String>): GitCommandResult {
+        if (paths.isEmpty()) return GitCommandResult(0, "", "")
         return executor.executeBlocking(
             repoPath,
             args = arrayOf("add", "--") + paths.toTypedArray()
         )
     }
 
-    override fun commit(message: String): ro.faur.explorer.gitpanel.exec.GitCommandResult {
+    override fun commit(message: String): GitCommandResult {
         return executor.executeBlocking(
             repoPath,
             args = arrayOf("commit", "-m", message)
         )
     }
 
-    override fun push(): ro.faur.explorer.gitpanel.exec.GitCommandResult {
+    override fun push(): GitCommandResult {
         return executor.executeBlocking(
             repoPath,
             args = arrayOf("push")

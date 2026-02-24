@@ -175,42 +175,24 @@ class ChangedFilesPanelStagingTest {
         assertFalse(checked.contains("src/Conflict.kt"))
     }
 
+    @Test fun `getCheckedPaths excludes ignored files`() {
+        val panel = ro.faur.explorer.gitpanel.ui.ChangedFilesPanel()
+        panel.setMode(staging = true)
+        val files = listOf(
+            file("src/Foo.kt", GitFileStatus.MODIFIED),
+            file(".env", GitFileStatus.IGNORED),
+        )
+        panel.setFiles(files, "Working Tree")
+        val checked = panel.getCheckedPaths()
+        assertEquals(1, checked.size)
+        assertFalse(checked.contains(".env"))
+    }
+
     @Test fun `getCheckedPaths returns empty in HISTORY mode`() {
         val panel = ro.faur.explorer.gitpanel.ui.ChangedFilesPanel()
         panel.setMode(staging = false)
         panel.setFiles(listOf(file("src/Foo.kt", GitFileStatus.MODIFIED)), "Commit abc")
         assertEquals(emptyList<String>(), panel.getCheckedPaths())
-    }
-}
-
-// ── doCommit validation ───────────────────────────────────────────────────────
-
-class DoCommitValidationTest {
-
-    @Test fun `empty message is invalid`() {
-        assertTrue("".isBlank())
-    }
-
-    @Test fun `whitespace-only message is invalid`() {
-        assertTrue("   \n\t".isBlank())
-    }
-
-    @Test fun `empty checked paths list is invalid`() {
-        assertTrue(emptyList<String>().isEmpty())
-    }
-}
-
-// ── LocalGitBackend write-method arg construction ─────────────────────────────
-
-class LocalGitBackendWriteArgsTest {
-
-    @Test fun `stageFiles passes explicit paths after double-dash`() {
-        // We can't run git here, so verify the path list is non-empty to
-        // confirm the method signature accepts a List<String>.
-        val paths = listOf("src/Foo.kt", "src/Bar.kt")
-        // If stageFiles compiles and accepts List<String>, this test validates
-        // the contract. Real integration tested manually / via sftp tests.
-        assertTrue(paths.isNotEmpty())
     }
 }
 
