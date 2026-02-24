@@ -141,6 +141,48 @@ class ParseDiffTreeLineTest {
     }
 }
 
+// ── ChangedFilesPanel staging mode ────────────────────────────────────────────
+
+class ChangedFilesPanelStagingTest {
+
+    private fun file(path: String, status: GitFileStatus) =
+        ro.faur.explorer.gitpanel.CommitFile(path, status)
+
+    @Test fun `getCheckedPaths returns all paths by default in staging mode`() {
+        val panel = ro.faur.explorer.gitpanel.ui.ChangedFilesPanel()
+        panel.setMode(staging = true)
+        val files = listOf(
+            file("src/Foo.kt", GitFileStatus.MODIFIED),
+            file("src/Bar.kt", GitFileStatus.ADDED),
+        )
+        panel.setFiles(files, "Working Tree")
+        val checked = panel.getCheckedPaths()
+        assertEquals(2, checked.size)
+        assertTrue(checked.contains("src/Foo.kt"))
+        assertTrue(checked.contains("src/Bar.kt"))
+    }
+
+    @Test fun `getCheckedPaths excludes unmerged files`() {
+        val panel = ro.faur.explorer.gitpanel.ui.ChangedFilesPanel()
+        panel.setMode(staging = true)
+        val files = listOf(
+            file("src/Foo.kt", GitFileStatus.MODIFIED),
+            file("src/Conflict.kt", GitFileStatus.UNMERGED),
+        )
+        panel.setFiles(files, "Working Tree")
+        val checked = panel.getCheckedPaths()
+        assertEquals(1, checked.size)
+        assertFalse(checked.contains("src/Conflict.kt"))
+    }
+
+    @Test fun `getCheckedPaths returns empty in HISTORY mode`() {
+        val panel = ro.faur.explorer.gitpanel.ui.ChangedFilesPanel()
+        panel.setMode(staging = false)
+        panel.setFiles(listOf(file("src/Foo.kt", GitFileStatus.MODIFIED)), "Commit abc")
+        assertEquals(emptyList<String>(), panel.getCheckedPaths())
+    }
+}
+
 // ── LocalGitBackend write-method arg construction ─────────────────────────────
 
 class LocalGitBackendWriteArgsTest {
