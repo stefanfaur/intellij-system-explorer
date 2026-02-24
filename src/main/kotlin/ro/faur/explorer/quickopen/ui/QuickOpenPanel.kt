@@ -95,7 +95,7 @@ class QuickOpenPanel(
 
     private val truncationLabel = JBLabel("").apply { isVisible = false }
 
-    private val previewPane = PreviewPane().apply { isVisible = false }
+    private val previewPane = PreviewPane(project).apply { isVisible = false }
     private var previewVisible = false
 
     private val modeChipLabel = JBLabel("").apply {
@@ -825,6 +825,7 @@ class QuickOpenPanel(
     }
 
     override fun dispose() {
+        previewPane.dispose()
         candidatePool.cancel()
         pendingSearch?.cancel(true)
         searchScheduler.shutdownNow()
