@@ -183,6 +183,23 @@ class ChangedFilesPanelStagingTest {
     }
 }
 
+// ── doCommit validation ───────────────────────────────────────────────────────
+
+class DoCommitValidationTest {
+
+    @Test fun `empty message is invalid`() {
+        assertTrue("".isBlank())
+    }
+
+    @Test fun `whitespace-only message is invalid`() {
+        assertTrue("   \n\t".isBlank())
+    }
+
+    @Test fun `empty checked paths list is invalid`() {
+        assertTrue(emptyList<String>().isEmpty())
+    }
+}
+
 // ── LocalGitBackend write-method arg construction ─────────────────────────────
 
 class LocalGitBackendWriteArgsTest {

@@ -1,6 +1,9 @@
 package ro.faur.explorer.gitpanel.ui
 
 import com.intellij.icons.AllIcons
+import com.intellij.notification.Notification
+import com.intellij.notification.NotificationType
+import com.intellij.notification.Notifications
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -8,6 +11,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
@@ -32,6 +36,12 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
 
     private val registry = GitRepositoryRegistry.getInstance(project)
 
+    companion object {
+        private val LOG = Logger.getInstance(GitPanelComponent::class.java)
+    }
+
+    @Volatile private var disposed = false
+
     // ── State ──────────────────────────────────────────────────────────────
     private var selectedBackend: GitBackend? = null
     private var currentBranch: String? = null
@@ -49,10 +59,12 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     // Suppress action listener during programmatic model rebuild to avoid double reload
     private var suppressComboAction = false
 
-    private val registryListener: () -> Unit = { ApplicationManager.getApplication().invokeLater { rebuildCombo() } }
+    private val registryListener: () -> Unit = {
+        if (!disposed) ApplicationManager.getApplication().invokeLater { if (!disposed) rebuildCombo() }
+    }
 
     private val navListener: (String?, String) -> Unit = { connName, path ->
-        ApplicationManager.getApplication().invokeLater { selectMatchingBackend(connName, path) }
+        if (!disposed) ApplicationManager.getApplication().invokeLater { if (!disposed) selectMatchingBackend(connName, path) }
     }
 
     init {
@@ -105,6 +117,11 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
             override fun actionPerformed(e: AnActionEvent) { removeSelectedRepo() }
             override fun update(e: AnActionEvent) { e.presentation.isEnabled = selectedBackend != null }
         })
+        group.add(object : AnAction("Push", "Push current branch to remote", AllIcons.Actions.Upload) {
+            override fun getActionUpdateThread() = ActionUpdateThread.BGT
+            override fun actionPerformed(e: AnActionEvent) { doPush() }
+            override fun update(e: AnActionEvent) { e.presentation.isEnabled = selectedBackend != null }
+        })
 
         val toolbar = ActionManager.getInstance()
             .createActionToolbar("GitPanel.Toolbar", group, true)
@@ -144,6 +161,13 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         FileChooser.chooseFile(descriptor, project, null) { vf ->
             if (File(vf.path, ".git").exists()) {
                 registry.register(LocalGitBackend(vf.path))
+            } else {
+                Notifications.Bus.notify(Notification(
+                    "SystemExplorer",
+                    "Not a Git Repository",
+                    "The selected folder '${vf.path}' does not contain a .git directory.",
+                    NotificationType.WARNING
+                ), project)
             }
         }
     }
@@ -182,15 +206,34 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
 
     fun reloadData() {
         val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
         ApplicationManager.getApplication().executeOnPooledThread {
-            val branch = runCatching { backend.getCurrentBranch() }.getOrNull()
+            val branch = runCatching { backend.getCurrentBranch() }.getOrElse { null }
             val log    = runCatching { backend.getLog(200) }.getOrElse { emptyList() }
             val status = runCatching { backend.getWorkingTreeStatus() }.getOrElse { emptyList() }
             ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater  // stale
                 currentBranch = branch
                 logEntries    = log
                 branchLabel.text = if (branch != null) "  \u2387 $branch  " else ""
                 commitLogPanel.setData(log, status.size)
+                // branch == null means getCurrentBranch() failed — a strong signal that
+                // git is not reachable on the remote server (wrong PATH, not installed, etc.).
+                // Notify the user so they are not left wondering why commits are missing.
+                if (branch == null && backend.id.type == BackendType.REMOTE) {
+                    Notifications.Bus.notify(
+                        Notification(
+                            "SystemExplorer",
+                            "Remote Git: Could Not Load Repository",
+                            "Failed to run git commands for <b>${backend.displayName}</b>. " +
+                                "Make sure git is installed and on the PATH on the remote server. " +
+                                "Check the IDE log for details.",
+                            NotificationType.WARNING
+                        ),
+                        project
+                    )
+                }
             }
         }
     }
@@ -217,27 +260,147 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
 
     private fun onCommitSelected(entry: GitLogEntry?) {
         val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
         if (entry == null) {
-            // Working tree row
+            // Working tree row — switch both panels to staging/editor mode
             ApplicationManager.getApplication().executeOnPooledThread {
                 try {
                     val files = backend.getWorkingTreeStatus()
                     ApplicationManager.getApplication().invokeLater {
-                        changedFilesPanel.setFiles(files, "Working Tree")
-                        commitDetailsPanel.setCommit(null)
+                        if (disposed) return@invokeLater
+                        if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                        changedFilesPanel.setMode(staging = true)
+                        changedFilesPanel.setFiles(files, "Working Tree — ${files.size} changes")
+                        commitDetailsPanel.setWorkingTreeMode(currentBranch) { message, push ->
+                            doCommit(message, push)
+                        }
                     }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    LOG.warn("Failed to load working tree status", e)
+                }
             }
         } else {
+            // History row — switch both panels back to read-only mode
             ApplicationManager.getApplication().executeOnPooledThread {
                 try {
                     val files = backend.getCommitFiles(entry.hash)
                     val info  = backend.getCommitInfo(entry.hash)
                     ApplicationManager.getApplication().invokeLater {
+                        if (disposed) return@invokeLater
+                        if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                        changedFilesPanel.setMode(staging = false)
                         changedFilesPanel.setFiles(files, "Changes in ${entry.hash.take(7)}")
                         commitDetailsPanel.setCommit(info)
                     }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    LOG.warn("Failed to load commit details for backend ${backend.javaClass.simpleName}", e)
+                }
+            }
+        }
+    }
+
+    // ── Write operations ─────────────────────────────────────────────────────
+
+    private fun doCommit(message: String, push: Boolean) {
+        val backend = selectedBackend ?: return
+        val paths = changedFilesPanel.getCheckedPaths()
+
+        // Validate on EDT before going to background
+        if (paths.isEmpty()) {
+            commitDetailsPanel.showError("No files selected. Check at least one file to commit.")
+            return
+        }
+        if (message.isBlank()) {
+            commitDetailsPanel.showError("Commit message cannot be empty.")
+            return
+        }
+
+        // For remote + push: confirm on EDT
+        if (push && backend.id.type == BackendType.REMOTE) {
+            val confirmed = javax.swing.JOptionPane.showConfirmDialog(
+                this,
+                "Push to remote '${backend.id.connectionName}' on branch '${currentBranch ?: "?"}'?\nThis cannot be undone.",
+                "Confirm Push",
+                javax.swing.JOptionPane.OK_CANCEL_OPTION,
+                javax.swing.JOptionPane.WARNING_MESSAGE
+            ) == javax.swing.JOptionPane.OK_OPTION
+            if (!confirmed) return
+        }
+
+        commitDetailsPanel.showProgress()
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val stageResult = backend.stageFiles(paths)
+            if (!stageResult.isSuccess) {
+                ApplicationManager.getApplication().invokeLater {
+                    if (!disposed) commitDetailsPanel.showError("Stage failed: ${stageResult.stderr.take(200)}")
+                }
+                return@executeOnPooledThread
+            }
+
+            val commitResult = backend.commit(message)
+            if (!commitResult.isSuccess) {
+                ApplicationManager.getApplication().invokeLater {
+                    if (!disposed) commitDetailsPanel.showError("Commit failed: ${commitResult.stderr.take(200)}")
+                }
+                return@executeOnPooledThread
+            }
+
+            if (push) {
+                val pushResult = backend.push()
+                if (!pushResult.isSuccess) {
+                    ApplicationManager.getApplication().invokeLater {
+                        if (!disposed) {
+                            commitDetailsPanel.showError(
+                                "Committed locally. Push failed: ${pushResult.stderr.take(200)}. " +
+                                "Retry with the Push toolbar button."
+                            )
+                            reloadData()
+                        }
+                    }
+                    return@executeOnPooledThread
+                }
+            }
+
+            ApplicationManager.getApplication().invokeLater {
+                if (!disposed) {
+                    commitDetailsPanel.clearEditor()
+                    reloadData()
+                }
+            }
+        }
+    }
+
+    private fun doPush() {
+        val backend = selectedBackend ?: return
+
+        if (backend.id.type == BackendType.REMOTE) {
+            val confirmed = javax.swing.JOptionPane.showConfirmDialog(
+                this,
+                "Push to remote '${backend.id.connectionName}' on branch '${currentBranch ?: "?"}'?\nThis cannot be undone.",
+                "Confirm Push",
+                javax.swing.JOptionPane.OK_CANCEL_OPTION,
+                javax.swing.JOptionPane.WARNING_MESSAGE
+            ) == javax.swing.JOptionPane.OK_OPTION
+            if (!confirmed) return
+        }
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val result = backend.push()
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (!result.isSuccess) {
+                    Notifications.Bus.notify(
+                        Notification(
+                            "SystemExplorer",
+                            "Push Failed",
+                            result.stderr.take(300).ifBlank { "Unknown error" },
+                            NotificationType.ERROR
+                        ), project
+                    )
+                } else {
+                    reloadData()
+                }
             }
         }
     }
@@ -245,6 +408,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     // ── Disposable ────────────────────────────────────────────────────────────
 
     override fun dispose() {
+        disposed = true
         registry.removeListener(registryListener)
         ActiveBrowserTracker.getInstance(project).removeListener(navListener)
     }
