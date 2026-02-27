@@ -77,7 +77,7 @@ class PasswordPromptDialog(
         }
     }
 
-    fun getPassword(): String = String(passwordField.password)
+    fun getPassword(): CharArray = passwordField.password
 
     override fun getPreferredFocusedComponent() = passwordField
 }

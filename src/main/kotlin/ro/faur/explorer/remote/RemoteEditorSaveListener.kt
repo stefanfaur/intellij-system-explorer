@@ -7,9 +7,13 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileDocumentManagerListener
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.concurrency.AppExecutorUtil
 import ro.faur.explorer.remote.security.RemoteAuditLogger
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 /**
  * Listens for document saves and automatically uploads the file back to the remote host
@@ -18,8 +22,8 @@ import java.nio.file.Paths
  * Detection works by checking for [RemoteEditorManager.REMOTE_PATH_KEY] and
  * [RemoteEditorManager.REMOTE_CONNECTION_KEY] user data on the [VirtualFile].
  *
- * The corresponding [SftpConnectionManager] is located via the static registry in
- * [RemoteEditorManager.connectionManagerRegistry].
+ * The live [SftpFileOperations] handle is read from [RemoteEditorManager.SFTP_OPS_KEY]
+ * on the [VirtualFile].
  *
  * Registration: declare this class as a `fileDocumentManagerListener` extension in plugin.xml:
  * ```xml
@@ -32,6 +36,9 @@ import java.nio.file.Paths
 class RemoteEditorSaveListener : FileDocumentManagerListener {
 
     private val log = Logger.getInstance(RemoteEditorSaveListener::class.java)
+    // Shared application executor — platform-managed, no explicit shutdown needed
+    private val uploadExecutor = AppExecutorUtil.getAppScheduledExecutorService()
+    private val pendingUploads = ConcurrentHashMap<String, ScheduledFuture<*>>()
 
     companion object {
         private const val NOTIFICATION_GROUP = "Remote Explorer"
@@ -39,27 +46,22 @@ class RemoteEditorSaveListener : FileDocumentManagerListener {
 
     /**
      * Called before IntelliJ writes the document to disk.
-     * We intercept saves of remote temp files here and schedule an upload.
-     *
-     * Note: the actual disk write by IntelliJ happens *after* this callback returns,
-     * so we queue the upload on a background thread that waits briefly before reading
-     * the saved file.
+     * We debounce rapid successive saves (100 ms window) per remote path; the scheduled
+     * upload runs after the debounce delay, by which time IntelliJ has completed the
+     * actual disk write.
      */
     override fun beforeDocumentSaving(document: Document) {
-        val fileDocManager = FileDocumentManager.getInstance()
-        val virtualFile: VirtualFile = fileDocManager.getFile(document) ?: return
+        val virtualFile: VirtualFile = FileDocumentManager.getInstance().getFile(document) ?: return
 
         val remotePath = virtualFile.getUserData(RemoteEditorManager.REMOTE_PATH_KEY) ?: return
         val connectionName = virtualFile.getUserData(RemoteEditorManager.REMOTE_CONNECTION_KEY) ?: return
 
-        // Schedule upload after IntelliJ has written the document to disk
-        Thread {
-            Thread.sleep(200)
+        // Cancel any previously scheduled upload for this file
+        pendingUploads[remotePath]?.cancel(false)
+        pendingUploads[remotePath] = uploadExecutor.schedule({
+            pendingUploads.remove(remotePath)
             performUpload(virtualFile, remotePath, connectionName)
-        }.also {
-            it.isDaemon = true
-            it.name = "RemoteEditorUpload[$remotePath]"
-        }.start()
+        }, 100, TimeUnit.MILLISECONDS)
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -75,47 +77,11 @@ class RemoteEditorSaveListener : FileDocumentManagerListener {
             return
         }
 
-        // Prefer the live SftpFileOperations stored on the VirtualFile (set by RemoteEditorManager)
         val fileOps = virtualFile.getUserData(RemoteEditorManager.SFTP_OPS_KEY)
-        if (fileOps != null) {
-            try {
-                val sizeBytes = Files.size(localPath)
-                fileOps.upload(localPath, remotePath)
-                RemoteAuditLogger.logUpload(remotePath, sizeBytes, verified = true)
-                showSuccessNotification("Saved to remote: $remotePath", connectionName)
-                log.info("RemoteEditorSaveListener: uploaded $localPath → $remotePath on $connectionName")
-            } catch (e: Exception) {
-                RemoteAuditLogger.logUpload(remotePath, 0L, verified = false)
-                log.error("RemoteEditorSaveListener: upload failed for $remotePath on $connectionName", e)
-                showErrorNotification("Upload failed for $remotePath: ${e.message}", "Remote Save Failed")
-            }
-            return
-        }
-
-        // Fallback: use SftpConnectionManager from the legacy registry
-        val connectionManager = RemoteEditorManager.connectionManagerRegistry[connectionName]
-        if (connectionManager == null) {
-            log.warn("RemoteEditorSaveListener: no SftpConnectionManager registered for '$connectionName'")
-            return
-        }
-        if (!connectionManager.isConnected(connectionName)) {
-            showErrorNotification("Upload skipped — not connected to '$connectionName'", "Remote Explorer Save")
-            return
-        }
-        val sftpClient = connectionManager.getSftpClient(connectionName)
-        if (sftpClient == null) {
-            log.error("RemoteEditorSaveListener: SFTP client unavailable for '$connectionName'")
-            showErrorNotification("Upload failed for $remotePath — SFTP client unavailable", "Remote Save Failed")
-            return
-        }
+            ?: run { log.warn("No SFTP ops for $remotePath, cannot upload"); return }
         try {
             val sizeBytes = Files.size(localPath)
-            sftpClient.write(
-                remotePath,
-                org.apache.sshd.sftp.client.SftpClient.OpenMode.Write,
-                org.apache.sshd.sftp.client.SftpClient.OpenMode.Create,
-                org.apache.sshd.sftp.client.SftpClient.OpenMode.Truncate,
-            ).use { output -> Files.newInputStream(localPath).use { it.copyTo(output) } }
+            fileOps.upload(localPath, remotePath)
             RemoteAuditLogger.logUpload(remotePath, sizeBytes, verified = true)
             showSuccessNotification("Saved to remote: $remotePath", connectionName)
             log.info("RemoteEditorSaveListener: uploaded $localPath → $remotePath on $connectionName")

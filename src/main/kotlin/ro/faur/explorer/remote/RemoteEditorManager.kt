@@ -46,13 +46,6 @@ class RemoteEditorManager(
 
         /** Live [SftpFileOperations] stored on the VirtualFile for save-back by [RemoteEditorSaveListener]. */
         val SFTP_OPS_KEY = Key.create<SftpFileOperations>("SystemExplorer.SftpOps")
-
-        /**
-         * Legacy registry kept for backward compatibility.
-         * New code uses [SFTP_OPS_KEY] on the VirtualFile instead.
-         */
-        val connectionManagerRegistry: MutableMap<String, SftpConnectionManager> =
-            java.util.concurrent.ConcurrentHashMap()
     }
 
     fun isRemoteTempFile(file: com.intellij.openapi.vfs.VirtualFile): Boolean =
@@ -152,5 +145,10 @@ class RemoteEditorManager(
                 FileEditorManager.getInstance(project).openFile(virtualFile, true)
             }
         }.also { it.isDaemon = true; it.name = "RemoteOpen[$remotePath]" }.start()
+    }
+
+    /** Cleans up all tracked temporary files created by this manager. */
+    fun cleanupTempFiles() {
+        tempFileManager.cleanupAll()
     }
 }

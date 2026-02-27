@@ -30,16 +30,19 @@ class RemoteConnectionSettings : PersistentStateComponent<RemoteConnectionSettin
     /**
      * Add a connection profile. Returns false if a connection with the same name exists.
      */
+    @Synchronized
     fun addConnection(profile: ConnectionProfile): Boolean {
         if (myState.connections.any { it.name == profile.name }) return false
         myState.connections.add(profile)
         return true
     }
 
+    @Synchronized
     fun removeConnection(name: String) {
         myState.connections.removeAll { it.name == name }
     }
 
+    @Synchronized
     fun getConnection(name: String): ConnectionProfile? {
         return myState.connections.find { it.name == name }
     }

@@ -1,7 +1,5 @@
 package ro.faur.explorer.remote.git
 
-import java.util.Date
-
 /**
  * Parsed representation of a single `git log` entry.
  */
@@ -9,7 +7,7 @@ data class GitLogEntry(
     val hash: String,
     val authorName: String,
     val authorEmail: String,
-    val date: Date,
+    val timestamp: Long,
     val subject: String,
 )
 
@@ -39,7 +37,7 @@ object GitLogParser {
             hash = hash,
             authorName = author,
             authorEmail = email,
-            date = Date(epochSeconds * 1_000L),
+            timestamp = epochSeconds,
             subject = subject,
         )
     }

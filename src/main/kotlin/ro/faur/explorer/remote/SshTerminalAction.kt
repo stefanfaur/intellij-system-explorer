@@ -33,11 +33,12 @@ object SshTerminalAction {
         ).executeCommand(sshCommand)
     }
 
+    private fun shellQuote(s: String): String = "'${s.replace("'", "'\\''")}'"
+
     private fun buildSshCommand(profile: ConnectionProfile, remotePath: String): String {
         val portFlag = if (profile.port != 22) " -p ${profile.port}" else ""
-        val keyFlag = if (profile.authMethod == ConnectionProfile.AuthMethod.KEY_FILE && profile.keyFilePath != null) {
-            " -i ${profile.keyFilePath}"
-        } else ""
+        val keyFlag = if (profile.authMethod == ConnectionProfile.AuthMethod.KEY_FILE && profile.keyFilePath != null)
+            " -i ${shellQuote(profile.keyFilePath!!)}" else ""
         val escapedPath = remotePath.replace("'", "'\\''")
         return "ssh$portFlag$keyFlag ${profile.username}@${profile.host} -t 'cd '\\''$escapedPath'\\'' && exec \$SHELL -l'"
     }

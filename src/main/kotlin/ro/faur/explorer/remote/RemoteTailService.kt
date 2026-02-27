@@ -33,7 +33,10 @@ class RemoteTailService private constructor(
     private val session: ClientSession,
 ) : Closeable {
 
+    private data class TailSession(val channel: ChannelExec, val pipedOut: PipedOutputStream, val pipedIn: PipedInputStream)
+
     private val activeChannels = ConcurrentHashMap<String, ChannelExec>()
+    private val activeSessions = ConcurrentHashMap<String, TailSession>()
 
     /**
      * Opens an exec channel running `tail -f -n $initialLines $remotePath` and
@@ -54,6 +57,7 @@ class RemoteTailService private constructor(
 
         channel.open().verify(10_000)
         activeChannels[remotePath] = channel
+        activeSessions[remotePath] = TailSession(channel, pipedOut, pipedIn)
 
         val readerThread = Thread {
             try {
@@ -80,7 +84,12 @@ class RemoteTailService private constructor(
      */
     fun stopTail(remotePath: String) {
         val channel = activeChannels.remove(remotePath) ?: return
+        val session = activeSessions.remove(remotePath)
         closeChannel(channel)
+        session?.let {
+            runCatching { it.pipedOut.close() }
+            runCatching { it.pipedIn.close() }
+        }
     }
 
     /**

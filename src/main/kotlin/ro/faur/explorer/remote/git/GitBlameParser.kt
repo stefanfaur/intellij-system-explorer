@@ -8,12 +8,13 @@ data class BlameLine(
     val lineNumber: Int,
     val content: String,
     val summary: String = "",
+    val isUncommitted: Boolean = false,
 )
 
 object GitBlameParser {
-    fun parse(porcelainOutput: String): List<BlameLine> {
+    fun parse(porcelainOutput: String): Map<Int, BlameLine> {
         val lines = porcelainOutput.lines()
-        val result = mutableListOf<BlameLine>()
+        val result = mutableMapOf<Int, BlameLine>()
         var i = 0
         while (i < lines.size) {
             val headerLine = lines[i]
@@ -22,7 +23,8 @@ object GitBlameParser {
             if (headerParts.size < 3) { i++; continue }
             val hash = headerParts[0]
             if (hash.length != 40) { i++; continue }
-            val lineNum = headerParts[2].toIntOrNull() ?: 0
+            val isUncommitted = hash.all { it == '0' }
+            val lineNum = headerParts[1].toIntOrNull() ?: 0
             i++
             var author = ""
             var authorEmail = ""
@@ -40,7 +42,8 @@ object GitBlameParser {
                 }
                 i++
             }
-            result.add(BlameLine(hash, author, authorEmail, authorTime, lineNum, content, summary))
+            val blameLine = BlameLine(hash, author, authorEmail, authorTime, lineNum, content, summary, isUncommitted)
+            result[lineNum - 1] = blameLine   // 0-based key
         }
         return result
     }

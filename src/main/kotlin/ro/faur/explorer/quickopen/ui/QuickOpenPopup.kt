@@ -6,6 +6,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.wm.IdeFocusManager
 import ro.faur.explorer.actions.NavigationActions
+import ro.faur.explorer.quickopen.query.RelativePathResolver
 import ro.faur.explorer.model.BookmarkManager
 import ro.faur.explorer.quickopen.model.CandidateType
 import ro.faur.explorer.quickopen.model.SearchCandidate
@@ -66,7 +67,7 @@ object QuickOpenPopup {
             val text = (contents.getTransferData(java.awt.datatransfer.DataFlavor.stringFlavor) as? String)
                 ?.trim() ?: return ""
             if ((text.startsWith("/") || text.startsWith("~")) && java.io.File(
-                    text.replace("~", System.getProperty("user.home"))
+                    RelativePathResolver.expandAliases(text)
                 ).exists()) text else ""
         } catch (_: Exception) { "" }
     }

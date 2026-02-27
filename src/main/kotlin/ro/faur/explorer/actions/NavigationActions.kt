@@ -2,7 +2,6 @@ package ro.faur.explorer.actions
 
 import com.intellij.openapi.project.Project
 import ro.faur.explorer.settings.ExplorerSettings
-import java.nio.file.Path
 import java.nio.file.Paths
 
 object NavigationActions {
@@ -13,11 +12,15 @@ object NavigationActions {
     }
 
     fun goHome(project: Project? = null): String {
-        val defaultRoot = ExplorerSettings.getInstance().state.defaultRoot
-        return when {
-            defaultRoot.isNotEmpty() -> defaultRoot
-            project?.basePath != null -> project.basePath!!
-            else -> System.getProperty("user.home")
+        return try {
+            val defaultRoot = ExplorerSettings.getInstance().state.defaultRoot
+            when {
+                defaultRoot.isNotEmpty() -> defaultRoot
+                project?.basePath != null -> project.basePath!!
+                else -> System.getProperty("user.home")
+            }
+        } catch (_: Exception) {
+            System.getProperty("user.home")
         }
     }
 

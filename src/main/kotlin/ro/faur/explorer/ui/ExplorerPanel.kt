@@ -168,7 +168,8 @@ class ExplorerPanel(private val project: Project) : Disposable {
         }
         menu.add(newItem)
 
-        val manageItem = javax.swing.JMenuItem("🔧 Manage Connections...").apply {
+        val manageItem = javax.swing.JMenuItem("Manage Connections...").apply {
+            icon = AllIcons.General.Settings
             addActionListener { ro.faur.explorer.remote.ui.ManageConnectionsDialog(project).show() }
         }
         menu.add(manageItem)
@@ -220,7 +221,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
                         javax.swing.SwingUtilities.invokeAndWait {
                             val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, profile.name)
                             if (dialog.showAndGet()) {
-                                resolved = dialog.getPassword()
+                                resolved = String(dialog.getPassword())
                                 shouldRememberPassword = dialog.rememberPassword.isSelected
                             } else cancelled = true
                         }
@@ -246,7 +247,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
                     javax.swing.SwingUtilities.invokeAndWait {
                         val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, "'${profile.name}' key file")
                         if (dialog.showAndGet()) {
-                            kp = dialog.getPassword()
+                            kp = String(dialog.getPassword())
                             shouldRememberKp = dialog.rememberPassword.isSelected
                         } else cancelled = true
                     }

@@ -82,13 +82,15 @@ class RemoteBrowserPanel(
     }
 
     private var _currentPath: String = "/"
+    private var homeDirectory: String = "/"
     private var connectionName: String? = null
     private var connectionProfile: ConnectionProfile? = null
     private var fileOps: SftpFileOperations? = null
     private var filterPattern: String = ""
 
     private val gitRootDetector = RemoteGitRootDetector.forProject(project)
-    private var gitAvailable: Boolean? = null
+    @Volatile private var gitAvailable: Boolean? = null
+    private var activeDropTarget: RemoteTreeDropTarget? = null
     private val statusPollExecutor = Executors.newSingleThreadScheduledExecutor { r ->
         Thread(r).also { it.isDaemon = true; it.name = "RemoteGitStatusPoll" }
     }
@@ -199,7 +201,7 @@ class RemoteBrowserPanel(
     }
 
     override fun navigateHome() {
-        navigateTo("/")
+        navigateTo(homeDirectory)
     }
 
     override fun refresh() {
@@ -224,24 +226,40 @@ class RemoteBrowserPanel(
         fileOps           = ops
         connectionProfile = profile
         gitAvailable      = null
+        homeDirectory     = "/"
 
+        activeDropTarget?.dispose()
         val dropTarget = RemoteTreeDropTarget(this, transferService, name)
+        activeDropTarget = dropTarget
         DnDManager.getInstance().registerTarget(dropTarget, tree)
 
-        history.push("/")
-        doNavigateTo("/")
-        pathField.text = "/"
         notifyNavStateChanged()
+
+        // Resolve the home directory via SFTP realpath(".") on a background thread,
+        // then begin navigation. Avoids a momentary flash to "/" before redirecting.
+        Thread {
+            val home = ops.homeDir()
+            ApplicationManager.getApplication().invokeLater {
+                if (fileOps !== ops) return@invokeLater   // disconnected before resolution
+                homeDirectory = home
+                history.push(home)
+                doNavigateTo(home)
+                notifyNavStateChanged()
+            }
+        }.also { it.isDaemon = true; it.name = "RemoteHomeDir[$name]" }.start()
     }
 
     fun disconnect() {
         stopGitStatusPolling()
-        DnDManager.getInstance().unregisterTarget(null, tree)
+        activeDropTarget?.let { DnDManager.getInstance().unregisterTarget(it, tree) }
+        activeDropTarget?.dispose()
+        activeDropTarget = null
         val oldName = connectionName
         connectionName    = null
         connectionProfile = null
         fileOps           = null
         gitAvailable      = null
+        homeDirectory     = "/"
         if (oldName != null) {
             GitRepositoryRegistry.getInstance(project).unregisterByConnection(oldName)
             directoryCache.invalidateAll(oldName)
@@ -249,6 +267,7 @@ class RemoteBrowserPanel(
             RemoteGitVcsManager.getInstance(project).clearConnection(oldName)
             RemoteGitStatusCache.invalidate(oldName)
         }
+        editorManager.cleanupTempFiles()
         sftpFileTreeModel.showDisconnected()
         pathField.text = ""
         statusLabel.text = "Disconnected"
@@ -296,7 +315,7 @@ class RemoteBrowserPanel(
         if (isNowRoot && !wasKnownRoot) {
             if (gitAvailable == null) gitAvailable = checkGitAvailable(connKey)
             if (gitAvailable == true && connectionManager != null) {
-                val vcs = RemoteGitVcs.getInstance(project)
+                val vcs = RemoteGitVcs.getInstance(project) ?: return
                 vcs.configure(connectionManager, connKey, path)
                 ActiveConnectionRegistry.set(ActiveConnectionInfo(connectionManager, connKey, path))
                 startGitStatusPolling(connKey)
@@ -335,7 +354,7 @@ class RemoteBrowserPanel(
     }
 
     private fun stopGitStatusPolling() {
-        statusPollFuture?.cancel(false)
+        statusPollFuture?.cancel(true)
         statusPollFuture = null
     }
 
@@ -548,7 +567,14 @@ class RemoteBrowserPanel(
         ) {
             val node  = value as? DefaultMutableTreeNode ?: return
             val entry = node.userObject as? SftpEntry ?: run {
-                append(node.userObject?.toString() ?: "", SimpleTextAttributes.REGULAR_ATTRIBUTES); return
+                val text = node.userObject?.toString() ?: ""
+                if (text == SftpFileTreeModel.ACCESS_DENIED_PLACEHOLDER) {
+                    setIcon(AllIcons.General.Warning)
+                    append(text, SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                } else {
+                    append(text, SimpleTextAttributes.REGULAR_ATTRIBUTES)
+                }
+                return
             }
             val connKey   = connectionName
             val gitStatus = connKey?.let { RemoteGitStatusCache.getStatus(it, entry.path) }
@@ -587,7 +613,8 @@ class RemoteBrowserPanel(
     override fun dispose() {
         super.dispose()
         stopGitStatusPolling()
-        statusPollExecutor.shutdown()
+        statusPollExecutor.shutdownNow()
+        editorManager.cleanupTempFiles()
         fileOps = null
     }
 }

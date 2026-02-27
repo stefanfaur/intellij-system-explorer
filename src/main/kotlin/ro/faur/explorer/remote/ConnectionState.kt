@@ -29,9 +29,10 @@ class ConnectionState {
         }
 
     fun onConnecting() {
-        if (status == ConnectionStatus.DISCONNECTED) {
-            status = ConnectionStatus.CONNECTING
+        check(status == ConnectionStatus.DISCONNECTED) {
+            "onConnecting() called from invalid state: $status"
         }
+        status = ConnectionStatus.CONNECTING
     }
 
     fun onConnected() {

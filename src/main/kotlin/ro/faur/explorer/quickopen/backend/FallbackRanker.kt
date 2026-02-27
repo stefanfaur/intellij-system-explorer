@@ -71,17 +71,13 @@ class FallbackRanker : RankerBackend {
 
         if (best < 0.0 || bestJ < 0) return -1.0 to emptyList()
 
-        // Traceback to find matched ranges
+        // Traceback to find matched ranges (strict diagonal — no leftward scan)
         val matched = mutableListOf<Int>()
         var ci = m
         var cj = bestJ
-        while (ci > 0 && cj > 0) {
-            if (H[ci][cj] > 0) {
-                matched.add(cj - 1)
-                ci--; cj--
-            } else {
-                cj--
-            }
+        while (ci > 0 && cj > 0 && H[ci][cj] > 0) {
+            matched.add(cj - 1)
+            ci--; cj--
         }
         matched.reverse()
 

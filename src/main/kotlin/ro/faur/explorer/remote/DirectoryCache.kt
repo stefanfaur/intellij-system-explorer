@@ -28,7 +28,8 @@ class DirectoryCache(
         }
     }
 
-    private fun cacheKey(hostKey: String, path: String): String = "$hostKey:$path"
+    private fun cacheKey(hostKey: String, path: String): String =
+        "${hostKey.length}\u0000$hostKey\u0000$path"
 
     fun get(hostKey: String, path: String): List<SftpEntry>? {
         val key = cacheKey(hostKey, path)
@@ -58,7 +59,7 @@ class DirectoryCache(
     }
 
     fun invalidateAll(hostKey: String) {
-        val prefix = "$hostKey:"
+        val prefix = "${hostKey.length}\u0000$hostKey\u0000"
         lock.write {
             val keysToRemove = lruMap.keys.filter { it.startsWith(prefix) }
             keysToRemove.forEach { lruMap.remove(it) }

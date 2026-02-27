@@ -5,6 +5,11 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 
+data class GlobPreset(
+    var name: String = "",
+    var pattern: String = ""
+)
+
 @State(
     name = "ro.faur.explorer.settings.ExplorerSettings",
     storages = [Storage("explorerSettings.xml")]
@@ -22,14 +27,9 @@ class ExplorerSettings : PersistentStateComponent<ExplorerSettings.State> {
         var sortBy: String = "name",  // "name", "size", "modified"
         var expandDirectoriesOnSingleClick: Boolean = true,
         var rememberLastPath: Boolean = true,
-        var quickOpenV2Enabled: Boolean = false,
-        // Phase 6 — ripgrep and content search settings
-        var ripgrepPath: String = "",
-        var useRipgrepForExternalPaths: Boolean = false,
-        var maxIndexSize: Int = 50_000,
-        var allowNetworkMountIndexing: Boolean = false,
-        var contentSearchEnabled: Boolean = true,
-        var contentSearchScope: String = "",
+        var showFolderItemCount: Boolean = false,
+        var statusBarDetail: String = "normal",  // "minimal", "normal", "verbose"
+        var globPresets: MutableList<GlobPreset> = mutableListOf(),
     )
 
     private var myState = State()

@@ -27,7 +27,4 @@ data class ConnectionProfile(
 
     // No password field — passwords stored via PasswordSafe or prompted per-session.
     // This is intentional: ConnectionProfile is serialized to XML and must not contain secrets.
-    @Transient
-    var password: String? = null
-        private set
 }

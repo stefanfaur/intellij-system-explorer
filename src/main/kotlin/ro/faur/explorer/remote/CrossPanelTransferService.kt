@@ -1,8 +1,6 @@
 package ro.faur.explorer.remote
 
-import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.Task
+import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.coroutines.Dispatchers
@@ -48,27 +46,18 @@ class CrossPanelTransferService(
             ?: throw IllegalStateException("Not connected to $connectionName")
 
         val errors = mutableListOf<TransferError>()
-        val totalFiles = localFiles.size
 
         withContext(Dispatchers.IO) {
-            ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Uploading to $connectionName…", true) {
-                override fun run(indicator: ProgressIndicator) {
-                    indicator.isIndeterminate = false
-                    for ((index, file) in localFiles.withIndex()) {
-                        indicator.checkCanceled()
-                        indicator.fraction = index.toDouble() / totalFiles
-                        indicator.text2 = file.name
-                        val localPath = Paths.get(file.path)
-                        val remotePath = RemotePathUtils.join(remoteTargetDir, file.name)
-                        uploadRecursive(sftpClient, localPath, remotePath, errors)
-                    }
-                    indicator.fraction = 1.0
-                }
-            })
+            val indicator = EmptyProgressIndicator()
+            for (file in localFiles) {
+                indicator.checkCanceled()
+                val localPath = Paths.get(file.path)
+                val remotePath = RemotePathUtils.join(remoteTargetDir, file.name)
+                uploadRecursive(sftpClient, localPath, remotePath, errors)
+            }
+            // Invalidate cache for the target directory so next listing is fresh
+            directoryCache?.invalidate(connectionName, remoteTargetDir)
         }
-
-        // Invalidate cache for the target directory so next listing is fresh
-        directoryCache?.invalidate(connectionName, remoteTargetDir)
 
         if (errors.isNotEmpty()) {
             throw BatchTransferException("Upload completed with ${errors.size} error(s)", errors)
@@ -91,22 +80,14 @@ class CrossPanelTransferService(
     ) {
         val errors = mutableListOf<TransferError>()
         val localBase = Paths.get(localTargetDir.path)
-        val totalEntries = remoteEntries.size
 
         withContext(Dispatchers.IO) {
-            ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Downloading from $connectionName…", true) {
-                override fun run(indicator: ProgressIndicator) {
-                    indicator.isIndeterminate = false
-                    for ((index, entry) in remoteEntries.withIndex()) {
-                        indicator.checkCanceled()
-                        indicator.fraction = index.toDouble() / totalEntries
-                        indicator.text2 = entry.name
-                        val localPath = localBase.resolve(entry.name)
-                        downloadRecursive(fileOps, entry, localPath, errors)
-                    }
-                    indicator.fraction = 1.0
-                }
-            })
+            val indicator = EmptyProgressIndicator()
+            for (entry in remoteEntries) {
+                indicator.checkCanceled()
+                val localPath = localBase.resolve(entry.name)
+                downloadRecursive(fileOps, entry, localPath, errors)
+            }
         }
 
         if (errors.isNotEmpty()) {

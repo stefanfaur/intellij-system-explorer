@@ -105,7 +105,7 @@ class RemoteGitHistoryProvider(
         val result = try {
             executor.executeBlocking(
                 repoPath,
-                args = arrayOf("log", "--format=%H|%an|%ae|%at|%s", "--", relPath)
+                args = arrayOf("log", "--format=%H|%an|%ae|%at|%s", "--max-count=500", "--", relPath)
             )
         } catch (e: IllegalStateException) {
             throw VcsException("git log failed for $relPath: ${e.message}", e)
@@ -123,7 +123,7 @@ class RemoteGitHistoryProvider(
                 hash = entry.hash,
                 authorName = entry.authorName,
                 authorEmail = entry.authorEmail,
-                revisionDate = entry.date,
+                revisionDate = java.util.Date(entry.timestamp * 1_000L),
                 commitMessage = entry.subject,
             )
         }

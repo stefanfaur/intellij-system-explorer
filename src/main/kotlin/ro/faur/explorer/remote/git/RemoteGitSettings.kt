@@ -19,6 +19,8 @@ class RemoteGitSettings : PersistentStateComponent<RemoteGitSettings.State> {
         var commandTimeoutSec: Int = 15,
         var showGitColorsOnTree: Boolean = true,
         var showBranchInStatusBar: Boolean = true,
+        var maxBlameLines: Int = 5000,
+        var disableOnRepoSizeFiles: Int = 0,  // 0 = never disable
     )
 
     private var state = State()

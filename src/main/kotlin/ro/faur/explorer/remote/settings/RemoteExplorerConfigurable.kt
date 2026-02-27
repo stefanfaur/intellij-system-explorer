@@ -23,11 +23,15 @@ class RemoteExplorerConfigurable : Configurable {
     private val connectionTimeoutSpinner = JSpinner(SpinnerNumberModel(10, 1, 300, 1))
     private val cacheTtlSpinner = JSpinner(SpinnerNumberModel(30, 0, 3600, 1))
     private val maxFileSizeSpinner = JSpinner(SpinnerNumberModel(10, 1, 500, 1))
+    private val maxTransferSizeSpinner = JSpinner(SpinnerNumberModel(100L, 1L, 10000L, 10L))
     private val tailInitialLinesSpinner = JSpinner(SpinnerNumberModel(1000, 1, 100000, 100))
     private val showSshConfigHostsCheckBox = JBCheckBox("Show SSH config hosts", true)
     private val secureDeleteCheckBox = JBCheckBox("Secure delete sensitive files", true)
+    private val keepaliveMaxFailuresSpinner = JSpinner(SpinnerNumberModel(3, 1, 20, 1))
+    private val connectionRetryAttemptsSpinner = JSpinner(SpinnerNumberModel(2, 0, 10, 1))
+    private val maxCachedDirectoriesSpinner = JSpinner(SpinnerNumberModel(200, 10, 2000, 10))
 
-    override fun getDisplayName(): String = "Remote"
+    override fun getDisplayName(): String = "Remote SSH"
 
     override fun createComponent(): JComponent {
         val settings = RemoteExplorerSettings.getInstance().state
@@ -59,9 +63,13 @@ class RemoteExplorerConfigurable : Configurable {
         }
 
         addRow("SSH keepalive interval (s):", keepaliveSpinner)
+        addRow("Keepalive max failures:", keepaliveMaxFailuresSpinner)
         addRow("Connection timeout (s):", connectionTimeoutSpinner)
+        addRow("Connection retry attempts:", connectionRetryAttemptsSpinner)
         addRow("Directory cache TTL (s):", cacheTtlSpinner)
+        addRow("Max cached directories:", maxCachedDirectoriesSpinner)
         addRow("Max file size for editor (MB):", maxFileSizeSpinner)
+        addRow("Max transfer size (MB):", maxTransferSizeSpinner)
         addRow("Tail log initial lines:", tailInitialLinesSpinner)
         addCheckRow(showSshConfigHostsCheckBox)
         addCheckRow(secureDeleteCheckBox)
@@ -78,9 +86,13 @@ class RemoteExplorerConfigurable : Configurable {
     override fun isModified(): Boolean {
         val s = RemoteExplorerSettings.getInstance().state
         return keepaliveSpinner.value as Int != s.keepaliveIntervalSec
+            || keepaliveMaxFailuresSpinner.value as Int != s.keepaliveMaxFailures
             || connectionTimeoutSpinner.value as Int != s.connectionTimeoutSec
+            || connectionRetryAttemptsSpinner.value as Int != s.connectionRetryAttempts
             || cacheTtlSpinner.value as Int != s.directoryCacheTtlSec
+            || maxCachedDirectoriesSpinner.value as Int != s.maxCachedDirectories
             || maxFileSizeSpinner.value as Int != s.maxFileSizeMb
+            || maxTransferSizeSpinner.value as Long != s.maxTransferSizeMb
             || tailInitialLinesSpinner.value as Int != s.tailInitialLines
             || showSshConfigHostsCheckBox.isSelected != s.showSshConfigHosts
             || secureDeleteCheckBox.isSelected != s.secureDeleteSensitiveFiles
@@ -89,9 +101,13 @@ class RemoteExplorerConfigurable : Configurable {
     override fun apply() {
         val s = RemoteExplorerSettings.getInstance().state
         s.keepaliveIntervalSec = keepaliveSpinner.value as Int
+        s.keepaliveMaxFailures = keepaliveMaxFailuresSpinner.value as Int
         s.connectionTimeoutSec = connectionTimeoutSpinner.value as Int
+        s.connectionRetryAttempts = connectionRetryAttemptsSpinner.value as Int
         s.directoryCacheTtlSec = cacheTtlSpinner.value as Int
+        s.maxCachedDirectories = maxCachedDirectoriesSpinner.value as Int
         s.maxFileSizeMb = maxFileSizeSpinner.value as Int
+        s.maxTransferSizeMb = maxTransferSizeSpinner.value as Long
         s.tailInitialLines = tailInitialLinesSpinner.value as Int
         s.showSshConfigHosts = showSshConfigHostsCheckBox.isSelected
         s.secureDeleteSensitiveFiles = secureDeleteCheckBox.isSelected
@@ -103,9 +119,13 @@ class RemoteExplorerConfigurable : Configurable {
 
     private fun loadFromState(s: RemoteExplorerSettings.State) {
         keepaliveSpinner.value = s.keepaliveIntervalSec
+        keepaliveMaxFailuresSpinner.value = s.keepaliveMaxFailures
         connectionTimeoutSpinner.value = s.connectionTimeoutSec
+        connectionRetryAttemptsSpinner.value = s.connectionRetryAttempts
         cacheTtlSpinner.value = s.directoryCacheTtlSec
+        maxCachedDirectoriesSpinner.value = s.maxCachedDirectories
         maxFileSizeSpinner.value = s.maxFileSizeMb
+        maxTransferSizeSpinner.value = s.maxTransferSizeMb
         tailInitialLinesSpinner.value = s.tailInitialLines
         showSshConfigHostsCheckBox.isSelected = s.showSshConfigHosts
         secureDeleteCheckBox.isSelected = s.secureDeleteSensitiveFiles

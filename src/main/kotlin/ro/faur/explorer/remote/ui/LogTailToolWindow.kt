@@ -35,6 +35,7 @@ class LogTailToolWindow(
     )
 
     private val activeTabs = mutableMapOf<String, TailTab>()
+    private val contentListeners = mutableMapOf<String, ContentManagerListener>()
     private var toolWindowRef: ToolWindow? = null
 
     /**
@@ -74,7 +75,7 @@ class LogTailToolWindow(
         activeTabs[tabKey] = tab
 
         // Listen for the content being removed (user clicks the X on the tab)
-        toolWindow.contentManager.addContentManagerListener(object : ContentManagerListener {
+        val listener = object : ContentManagerListener {
             override fun contentRemoved(event: ContentManagerEvent) {
                 if (event.content === content) {
                     // Stop the tail when the user closes this tab
@@ -82,10 +83,14 @@ class LogTailToolWindow(
                         removed.tailService.stopTail(removed.remotePath)
                         removed.consoleView.dispose()
                     }
-                    toolWindow.contentManager.removeContentManagerListener(this)
+                    contentListeners.remove(tabKey)?.let {
+                        toolWindow.contentManager.removeContentManagerListener(it)
+                    }
                 }
             }
-        })
+        }
+        contentListeners[tabKey] = listener
+        toolWindow.contentManager.addContentManagerListener(listener)
 
         // Begin receiving lines from the tail
         onLine { line ->
@@ -103,6 +108,7 @@ class LogTailToolWindow(
         val key = "$serverName:$remotePath"
         val tab = activeTabs.remove(key) ?: return
         tab.tailService.stopTail(tab.remotePath)
+        contentListeners.remove(key)?.let { toolWindowRef?.contentManager?.removeContentManagerListener(it) }
         toolWindowRef?.contentManager?.removeContent(tab.content, true)
         tab.consoleView.dispose()
     }
@@ -112,10 +118,14 @@ class LogTailToolWindow(
      * Call this when the plugin is unloaded or the project is closed.
      */
     fun dispose() {
-        val snapshot = activeTabs.values.toList()
+        val snapshot = activeTabs.entries.toList()
         activeTabs.clear()
-        for (tab in snapshot) {
+        contentListeners.clear()
+        for ((key, tab) in snapshot) {
             runCatching { tab.tailService.stopTail(tab.remotePath) }
+            runCatching {
+                contentListeners.remove(key)?.let { toolWindowRef?.contentManager?.removeContentManagerListener(it) }
+            }
             runCatching { toolWindowRef?.contentManager?.removeContent(tab.content, true) }
             runCatching { tab.consoleView.dispose() }
         }

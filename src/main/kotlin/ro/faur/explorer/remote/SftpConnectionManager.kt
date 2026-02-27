@@ -6,6 +6,11 @@ import org.apache.sshd.common.session.helpers.AbstractSession
 import org.apache.sshd.core.CoreModuleProperties
 import org.apache.sshd.sftp.client.SftpClient
 import org.apache.sshd.sftp.client.SftpClientFactory
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.ui.Messages
+import ro.faur.explorer.remote.security.ConnectionRateLimiter
+import ro.faur.explorer.remote.security.HostKeyVerifier
+import ro.faur.explorer.remote.settings.RemoteExplorerSettings
 import java.security.KeyPair
 import java.nio.file.Paths
 import java.nio.file.Files
@@ -30,10 +35,30 @@ class SftpConnectionManager(
 ) {
     // ── Singleton SshClient ──────────────────────────────────────────────────
 
+    private val hostKeyVerifier = HostKeyVerifier(
+        knownHostsPath = Paths.get(System.getProperty("user.home"), ".ssh", "known_hosts_explorer"),
+        autoAcceptUnknown = false,
+        tofuCallback = { host, fingerprint ->
+            var accepted = false
+            ApplicationManager.getApplication().invokeAndWait {
+                accepted = Messages.showYesNoDialog(
+                    "Unknown host: $host\nFingerprint: $fingerprint\nTrust this host?",
+                    "SSH Host Key Verification",
+                    Messages.getQuestionIcon()
+                ) == Messages.YES
+            }
+            accepted
+        }
+    )
+
+    private val rateLimiter = ConnectionRateLimiter()
+
     private val lazyClient = lazy {
         SshClient.setUpDefaultClient().also { client ->
-            CoreModuleProperties.HEARTBEAT_INTERVAL.set(client, Duration.ofSeconds(60))
-            CoreModuleProperties.HEARTBEAT_NO_REPLY_MAX.set(client, 3)
+            val rs = try { RemoteExplorerSettings.getInstance().state } catch (_: Exception) { null }
+            CoreModuleProperties.HEARTBEAT_INTERVAL.set(client, Duration.ofSeconds((rs?.keepaliveIntervalSec ?: 60).toLong()))
+            CoreModuleProperties.HEARTBEAT_NO_REPLY_MAX.set(client, rs?.keepaliveMaxFailures ?: 3)
+            client.serverKeyVerifier = hostKeyVerifier.asServerKeyVerifier()
             client.start()
         }
     }
@@ -43,7 +68,7 @@ class SftpConnectionManager(
 
     private data class ConnectionEntry(
         val session: ClientSession,
-        var sftpClient: SftpClient? = null,
+        @Volatile var sftpClient: SftpClient? = null,
     )
 
     private val connections = ConcurrentHashMap<String, ConnectionEntry>()
@@ -65,44 +90,61 @@ class SftpConnectionManager(
         password: String? = null,
         keyPassphrase: String? = null,
     ): ClientSession {
-        val session = sshClient
-            .connect(profile.username, profile.host, profile.port)
-            .verify(connectTimeoutMs)
-            .session
-
-        when (profile.authMethod) {
-            ConnectionProfile.AuthMethod.PASSWORD -> {
-                requireNotNull(password) { "Password required for PASSWORD auth method" }
-                session.addPasswordIdentity(password)
-            }
-
-            ConnectionProfile.AuthMethod.KEY_FILE -> {
-                val keyPair = loadKeyPair(profile.keyFilePath!!, keyPassphrase)
-                session.addPublicKeyIdentity(keyPair)
-            }
-
-            ConnectionProfile.AuthMethod.AGENT -> {
-                // No sshd-agent on classpath — load default key files the same
-                // way SftpFileOperations.createWithAgent() does.
-                val home = System.getProperty("user.home")
-                listOf("id_ed25519", "id_ecdsa", "id_rsa", "id_dsa")
-                    .map { java.io.File("$home/.ssh/$it") }
-                    .filter { it.exists() }
-                    .forEach { keyFile ->
-                        runCatching {
-                            Files.newInputStream(keyFile.toPath()).use { inputStream ->
-                                val pairs = SecurityUtils.loadKeyPairIdentities(
-                                    null, null, inputStream, FilePasswordProvider.EMPTY
-                                )
-                                pairs.forEach { session.addPublicKeyIdentity(it) }
-                            }
-                        }
-                    }
-            }
+        val backoff = rateLimiter.checkRateLimit(profile.host)
+        if (backoff != null) {
+            throw IllegalStateException("Too many failed attempts for ${profile.host}. Retry in ${backoff.toSeconds()}s.")
         }
 
-        session.auth().verify(connectTimeoutMs)
+        val session = try {
+            sshClient
+                .connect(profile.username, profile.host, profile.port)
+                .verify(connectTimeoutMs)
+                .session
+        } catch (e: Exception) {
+            rateLimiter.recordFailure(profile.host)
+            throw e
+        }
 
+        try {
+            when (profile.authMethod) {
+                ConnectionProfile.AuthMethod.PASSWORD -> {
+                    requireNotNull(password) { "Password required for PASSWORD auth method" }
+                    session.addPasswordIdentity(password)
+                }
+
+                ConnectionProfile.AuthMethod.KEY_FILE -> {
+                    val keyPair = loadKeyPair(profile.keyFilePath!!, keyPassphrase)
+                    session.addPublicKeyIdentity(keyPair)
+                }
+
+                ConnectionProfile.AuthMethod.AGENT -> {
+                    // No sshd-agent on classpath — load default key files the same
+                    // way SftpFileOperations.createWithAgent() does.
+                    val home = System.getProperty("user.home")
+                    listOf("id_ed25519", "id_ecdsa", "id_rsa", "id_dsa")
+                        .map { java.io.File("$home/.ssh/$it") }
+                        .filter { it.exists() }
+                        .forEach { keyFile ->
+                            runCatching {
+                                Files.newInputStream(keyFile.toPath()).use { inputStream ->
+                                    val pairs = SecurityUtils.loadKeyPairIdentities(
+                                        null, null, inputStream, FilePasswordProvider.EMPTY
+                                    )
+                                    pairs.forEach { session.addPublicKeyIdentity(it) }
+                                }
+                            }
+                        }
+                }
+            }
+
+            session.auth().verify(connectTimeoutMs)
+        } catch (e: Exception) {
+            rateLimiter.recordFailure(profile.host)
+            session.close()
+            throw e
+        }
+
+        rateLimiter.recordSuccess(profile.host)
         connections[profile.name] = ConnectionEntry(session)
         return session
     }
@@ -136,10 +178,12 @@ class SftpConnectionManager(
      */
     fun getSftpClient(connectionName: String): SftpClient? {
         val entry = connections[connectionName] ?: return null
-        if (entry.sftpClient == null) {
-            entry.sftpClient = SftpClientFactory.instance().createSftpClient(entry.session)
+        synchronized(entry) {
+            if (entry.sftpClient == null || !entry.sftpClient!!.isOpen) {
+                entry.sftpClient = SftpClientFactory.instance().createSftpClient(entry.session)
+            }
+            return entry.sftpClient
         }
-        return entry.sftpClient
     }
 
     /**

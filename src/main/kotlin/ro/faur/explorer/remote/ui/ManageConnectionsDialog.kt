@@ -147,7 +147,7 @@ class ManageConnectionsDialog(private val project: Project) : DialogWrapper(proj
                     SwingUtilities.invokeAndWait {
                         val dialog = PasswordPromptDialog(project, "'$name' key file")
                         if (dialog.showAndGet()) {
-                            enteredPassphrase = dialog.getPassword()
+                            enteredPassphrase = String(dialog.getPassword())
                             remember = dialog.rememberPassword.isSelected
                         } else {
                             cancelled = true

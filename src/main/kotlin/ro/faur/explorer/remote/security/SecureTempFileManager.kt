@@ -3,6 +3,7 @@ package ro.faur.explorer.remote.security
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.PosixFilePermission
 import java.nio.file.attribute.PosixFilePermissions
 import java.security.MessageDigest
@@ -52,27 +53,45 @@ class SecureTempFileManager {
 
         val filePath = hashDir.resolve(filename)
 
-        if (!Files.exists(filePath)) {
+        return try {
+            Files.newOutputStream(filePath, StandardOpenOption.CREATE_NEW).close()
             if (isUnix) {
-                Files.createFile(filePath, filePerms)
-            } else {
-                Files.createFile(filePath)
+                Files.setPosixFilePermissions(
+                    filePath,
+                    setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
+                )
             }
-        } else if (isUnix) {
-            Files.setPosixFilePermissions(
-                filePath,
-                setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
-            )
+            tracked[filePath] = TempFileInfo(host, remotePath)
+            filePath
+        } catch (_: java.nio.file.FileAlreadyExistsException) {
+            tracked[filePath] = TempFileInfo(host, remotePath)
+            filePath
         }
-
-        tracked[filePath] = TempFileInfo(host, remotePath)
-        return filePath
     }
 
     fun cleanupAll() {
+        val secure = try {
+            ro.faur.explorer.remote.settings.RemoteExplorerSettings.getInstance().state.secureDeleteSensitiveFiles
+        } catch (_: Exception) { false }
         val paths = tracked.keys.toList()
         tracked.clear()
         for (path in paths) {
+            if (secure) {
+                try {
+                    val size = Files.size(path)
+                    if (size > 0) {
+                        Files.newOutputStream(path).use { out ->
+                            val zeros = ByteArray(minOf(size, 65536L).toInt())
+                            var remaining = size
+                            while (remaining > 0) {
+                                val chunk = minOf(remaining, zeros.size.toLong()).toInt()
+                                out.write(zeros, 0, chunk)
+                                remaining -= chunk
+                            }
+                        }
+                    }
+                } catch (_: Exception) { /* best-effort */ }
+            }
             try {
                 Files.deleteIfExists(path)
             } catch (_: Exception) {

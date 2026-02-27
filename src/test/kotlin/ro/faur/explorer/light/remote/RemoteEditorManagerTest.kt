@@ -48,18 +48,6 @@ class RemoteEditorManagerTest : BasePlatformTestCase() {
         assertNull(manager.getConnectionName(file))
     }
 
-    fun `test connectionManagerRegistry put and get works`() {
-        val registry = RemoteEditorManager.connectionManagerRegistry
-        val prevSize = registry.size
-        try {
-            val fakeManager = SftpConnectionManager()
-            registry["test-conn"] = fakeManager
-            assertSame(fakeManager, registry["test-conn"])
-        } finally {
-            registry.remove("test-conn")
-            assertEquals(prevSize, registry.size)
-        }
-    }
 
     private fun createManager(): RemoteEditorManager {
         return RemoteEditorManager(

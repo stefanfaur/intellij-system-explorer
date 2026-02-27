@@ -173,7 +173,8 @@ class ConnectionDialog(
     override fun doValidate(): ValidationInfo? {
         if (nameField.text.isBlank()) return ValidationInfo("Name is required", nameField)
         if (hostField.text.isBlank()) return ValidationInfo("Host is required", hostField)
-        if (portField.text.toIntOrNull() == null) return ValidationInfo("Port must be a number", portField)
+        val portVal = portField.text.toIntOrNull()
+        if (portVal == null || portVal !in 1..65535) return ValidationInfo("Port must be between 1 and 65535", portField)
         if (usernameField.text.isBlank()) return ValidationInfo("Username is required", usernameField)
         if (keyRadio.isSelected && keyFileBrowser.text.isBlank()) {
             return ValidationInfo("Key file path is required", keyFileBrowser.textField)
@@ -290,7 +291,7 @@ class ConnectionDialog(
                     SwingUtilities.invokeAndWait {
                         val dialog = PasswordPromptDialog(project, "'${keyFileBrowser.text.trim()}' key file")
                         if (dialog.showAndGet()) {
-                            enteredPassphrase = dialog.getPassword()
+                            enteredPassphrase = String(dialog.getPassword())
                         } else {
                             cancelled = true
                         }

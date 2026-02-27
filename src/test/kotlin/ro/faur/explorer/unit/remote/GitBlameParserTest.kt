@@ -19,13 +19,14 @@ class GitBlameParserTest {
 
         val result = GitBlameParser.parse(output)
         assertEquals(1, result.size)
-        assertEquals("abc123abc123abc123abc123abc123abc123abcd", result[0].commitHash)
-        assertEquals("John Doe", result[0].author)
-        assertEquals("john@example.com", result[0].authorEmail)
-        assertEquals(1700000000L, result[0].timestamp)
-        assertEquals(1, result[0].lineNumber)
-        assertEquals("line content here", result[0].content)
-        assertEquals("Initial commit", result[0].summary)
+        val line = result[0]!!
+        assertEquals("abc123abc123abc123abc123abc123abc123abcd", line.commitHash)
+        assertEquals("John Doe", line.author)
+        assertEquals("john@example.com", line.authorEmail)
+        assertEquals(1700000000L, line.timestamp)
+        assertEquals(1, line.lineNumber)
+        assertEquals("line content here", line.content)
+        assertEquals("Initial commit", line.summary)
     }
 
     @Test
@@ -47,8 +48,8 @@ class GitBlameParserTest {
 
         val result = GitBlameParser.parse(output)
         assertEquals(2, result.size)
-        assertEquals("Alice", result[0].author)
-        assertEquals("Bob", result[1].author)
+        assertEquals("Alice", result[0]!!.author)
+        assertEquals("Bob", result[1]!!.author)
     }
 
     @Test

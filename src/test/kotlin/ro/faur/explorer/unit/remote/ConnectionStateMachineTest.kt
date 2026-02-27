@@ -2,6 +2,7 @@ package ro.faur.explorer.unit.remote
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.assertThrows
 import ro.faur.explorer.remote.ConnectionState
 import ro.faur.explorer.remote.ConnectionStatus
 
@@ -66,11 +67,10 @@ class ConnectionStateMachineTest {
     }
 
     @Test
-    fun `connect from connecting is no-op`() {
+    fun `connect from connecting throws IllegalStateException`() {
         val state = ConnectionState()
         state.onConnecting()
-        state.onConnecting()
-        assertEquals(ConnectionStatus.CONNECTING, state.status)
+        assertThrows<IllegalStateException> { state.onConnecting() }
     }
 
     @Test

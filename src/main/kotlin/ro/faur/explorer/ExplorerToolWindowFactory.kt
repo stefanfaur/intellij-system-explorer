@@ -9,7 +9,7 @@ import ro.faur.explorer.ui.ExplorerPanel
 
 class ExplorerToolWindowFactory : ToolWindowFactory, DumbAware {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val explorerPanel = _root_ide_package_.ro.faur.explorer.ui.ExplorerPanel(project)
+        val explorerPanel = ExplorerPanel(project)
         Disposer.register(toolWindow.disposable, explorerPanel)
         val contentFactory = toolWindow.contentManager.factory
         val content = contentFactory.createContent(explorerPanel.component, "", false)

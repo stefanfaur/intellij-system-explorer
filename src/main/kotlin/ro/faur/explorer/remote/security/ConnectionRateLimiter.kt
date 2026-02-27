@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 class ConnectionRateLimiter {
 
     private data class HostState(
-        val failureCount: Int = 0,
+        var failureCount: Int = 0,
         val lastFailureTime: Instant? = null
     )
 
@@ -50,7 +50,7 @@ class ConnectionRateLimiter {
         hostStates.compute(host) { _, existing ->
             val current = existing ?: HostState()
             current.copy(
-                failureCount = current.failureCount + 1,
+                failureCount = (current.failureCount + 1).coerceAtMost(60),
                 lastFailureTime = Instant.now()
             )
         }
@@ -76,7 +76,9 @@ class ConnectionRateLimiter {
     // Internal: compute capped exponential backoff from failure count.
     private fun backoffForCount(failureCount: Int): Duration {
         if (failureCount <= 0) return Duration.ZERO
-        val rawMs = BASE_BACKOFF_MS * (1L shl failureCount) // 2^n * 1000 ms
-        return if (rawMs >= MAX_BACKOFF.toMillis()) MAX_BACKOFF else Duration.ofMillis(rawMs)
+        val safeCap = failureCount.coerceAtMost(30)  // prevent Long overflow at 1L shl 63
+        val rawMs = BASE_BACKOFF_MS * (1L shl safeCap)
+        return if (rawMs >= MAX_BACKOFF.toMillis()) MAX_BACKOFF
+               else Duration.ofMillis(rawMs)
     }
 }

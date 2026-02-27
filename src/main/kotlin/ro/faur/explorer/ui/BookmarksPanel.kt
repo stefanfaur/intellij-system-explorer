@@ -185,7 +185,9 @@ class BookmarksPanel(
 
             bookmarksList.selectedIndex = targetIndex
 
-            // Persist via callback
+            // Persist via callback (pre-mutation indices):
+            //   'dragSourceIndex' = original position before removal
+            //   'targetIndex'     = final insertion position after removal
             onBookmarkMoved?.invoke(dragSourceIndex, targetIndex)
 
             return true

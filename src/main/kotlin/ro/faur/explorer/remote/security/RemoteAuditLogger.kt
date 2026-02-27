@@ -40,15 +40,21 @@ object RemoteAuditLogger {
     }
 
     fun formatDownload(remotePath: String, sizeBytes: Long, success: Boolean): String {
-        val sizeKb = sizeBytes / 1024
-        val result = if (success) "SUCCESS (${sizeKb}KB)" else "FAILED"
+        val sizeStr = formatSize(sizeBytes)
+        val result = if (success) "SUCCESS ($sizeStr)" else "FAILED"
         return "AUDIT: SFTP DOWNLOAD $remotePath — $result"
     }
 
     fun formatUpload(remotePath: String, sizeBytes: Long, verified: Boolean): String {
-        val sizeKb = sizeBytes / 1024
+        val sizeStr = formatSize(sizeBytes)
         val verifiedStr = if (verified) ", verified" else ""
-        return "AUDIT: SFTP UPLOAD $remotePath — SUCCESS (${sizeKb}KB$verifiedStr)"
+        return "AUDIT: SFTP UPLOAD $remotePath — SUCCESS ($sizeStr$verifiedStr)"
+    }
+
+    private fun formatSize(sizeBytes: Long): String = when {
+        sizeBytes < 1024 -> "${sizeBytes}B"
+        sizeBytes < 1024 * 1024 -> "${"%.1f".format(sizeBytes / 1024.0)}KB"
+        else -> "${"%.1f".format(sizeBytes / (1024.0 * 1024.0))}MB"
     }
 
     fun formatAuthFailure(username: String, host: String, port: Int, reason: String): String {

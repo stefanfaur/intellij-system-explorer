@@ -7,6 +7,7 @@ import com.intellij.openapi.application.ApplicationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import ro.faur.explorer.remote.CrossPanelTransferService
 import java.awt.datatransfer.DataFlavor
@@ -28,7 +29,16 @@ class RemoteTreeDropTarget(
     private val connectionName: String,
 ) : DnDNativeTarget {
 
-    private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var dropScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    fun reconnect() {
+        dropScope.cancel()
+        dropScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
+
+    fun dispose() {
+        dropScope.cancel()
+    }
 
     override fun update(event: DnDEvent): Boolean {
         val canDrop = transferService != null && hasFileFlavor(event)
@@ -52,7 +62,7 @@ class RemoteTreeDropTarget(
 
         if (virtualFiles.isEmpty()) return
 
-        coroutineScope.launch {
+        dropScope.launch {
             try {
                 service.uploadAsync(virtualFiles, targetDir, connectionName)
                 ApplicationManager.getApplication().invokeLater {

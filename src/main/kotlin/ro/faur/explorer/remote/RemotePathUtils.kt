@@ -18,9 +18,9 @@ object RemotePathUtils {
      * Handles trailing slashes on the parent.
      */
     fun join(parent: String, child: String): String {
-        val normalizedParent = parent.trimEnd('/')
-        val normalizedChild = child.trimStart('/')
-        return "$normalizedParent/$normalizedChild"
+        val cleanChild = child.trimStart('/')
+        require(!cleanChild.contains("..")) { "Path traversal not allowed: $child" }
+        return "${parent.trimEnd('/')}/$cleanChild"
     }
 
     /**

@@ -145,7 +145,12 @@ object IntelliJSshConfigProvider {
             if (name.startsWith("get")) continue // skip method-style names for field access
             try {
                 val field = clazz.getDeclaredField(name)
-                field.isAccessible = true
+                try {
+                    field.isAccessible = true
+                } catch (e: Exception) {
+                    LOG.warn("Cannot access IntelliJ SSH config internals: ${e.message}")
+                    return null
+                }
                 val value = field.get(obj)
                 if (value is String) return value
             } catch (_: NoSuchFieldException) {

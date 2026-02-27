@@ -1,5 +1,6 @@
 package ro.faur.explorer.remote.ui
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.components.JBLabel
@@ -37,11 +38,19 @@ class ImportSshConfigDialog(
 
     init {
         title = "Import from ~/.ssh/config"
-        val configPath = Paths.get(System.getProperty("user.home"), ".ssh", "config")
-        entries = SshConfigParser.parse(configPath)
+        entries = try {
+            val configPath = Paths.get(System.getProperty("user.home"), ".ssh", "config")
+            SshConfigParser.parse(configPath)
+        } catch (e: Exception) {
+            LOG.warn("Could not parse SSH config: ${e.message}", e)
+            emptyList()
+        }
         existingNames = RemoteConnectionSettings.getInstance(project)
             .state.connections.map { it.name }.toSet()
         init()
+        if (entries.isEmpty()) {
+            setErrorText("Could not read SSH config file. Check IDE log for details.")
+        }
         populateTable()
     }
 
@@ -122,6 +131,7 @@ class ImportSshConfigDialog(
     }
 
     companion object {
+        private val LOG = Logger.getInstance(ImportSshConfigDialog::class.java)
         private val COLUMNS = arrayOf("", "Host", "HostName:Port", "User", "Auth", "Status")
         private const val COL_CHECK = 0
         private const val COL_HOST = 1

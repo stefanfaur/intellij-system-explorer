@@ -23,8 +23,10 @@ class RemoteGitConfigurable : Configurable {
     private val commandTimeoutSpinner = JSpinner(SpinnerNumberModel(15, 1, 300, 1))
     private val showGitColorsCheckBox = JBCheckBox("Show git colors on tree", true)
     private val showBranchInStatusBarCheckBox = JBCheckBox("Show branch in status bar", true)
+    private val maxBlameLinesSpinner = JSpinner(SpinnerNumberModel(5000, 100, 100_000, 100))
+    private val disableOnRepoSizeSpinner = JSpinner(SpinnerNumberModel(0, 0, 1_000_000, 1000))
 
-    override fun getDisplayName(): String = "Git"
+    override fun getDisplayName(): String = "Remote Git"
 
     override fun createComponent(): JComponent {
         val settings = RemoteGitSettings.getInstance().state
@@ -58,6 +60,8 @@ class RemoteGitConfigurable : Configurable {
         addCheckRow(enabledCheckBox)
         addRow("Status refresh interval (s):", statusRefreshSpinner)
         addRow("Command timeout (s):", commandTimeoutSpinner)
+        addRow("Max blame lines (0=unlimited):", maxBlameLinesSpinner)
+        addRow("Disable on repo size (files, 0=never):", disableOnRepoSizeSpinner)
         addCheckRow(showGitColorsCheckBox)
         addCheckRow(showBranchInStatusBarCheckBox)
 
@@ -75,6 +79,8 @@ class RemoteGitConfigurable : Configurable {
         return enabledCheckBox.isSelected != s.enabled
             || statusRefreshSpinner.value as Int != s.statusRefreshIntervalSec
             || commandTimeoutSpinner.value as Int != s.commandTimeoutSec
+            || maxBlameLinesSpinner.value as Int != s.maxBlameLines
+            || disableOnRepoSizeSpinner.value as Int != s.disableOnRepoSizeFiles
             || showGitColorsCheckBox.isSelected != s.showGitColorsOnTree
             || showBranchInStatusBarCheckBox.isSelected != s.showBranchInStatusBar
     }
@@ -84,6 +90,8 @@ class RemoteGitConfigurable : Configurable {
         s.enabled = enabledCheckBox.isSelected
         s.statusRefreshIntervalSec = statusRefreshSpinner.value as Int
         s.commandTimeoutSec = commandTimeoutSpinner.value as Int
+        s.maxBlameLines = maxBlameLinesSpinner.value as Int
+        s.disableOnRepoSizeFiles = disableOnRepoSizeSpinner.value as Int
         s.showGitColorsOnTree = showGitColorsCheckBox.isSelected
         s.showBranchInStatusBar = showBranchInStatusBarCheckBox.isSelected
     }
@@ -96,6 +104,8 @@ class RemoteGitConfigurable : Configurable {
         enabledCheckBox.isSelected = s.enabled
         statusRefreshSpinner.value = s.statusRefreshIntervalSec
         commandTimeoutSpinner.value = s.commandTimeoutSec
+        maxBlameLinesSpinner.value = s.maxBlameLines
+        disableOnRepoSizeSpinner.value = s.disableOnRepoSizeFiles
         showGitColorsCheckBox.isSelected = s.showGitColorsOnTree
         showBranchInStatusBarCheckBox.isSelected = s.showBranchInStatusBar
     }

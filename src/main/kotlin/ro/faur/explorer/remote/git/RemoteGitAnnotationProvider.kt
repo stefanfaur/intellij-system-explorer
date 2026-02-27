@@ -9,6 +9,9 @@ import com.intellij.openapi.vcs.annotate.LineAnnotationAspectAdapter
 import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.VirtualFile
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Date
 
 /**
@@ -36,7 +39,11 @@ class RemoteGitAnnotationProvider(
         val relPath = relativize(file.path)
             ?: throw VcsException("File ${file.path} is outside repository $repoPath")
 
+        val maxLines = try { RemoteGitSettings.getInstance().state.maxBlameLines } catch (_: Exception) { 5000 }
         val blameLines = runBlame(relPath)
+        if (blameLines.size > maxLines) {
+            throw VcsException("File too large for blame (${blameLines.size} lines > maxBlameLines=$maxLines). Increase the limit in Settings > System Explorer > Remote Git.")
+        }
         return RemoteGitAnnotation(project, file, blameLines)
     }
 
@@ -45,8 +52,12 @@ class RemoteGitAnnotationProvider(
         val relPath = relativize(file.path)
             ?: throw VcsException("File ${file.path} is outside repository $repoPath")
 
+        val maxLines = try { RemoteGitSettings.getInstance().state.maxBlameLines } catch (_: Exception) { 5000 }
         val revHash = revision.revisionNumber.asString()
         val blameLines = runBlame(relPath, revHash)
+        if (blameLines.size > maxLines) {
+            throw VcsException("File too large for blame (${blameLines.size} lines > maxBlameLines=$maxLines). Increase the limit in Settings > System Explorer > Remote Git.")
+        }
         return RemoteGitAnnotation(project, file, blameLines)
     }
 
@@ -61,7 +72,7 @@ class RemoteGitAnnotationProvider(
     }
 
     @Throws(VcsException::class)
-    private fun runBlame(relPath: String, revHash: String? = null): List<BlameLine> {
+    private fun runBlame(relPath: String, revHash: String? = null): Map<Int, BlameLine> {
         val args = if (revHash != null) {
             arrayOf("blame", "--porcelain", revHash, "--", relPath)
         } else {
@@ -96,8 +107,15 @@ class RemoteGitAnnotationProvider(
     private class RemoteGitAnnotation(
         project: Project,
         private val file: VirtualFile,
-        private val blameLines: List<BlameLine>,
+        private val blameLines: Map<Int, BlameLine>,
     ) : FileAnnotation(project) {
+
+        companion object {
+            private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                .withZone(ZoneId.systemDefault())
+            private val DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                .withZone(ZoneId.systemDefault())
+        }
 
         // ── LineAnnotationAspect definitions ──────────────────────────────────
 
@@ -105,7 +123,8 @@ class RemoteGitAnnotationProvider(
             "Revision", "Revision", true
         ) {
             override fun getValue(lineNumber: Int): String {
-                return blameLines.getOrNull(lineNumber)?.commitHash?.take(8) ?: ""
+                val line = blameLines[lineNumber] ?: return ""
+                return if (line.isUncommitted) "(uncommitted)" else line.commitHash.take(8)
             }
 
             override fun showAffectedPaths(lineNumber: Int) {
@@ -117,7 +136,7 @@ class RemoteGitAnnotationProvider(
             "Author", "Author", false
         ) {
             override fun getValue(lineNumber: Int): String {
-                return blameLines.getOrNull(lineNumber)?.author ?: ""
+                return blameLines[lineNumber]?.author ?: ""
             }
 
             override fun showAffectedPaths(lineNumber: Int) {
@@ -129,8 +148,8 @@ class RemoteGitAnnotationProvider(
             "Date", "Date", false
         ) {
             override fun getValue(lineNumber: Int): String {
-                val ts = blameLines.getOrNull(lineNumber)?.timestamp ?: return ""
-                return java.text.SimpleDateFormat("yyyy-MM-dd").format(Date(ts * 1_000L))
+                val ts = blameLines[lineNumber]?.timestamp ?: return ""
+                return DATE_FORMAT.format(Instant.ofEpochSecond(ts))
             }
 
             override fun showAffectedPaths(lineNumber: Int) {
@@ -140,36 +159,36 @@ class RemoteGitAnnotationProvider(
 
         // ── FileAnnotation API ────────────────────────────────────────────────
 
-        override fun getLineCount(): Int = blameLines.size
+        override fun getLineCount(): Int = (blameLines.keys.maxOrNull() ?: -1) + 1
 
         override fun getAspects(): Array<LineAnnotationAspect> =
             arrayOf(revisionAspect, authorAspect, dateAspect)
 
         override fun getToolTip(lineNumber: Int): String? {
-            val line = blameLines.getOrNull(lineNumber) ?: return null
-            val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(Date(line.timestamp * 1_000L))
+            val line = blameLines[lineNumber] ?: return null
+            val date = DATETIME_FORMAT.format(Instant.ofEpochSecond(line.timestamp))
             return "${line.commitHash.take(8)} — ${line.author} <${line.authorEmail}> on $date\n${line.summary}"
         }
 
         override fun getCurrentRevision(): VcsRevisionNumber? {
-            val hash = blameLines.firstOrNull()?.commitHash ?: return null
+            val hash = blameLines.values.firstOrNull()?.commitHash ?: return null
             return RemoteGitRevisionNumber(hash)
         }
 
         override fun getRevisions(): List<VcsFileRevision>? = null
 
         override fun getLineRevisionNumber(lineNumber: Int): VcsRevisionNumber? {
-            val hash = blameLines.getOrNull(lineNumber)?.commitHash ?: return null
+            val hash = blameLines[lineNumber]?.commitHash ?: return null
             return RemoteGitRevisionNumber(hash)
         }
 
         override fun getLineDate(lineNumber: Int): Date? {
-            val ts = blameLines.getOrNull(lineNumber)?.timestamp ?: return null
+            val ts = blameLines[lineNumber]?.timestamp ?: return null
             return Date(ts * 1_000L)
         }
 
         override fun getAnnotatedContent(): String =
-            blameLines.joinToString("\n") { it.content }
+            blameLines.values.joinToString("\n") { it.content }
 
         override fun getFile(): VirtualFile = file
 

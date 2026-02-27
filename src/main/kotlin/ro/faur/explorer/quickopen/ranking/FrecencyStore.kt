@@ -5,6 +5,7 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import ro.faur.explorer.quickopen.model.UsageSignals
+import ro.faur.explorer.settings.QuickOpenSettings
 import kotlin.math.exp
 import kotlin.math.ln
 
@@ -44,14 +45,17 @@ class FrecencyStore : PersistentStateComponent<FrecencyStore.State> {
     override fun getState(): State = myState
     override fun loadState(state: State) { myState = state }
 
+    @Synchronized
     fun recordVisit(path: String, branch: String? = null) {
         val entry = myState.entries.getOrPut(path) { Entry() }
         entry.lastUsedMs = System.currentTimeMillis()
         entry.useCount++
         if (branch != null) entry.branch = branch
         if (entry.useCount > myState.maxUseCount) myState.maxUseCount = entry.useCount
+        evictIfNeeded()
     }
 
+    @Synchronized
     fun getSignals(path: String): UsageSignals {
         val entry = myState.entries[path] ?: return UsageSignals()
         return UsageSignals(
@@ -62,18 +66,33 @@ class FrecencyStore : PersistentStateComponent<FrecencyStore.State> {
         )
     }
 
+    @Synchronized
     fun setBookmarked(path: String, bookmarked: Boolean) {
         myState.entries.getOrPut(path) { Entry() }.isBookmarked = bookmarked
     }
 
-    /** Computes [0,1] recency score using exponential time-decay (24h half-life). */
+    private fun evictIfNeeded() {
+        if (myState.entries.size > MAX_ENTRIES) {
+            val toRemove = myState.entries.entries
+                .sortedBy { it.value.lastUsedMs }
+                .take(myState.entries.size - MAX_ENTRIES)
+            toRemove.forEach { myState.entries.remove(it.key) }
+        }
+    }
+
+    /** Computes [0,1] recency score using exponential time-decay with configurable half-life. */
+    @Synchronized
     fun recencyScore(path: String): Double {
         val entry = myState.entries[path] ?: return 0.0
         val hoursAgo = (System.currentTimeMillis() - entry.lastUsedMs) / 3_600_000.0
-        return exp(-hoursAgo / 24.0)
+        val halfLife = try {
+            QuickOpenSettings.getInstance().state.frecencyHalfLifeHours
+        } catch (_: Exception) { 24.0 }
+        return exp(-hoursAgo * ln(2.0) / halfLife)
     }
 
     /** Computes [0,1] frequency score using log-scaled visit count. */
+    @Synchronized
     fun frequencyScore(path: String): Double {
         val entry = myState.entries[path] ?: return 0.0
         val max = myState.maxUseCount.coerceAtLeast(1)
@@ -81,6 +100,8 @@ class FrecencyStore : PersistentStateComponent<FrecencyStore.State> {
     }
 
     companion object {
+        private const val MAX_ENTRIES = 10_000
+
         fun getInstance(): FrecencyStore =
             ApplicationManager.getApplication().getService(FrecencyStore::class.java)
     }

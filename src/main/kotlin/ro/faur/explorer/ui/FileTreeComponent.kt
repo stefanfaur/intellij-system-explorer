@@ -14,6 +14,8 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.concurrency.AppExecutorUtil
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.SimpleTextAttributes
@@ -77,13 +79,16 @@ class FileTreeComponent(private val project: Project) : Disposable {
     /** Cached flag for whether to show file permissions (updated by ExplorerPanel). */
     internal var showPermissions: Boolean = false
 
+    /** When true, directories show their child count in the tree (e.g. "src (12)"). */
+    var showFolderItemCount: Boolean = false
+
     /** Cache for file permissions to avoid disk I/O on every render. */
-    private val permissionsCache = mutableMapOf<String, String>()
+    private val permissionsCache = ConcurrentHashMap<String, String>()
 
     /** Cache for file icons to avoid flashing during dumb mode transitions.
      *  When IntelliJ enters/exits dumb mode, vf.fileType returns different results,
      *  causing all icons to change twice in rapid succession → visible flash. */
-    private val iconCache = mutableMapOf<String, Icon>()
+    private val iconCache = ConcurrentHashMap<String, Icon>()
 
     /** The path currently displayed as the tree root. */
     var currentRootPath: String? = null
@@ -248,8 +253,15 @@ class FileTreeComponent(private val project: Project) : Disposable {
                 if (capturedFilter.isNotBlank()) model.getFilteredChildren(dir, capturedFilter)
                 else model.getChildren(dir)
             }
+            // Pre-populate the permissions cache on the background thread to avoid disk I/O on the EDT.
+            val newPermCache = mutableMapOf<String, String>()
+            children.forEach { vf ->
+                newPermCache[vf.path] = runCatching { formatPermissionsForFile(vf) }.getOrDefault("")
+            }
             ApplicationManager.getApplication().invokeLater {
                 if (isDisposed || loadGeneration.get() != gen) return@invokeLater
+                permissionsCache.clear()
+                permissionsCache.putAll(newPermCache)
                 populateNode(rootNode, children)
                 treeModel.reload()
             }
@@ -330,8 +342,13 @@ class FileTreeComponent(private val project: Project) : Disposable {
         // Open in System
         if (singleFile != null) {
             menu.add(JMenuItem("Open in System").apply {
+                isEnabled = java.awt.Desktop.isDesktopSupported() &&
+                        java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)
                 addActionListener {
-                    java.awt.Desktop.getDesktop().open(java.io.File(singleFile.path))
+                    AppExecutorUtil.getAppExecutorService().execute {
+                        runCatching { java.awt.Desktop.getDesktop().open(java.io.File(singleFile.path)) }
+                            .onFailure { LOG.warn("Failed to open file in system: ${it.message}") }
+                    }
                 }
             })
         }
@@ -607,6 +624,10 @@ class FileTreeComponent(private val project: Project) : Disposable {
                 } else {
                     // Permissions not enabled, just append the filename
                     append(vf.name)
+                    if (showFolderItemCount && vf.isDirectory) {
+                        val count = vf.children.size
+                        if (count > 0) append(" ($count)", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                    }
                 }
             } else {
                 append(value?.toString() ?: "")
@@ -667,18 +688,21 @@ class FileTreeComponent(private val project: Project) : Disposable {
             }
         }
 
-        private fun formatPermissions(file: VirtualFile): String {
-            if (SystemInfo.isWindows) return ""
+        private fun formatPermissions(file: VirtualFile): String =
+            formatPermissionsForFile(file)
+    }
 
-            try {
-                val path = Paths.get(file.path)
-                val perms = Files.getPosixFilePermissions(path)
-                val permString = PosixFilePermissions.toString(perms)
-                val prefix = if (file.isDirectory) "d" else "-"
-                return "$prefix$permString"
-            } catch (_: Exception) {
-                return ""  // Fail silently on any error
-            }
+    private fun formatPermissionsForFile(file: VirtualFile): String {
+        if (SystemInfo.isWindows) return ""
+
+        try {
+            val path = Paths.get(file.path)
+            val perms = Files.getPosixFilePermissions(path)
+            val permString = PosixFilePermissions.toString(perms)
+            val prefix = if (file.isDirectory) "d" else "-"
+            return "$prefix$permString"
+        } catch (_: Exception) {
+            return ""  // Fail silently on any error
         }
     }
 }

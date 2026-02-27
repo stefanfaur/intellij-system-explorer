@@ -43,4 +43,21 @@ class ShellUtilsTest {
         val escaped = RemoteGitCommandExecutor.shellEscape("\$HOME")
         assertEquals("'\$HOME'", escaped)
     }
+
+    @Test
+    fun `safe-directory flag is correctly escaped for a normal path`() {
+        // Verifies the -c safe.directory=<path> flag that bypasses git 2.35.2+ dubious-
+        // ownership checks. The value is shell-escaped as a single token so git receives
+        // the key=value pair intact.
+        val path = "/home/tomcat/PkOneConfiguration"
+        val escaped = RemoteGitCommandExecutor.shellEscape("safe.directory=$path")
+        assertEquals("'safe.directory=/home/tomcat/PkOneConfiguration'", escaped)
+    }
+
+    @Test
+    fun `safe-directory flag handles path with spaces`() {
+        val path = "/home/my user/my repo"
+        val escaped = RemoteGitCommandExecutor.shellEscape("safe.directory=$path")
+        assertEquals("'safe.directory=/home/my user/my repo'", escaped)
+    }
 }

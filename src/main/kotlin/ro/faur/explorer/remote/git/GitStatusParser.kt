@@ -29,6 +29,7 @@ object GitStatusParser {
         val parts = line.split(" ", limit = 9)
         if (parts.size < 9) return null
         val xy = parts[1]
+        if (xy.length < 2) return null
         val path = parts[8]
         val status = when {
             xy[0] == 'D' || xy[1] == 'D' -> GitFileStatus.DELETED

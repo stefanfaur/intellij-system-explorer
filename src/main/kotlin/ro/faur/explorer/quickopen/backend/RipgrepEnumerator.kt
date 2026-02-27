@@ -3,6 +3,7 @@ package ro.faur.explorer.quickopen.backend
 import com.intellij.openapi.diagnostic.Logger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import ro.faur.explorer.settings.QuickOpenSettings
 
 /**
  * Enumerates files using `rg --files` (ripgrep).
@@ -30,15 +31,26 @@ class RipgrepEnumerator(private val rgPath: String = "rg") : EnumeratorBackend {
         }
     }
 
-    override fun isAvailable(): Boolean = try {
-        ProcessBuilder(rgPath, "--version").start().waitFor() == 0
-    } catch (_: Exception) { false }
+    private val available: Boolean by lazy {
+        try { ProcessBuilder(rgPath, "--version").start().waitFor() == 0 }
+        catch (_: Exception) { false }
+    }
+    override fun isAvailable(): Boolean = available
 
     override fun enumerate(root: String, maxResults: Int): Flow<String> = flow {
+        val s = try { QuickOpenSettings.getInstance().state } catch (_: Exception) { null }
+        val cmd = mutableListOf(rgPath, "--files", "--color=never")
+        if (s?.ripgrepSearchHidden == true) cmd.add("--hidden")
+        if (s?.ripgrepFollowSymlinks == true) cmd.add("--follow")
+        if (s?.ripgrepRespectIgnore == false) cmd.add("--no-ignore")
+        val depth = s?.ripgrepMaxDepth ?: 0
+        if (depth > 0) { cmd.add("--max-depth"); cmd.add(depth.toString()) }
+        val extra = s?.ripgrepExtraFlags?.trim() ?: ""
+        if (extra.isNotBlank()) cmd.addAll(extra.split("\\s+".toRegex()))
+        cmd.add(root)
+
         val process = try {
-            ProcessBuilder(
-                rgPath, "--files", "--color=never", "--hidden", root
-            ).redirectErrorStream(false).start()
+            ProcessBuilder(cmd).redirectErrorStream(false).start()
         } catch (_: Exception) {
             return@flow
         }

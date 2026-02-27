@@ -96,6 +96,13 @@ class SftpFileOperations private constructor(
     // ── Metadata ──────────────────────────────────────────────────────────────
 
     /**
+     * Returns the canonical absolute path of the user's home directory on the remote server.
+     * Uses SFTP's `realpath(".")` which the server resolves relative to the connection's CWD
+     * (almost always the home directory). Falls back to `"/"` on any error.
+     */
+    fun homeDir(): String = runCatching { sftp.canonicalPath(".") }.getOrDefault("/")
+
+    /**
      * Returns the attributes of the entry at [path].
      * Throws if the path does not exist.
      */

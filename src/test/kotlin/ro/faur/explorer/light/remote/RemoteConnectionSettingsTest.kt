@@ -57,7 +57,9 @@ class RemoteConnectionSettingsTest : BasePlatformTestCase() {
         ))
         val state = settings.state
         val conn = state.connections[0]
-        assertNull(conn.password)
+        // ConnectionProfile intentionally has no password field — credentials go through PasswordSafe
+        assertNotNull(conn)
+        assertEquals("secure", conn.name)
     }
 
     fun `test duplicate connection name rejected`() {

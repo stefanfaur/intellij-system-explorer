@@ -21,6 +21,10 @@ class RemoteExplorerSettings : PersistentStateComponent<RemoteExplorerSettings.S
         var tailInitialLines: Int = 1000,
         var showSshConfigHosts: Boolean = true,
         var secureDeleteSensitiveFiles: Boolean = true,
+        var keepaliveMaxFailures: Int = 3,
+        var connectionRetryAttempts: Int = 2,
+        var maxCachedDirectories: Int = 200,
+        var maxTransferSizeMb: Long = 100L,
     )
 
     private var state = State()

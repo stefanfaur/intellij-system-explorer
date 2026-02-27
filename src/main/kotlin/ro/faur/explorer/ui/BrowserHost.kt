@@ -104,6 +104,12 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
         showActive()
     }
 
+    /** Removes [panel] by identity — safe even if indices have shifted since tab was built. */
+    fun removePanel(panel: BrowserPanel) {
+        val idx = panels.indexOf(panel)
+        if (idx >= 0) removePanel(idx)
+    }
+
     /**
      * Switches the active panel to [index]. No-op if out of range.
      */
@@ -184,7 +190,8 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
             else
                 BorderFactory.createEmptyBorder(0, 0, 2, 0)
             toolTipText         = "Close ${panel.panelLabel}"
-            addActionListener   { removePanel(index) }
+            val capturedPanel = panel   // capture reference, not index (which may go stale)
+            addActionListener   { removePanel(capturedPanel) }
         }
 
         return JPanel().apply {

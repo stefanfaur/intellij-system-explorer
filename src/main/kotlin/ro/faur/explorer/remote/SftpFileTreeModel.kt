@@ -18,6 +18,9 @@ class SftpFileTreeModel(
     companion object {
         /** Placeholder userObject inserted into unexpanded directory nodes. */
         const val LOADING_PLACEHOLDER = "loading..."
+
+        /** Placeholder inserted when directory listing fails (e.g. EACCES). */
+        const val ACCESS_DENIED_PLACEHOLDER = "Permission denied"
     }
 
     private val root = DefaultMutableTreeNode("(not connected)")
@@ -127,6 +130,14 @@ class SftpFileTreeModel(
                 }
             } catch (e: Exception) {
                 onError?.invoke(e)
+                ApplicationManager.getApplication().invokeLater {
+                    val isStillPlaceholder = parentNode.childCount == 1 &&
+                            (parentNode.firstChild as? DefaultMutableTreeNode)?.userObject == LOADING_PLACEHOLDER
+                    if (!isStillPlaceholder) return@invokeLater
+                    parentNode.removeAllChildren()
+                    parentNode.add(DefaultMutableTreeNode(ACCESS_DENIED_PLACEHOLDER))
+                    treeModel.nodeStructureChanged(parentNode)
+                }
             }
         }.also { it.isDaemon = true; it.name = "RemoteExpand[$path]" }.start()
     }

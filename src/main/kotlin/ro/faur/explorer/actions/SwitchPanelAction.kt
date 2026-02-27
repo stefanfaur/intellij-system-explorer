@@ -5,7 +5,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 
 /**
  * Switches the active panel in [ro.faur.explorer.ui.BrowserHost] to a specific index.
- * Registered as Cmd+1 (index 0 = Local), Cmd+2 (index 1 = first SSH), etc.
+ * Registered as Option+Shift+1 (index 0 = Local), Option+Shift+2 (index 1 = first SSH), etc.
  */
 open class SwitchPanelAction(private val panelIndex: Int) : AnAction() {
 
@@ -16,10 +16,10 @@ open class SwitchPanelAction(private val panelIndex: Int) : AnAction() {
 
     override fun update(e: AnActionEvent) {
         val panel = ExplorerActionUtil.findExplorerPanel(e)
+        e.presentation.isVisible = e.project != null
         e.presentation.isEnabled = panel != null &&
                 ExplorerActionUtil.isExplorerActive(e) &&
-                panelIndex < (panel?.browserHost?.panelCount ?: 0)
-        e.presentation.isEnabledAndVisible = e.project != null
+                panelIndex < (panel.browserHost.panelCount)
     }
 }
 

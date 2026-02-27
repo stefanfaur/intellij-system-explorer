@@ -80,7 +80,7 @@ abstract class BrowserPanel : JPanel(BorderLayout()), Disposable {
 
     // ── Concrete navigation (history managed centrally here) ───────────────
 
-    fun navigateTo(path: String) {
+    open fun navigateTo(path: String) {
         history.push(path)
         doNavigateTo(path)
         pathField.text = path
@@ -114,8 +114,9 @@ abstract class BrowserPanel : JPanel(BorderLayout()), Disposable {
 
     /**
      * Builds the NORTH section: pathField, then filterField.
+     * Subclasses may override to add extra controls (e.g. preset combobox).
      */
-    protected fun buildSharedNorth(): JPanel {
+    protected open fun buildSharedNorth(): JPanel {
         val north = JPanel()
         north.layout = BoxLayout(north, BoxLayout.Y_AXIS)
 
@@ -198,9 +199,9 @@ abstract class BrowserPanel : JPanel(BorderLayout()), Disposable {
 
     protected fun refreshToggleAppearance() {
         hiddenToggle.isContentAreaFilled = showHidden
-        if (showHidden) hiddenToggle.background = JBUI.CurrentTheme.ActionButton.pressedBackground()
+        hiddenToggle.background = if (showHidden) JBUI.CurrentTheme.ActionButton.pressedBackground() else null
         permissionsToggle?.isContentAreaFilled = showPermissions
-        if (showPermissions) permissionsToggle?.background = JBUI.CurrentTheme.ActionButton.pressedBackground()
+        permissionsToggle?.background = if (showPermissions) JBUI.CurrentTheme.ActionButton.pressedBackground() else null
     }
 
     // ── Base dispose (removes shared listeners) ────────────────────────────

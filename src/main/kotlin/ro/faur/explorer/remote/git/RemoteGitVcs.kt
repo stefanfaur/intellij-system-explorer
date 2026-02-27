@@ -94,9 +94,9 @@ class RemoteGitVcs(project: Project) : AbstractVcs(project, NAME) {
 
         fun getKey(): VcsKey = KEY
 
-        fun getInstance(project: Project): RemoteGitVcs {
+        fun getInstance(project: Project): RemoteGitVcs? {
             return ProjectLevelVcsManager.getInstance(project)
-                .findVcsByName(NAME) as RemoteGitVcs
+                .findVcsByName(NAME) as? RemoteGitVcs
         }
     }
 }

@@ -7,7 +7,6 @@ import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.vcsUtil.VcsUtil
 import ro.faur.explorer.remote.SftpConnectionManager
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
 
 /**
  * A [ContentRevision] that represents the current working-copy state of a remote file.
@@ -43,20 +42,14 @@ class RemoteGitWorkingCopyRevision(
         val sftpClient = connectionManager.getSftpClient(connectionName)
             ?: return null  // not connected — treat as unavailable
 
-        val tempFile = Files.createTempFile("remote-git-wc-", ".tmp")
         return try {
             sftpClient.read(remotePath).use { remoteIn ->
-                Files.newOutputStream(tempFile).use { localOut ->
-                    remoteIn.copyTo(localOut)
-                }
+                remoteIn.readBytes().toString(StandardCharsets.UTF_8)
             }
-            Files.readAllBytes(tempFile).toString(StandardCharsets.UTF_8)
         } catch (e: Exception) {
             // File may not exist (deleted in working copy) — return null rather than throwing.
             if (isFileNotFoundError(e)) null
             else throw VcsException("Failed to read working-copy content of $remotePath: ${e.message}", e)
-        } finally {
-            runCatching { Files.deleteIfExists(tempFile) }
         }
     }
 

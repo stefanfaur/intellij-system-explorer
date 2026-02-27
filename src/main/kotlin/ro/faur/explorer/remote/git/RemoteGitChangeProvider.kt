@@ -1,5 +1,6 @@
 package ro.faur.explorer.remote.git
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
@@ -33,6 +34,8 @@ class RemoteGitChangeProvider(
     private val connectionManager: SftpConnectionManager,
 ) : ChangeProvider {
 
+    private val LOG = Logger.getInstance(RemoteGitChangeProvider::class.java)
+
     @Throws(VcsException::class)
     override fun getChanges(
         dirtyScope: VcsDirtyScope,
@@ -52,7 +55,7 @@ class RemoteGitChangeProvider(
         }
 
         if (!result.isSuccess) {
-            // Non-zero exit — could be a bare repo or pre-init directory. Treat as empty.
+            LOG.debug("git status returned non-zero (exit=${result.exitCode}) for $connectionName:$repoPath — ${result.stderr.trim()}")
             return
         }
 

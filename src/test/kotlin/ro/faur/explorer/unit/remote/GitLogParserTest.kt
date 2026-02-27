@@ -3,7 +3,6 @@ package ro.faur.explorer.unit.remote
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import ro.faur.explorer.remote.git.GitLogParser
-import java.util.Date
 
 class GitLogParserTest {
 
@@ -20,7 +19,7 @@ class GitLogParserTest {
         assertEquals(validHash, entry.hash)
         assertEquals("John Doe", entry.authorName)
         assertEquals("john@example.com", entry.authorEmail)
-        assertEquals(Date(1700000000L * 1000), entry.date)
+        assertEquals(1700000000L, entry.timestamp)
         assertEquals("Initial commit", entry.subject)
     }
 

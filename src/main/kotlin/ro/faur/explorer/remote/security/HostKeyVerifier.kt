@@ -6,6 +6,7 @@ import org.apache.sshd.client.keyverifier.ServerKeyVerifier
 import org.apache.sshd.client.session.ClientSession
 import org.apache.sshd.common.config.keys.KeyUtils
 import org.apache.sshd.common.util.net.SshdSocketAddress
+import com.intellij.openapi.diagnostic.Logger
 import java.net.SocketAddress
 import java.nio.file.Path
 import java.security.PublicKey
@@ -34,6 +35,7 @@ class HostKeyVerifier(
     private val autoAcceptUnknown: Boolean = false,
     private val tofuCallback: ((host: String, fingerprint: String) -> Boolean)? = null,
 ) {
+    private val LOG = Logger.getInstance(HostKeyVerifier::class.java)
 
     /**
      * Returns a MINA SSHD [ServerKeyVerifier] that enforces the TOFU policy defined by
@@ -78,6 +80,7 @@ class HostKeyVerifier(
             val fingerprint = KeyUtils.getFingerPrint(serverKey)
 
             if (autoAcceptUnknown) {
+                LOG.warn("AUTO-ACCEPT: Trusting unknown host key for $host without verification")
                 return true
             }
 

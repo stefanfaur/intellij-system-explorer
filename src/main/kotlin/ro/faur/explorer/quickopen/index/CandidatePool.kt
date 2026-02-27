@@ -7,6 +7,7 @@ import ro.faur.explorer.quickopen.backend.EnumeratorBackend
 import ro.faur.explorer.quickopen.model.CandidateType
 import ro.faur.explorer.quickopen.model.SearchCandidate
 import ro.faur.explorer.quickopen.ranking.FrecencyStore
+import ro.faur.explorer.settings.QuickOpenSettings
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -14,7 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Manages the in-memory candidate pool for the current root.
  * Respects scope guardrails:
  *   - Hard cap at MAX_CANDIDATES (default 50,000)
- *   - 10s timeout kill on enumerator
+ *   - Configurable timeout kill on enumerator (from QuickOpenSettings)
  *   - Network mount rejection (future)
  *
  * Thread-safe: all mutations happen on a background coroutine;
@@ -22,7 +23,9 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 class CandidatePool(
     private val enumerator: EnumeratorBackend,
-    private val maxCandidates: Int = MAX_CANDIDATES
+    private val maxCandidates: Int = try {
+        QuickOpenSettings.getInstance().state.maxIndexSize
+    } catch (_: Exception) { MAX_CANDIDATES }
 ) {
 
     companion object {
@@ -45,13 +48,16 @@ class CandidatePool(
      * Calls [onUpdate] on EDT when the pool finishes populating.
      */
     fun refreshAsync(root: String, onUpdate: () -> Unit = {}) {
-        enumerationJob?.cancel()
-        _candidates.clear()
-        isTruncated = false
-
+        val previousJob = enumerationJob
         enumerationJob = scope.launch {
+            previousJob?.cancelAndJoin()   // wait for old job to stop before clearing
+            _candidates.clear()
+            isTruncated = false
+            val timeoutMs = try {
+                QuickOpenSettings.getInstance().state.indexEnumerationTimeoutSec * 1000L
+            } catch (_: Exception) { 10_000L }
             try {
-                withTimeout(10_000L) { // 10s hard kill
+                withTimeout(timeoutMs) {
                     try {
                         enumerator.enumerate(root, maxCandidates + 1).collect { path ->
                             if (_candidates.size >= maxCandidates) {
@@ -77,7 +83,7 @@ class CandidatePool(
                     }
                 }
             } catch (_: TimeoutCancellationException) {
-                LOG.warn("Enumeration timed out for $root after 10s")
+                LOG.warn("Enumeration timed out for $root after ${timeoutMs / 1000}s")
             }
             // Call onUpdate directly from the background thread.
             // Callers that need EDT dispatch (e.g. QuickOpenPanel) wrap it themselves.

@@ -2,6 +2,8 @@ package ro.faur.explorer.ui
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ReadAction
+import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -17,7 +19,15 @@ import ro.faur.explorer.model.BookmarkManager
 import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.settings.ExplorerSettings
 import ro.faur.explorer.util.FileSizeFormatter
+import java.awt.BorderLayout
+import java.awt.Component
+import java.awt.Dimension
+import javax.swing.BoxLayout
+import javax.swing.ComboBoxModel
+import javax.swing.DefaultComboBoxModel
 import javax.swing.Icon
+import javax.swing.JComboBox
+import javax.swing.JPanel
 
 /**
  * Browser panel backed by the local filesystem (IntelliJ VFS).
@@ -55,6 +65,46 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
     )
 
     private var _currentPath: String = NavigationActions.goHome(project)
+    private val presetComboBox = JComboBox<String>()
+
+    override fun buildSharedNorth(): JPanel {
+        val north = super.buildSharedNorth()
+        refreshPresets()
+
+        val filterRow = JPanel(BorderLayout()).apply {
+            alignmentX = Component.LEFT_ALIGNMENT
+            maximumSize = Dimension(Int.MAX_VALUE, filterField.preferredSize.height)
+        }
+        // Move the last component (filterField) from the BoxLayout into filterRow
+        north.remove(north.componentCount - 1)
+        filterRow.add(filterField, BorderLayout.CENTER)
+        presetComboBox.maximumSize = Dimension(120, filterField.preferredSize.height)
+        filterRow.add(presetComboBox, BorderLayout.EAST)
+        north.add(filterRow)
+
+        presetComboBox.addActionListener {
+            val selected = presetComboBox.selectedItem as? String ?: return@addActionListener
+            val preset = try {
+                ExplorerSettings.getInstance().state.globPresets.find { it.name == selected }
+            } catch (_: Exception) { null }
+            if (preset != null) {
+                filterField.text = preset.pattern
+                fileTreeComponent.filterPattern = preset.pattern
+                fileTreeComponent.setRoot(_currentPath)
+                updateStatus()
+            }
+        }
+        return north
+    }
+
+    private fun refreshPresets() {
+        val model = DefaultComboBoxModel<String>()
+        model.addElement("Presets\u2026")
+        try {
+            ExplorerSettings.getInstance().state.globPresets.forEach { model.addElement(it.name) }
+        } catch (_: Exception) {}
+        presetComboBox.model = model
+    }
 
     init {
         history.push(_currentPath)
@@ -73,6 +123,7 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
         // Restore persisted toggle state
         val settings = ExplorerSettings.getInstance()
         fileTreeComponent.showPermissions = settings.state.showFilePermissions
+        fileTreeComponent.showFolderItemCount = settings.state.showFolderItemCount
         showPermissions                   = settings.state.showFilePermissions
         refreshToggleAppearance()
 
@@ -105,6 +156,11 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
     }
 
     // ── Abstract contract ──────────────────────────────────────────────────
+
+    override fun navigateTo(path: String) {
+        if (path == _currentPath) return   // already here — skip redundant history push
+        super.navigateTo(path)
+    }
 
     override fun doNavigateTo(path: String) {
         _currentPath   = path
@@ -191,22 +247,48 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
     }
 
     internal fun updateStatus() {
+        val detail = try { ExplorerSettings.getInstance().state.statusBarDetail } catch (_: Exception) { "normal" }
         val selected = fileTreeComponent.getSelectedFiles()
         if (selected.isNotEmpty()) {
-            val dirs  = selected.filter { it.isDirectory }
-            val files = selected.filter { !it.isDirectory }
-            val fileSizeBytes  = files.sumOf { it.length }
-            val dirChildCount  = dirs.sumOf { FileSizeFormatter.countDirectChildren(it) }
-            statusLabel.text = when {
-                dirs.isEmpty()  -> "${selected.size} selected -- ${FileSizeFormatter.format(fileSizeBytes)}"
-                files.isEmpty() -> {
-                    val dirSizeBytes = dirs.sumOf { FileSizeFormatter.computeDirectoryImmediateSize(it) }
-                    "${selected.size} selected -- $dirChildCount items, ${FileSizeFormatter.format(dirSizeBytes)}"
+            if (detail == "minimal") {
+                statusLabel.text = "${selected.size} item(s)"
+                return
+            }
+            AppExecutorUtil.getAppExecutorService().execute {
+                val statusText = ReadAction.compute<String, Throwable> {
+                    when (detail) {
+                        "verbose" -> {
+                            val dirs  = selected.filter { it.isDirectory }
+                            val files = selected.filter { !it.isDirectory }
+                            val fileSizeBytes = files.sumOf { it.length }
+                            val dirChildCount = dirs.sumOf { FileSizeFormatter.countDirectChildren(it) }
+                            val permsStr = selected.firstOrNull()?.let {
+                                runCatching { java.nio.file.Files.getPosixFilePermissions(java.nio.file.Paths.get(it.path)).toString() }.getOrDefault("")
+                            } ?: ""
+                            "${selected.size} selected -- $dirChildCount items, ${FileSizeFormatter.format(fileSizeBytes)}, perms: $permsStr"
+                        }
+                        else -> {
+                            val dirs  = selected.filter { it.isDirectory }
+                            val files = selected.filter { !it.isDirectory }
+                            val fileSizeBytes  = files.sumOf { it.length }
+                            val dirChildCount  = dirs.sumOf { FileSizeFormatter.countDirectChildren(it) }
+                            when {
+                                dirs.isEmpty()  -> "${selected.size} selected -- ${FileSizeFormatter.format(fileSizeBytes)}"
+                                files.isEmpty() -> {
+                                    val dirSizeBytes = dirs.sumOf { FileSizeFormatter.computeDirectoryImmediateSize(it) }
+                                    "${selected.size} selected -- $dirChildCount items, ${FileSizeFormatter.format(dirSizeBytes)}"
+                                }
+                                else -> if (dirChildCount > 0)
+                                    "${selected.size} selected -- $dirChildCount items in dirs, ${FileSizeFormatter.format(fileSizeBytes)} in files"
+                                else
+                                    "${selected.size} selected -- ${FileSizeFormatter.format(fileSizeBytes)}"
+                            }
+                        }
+                    }
                 }
-                else -> if (dirChildCount > 0)
-                    "${selected.size} selected -- $dirChildCount items in dirs, ${FileSizeFormatter.format(fileSizeBytes)} in files"
-                else
-                    "${selected.size} selected -- ${FileSizeFormatter.format(fileSizeBytes)}"
+                ApplicationManager.getApplication().invokeLater {
+                    statusLabel.text = statusText
+                }
             }
         } else {
             val children    = fileTreeComponent.getRootChildren()
