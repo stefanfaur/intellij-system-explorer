@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T14:20:14.185Z"
+last_updated: "2026-02-28T18:54:29.800Z"
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 16
-  completed_plans: 13
+  completed_phases: 4
+  total_plans: 18
+  completed_plans: 15
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 ## Current Position
 
 Phase: 8 of 8 (Intelligent Indexed Local Filesystem Search with Apache Lucene and Hybrid Mode)
-Plan: 4 of 6 in current phase
-Status: Plan 08-04 complete — LuceneEnumerator, IndexRegistry, and hybrid mode wiring in QuickOpenPanel
-Last activity: 2026-02-28 — Completed plan 08-04 (LuceneEnumerator as EnumeratorBackend drop-in, IndexRegistry singleton, hybrid mode selection in QuickOpenPanel)
+Plan: 6 of 6 in current phase
+Status: Plan 08-06 task 1 complete — index mode chip added to status bar; checkpoint:human-verify pending for full Phase 8 validation
+Last activity: 2026-02-28 — Completed plan 08-06 task 1 (index mode chip Indexed/Indexing.../Live in QuickOpenPanel status bar)
 
 Progress: [███░░░░░░░] 25%
 
@@ -57,6 +57,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 08 P02 | 2 | 2 tasks | 2 files |
 | Phase 08-01 P01 | 15 | 2 tasks | 3 files |
 | Phase 08 P04 | 7 | 2 tasks | 3 files |
+| Phase 08 P06 | 2 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,7 @@ Recent decisions affecting current work:
 - [Phase 08]: searchPaths blank query uses MatchAllDocsQuery — WildcardQuery on empty string returns no results
 - [Phase 08-04]: candidatePool changed to var to allow runtime replacement when switching to LuceneEnumerator on hybrid threshold crossing
 - [Phase 08-04]: IndexRegistry is a Kotlin object singleton with independent registryScope not cancelled on panel dispose
+- [Phase 08-06]: indexModeChipLabel is separate from modeChipLabel — placed in bottomRow EAST for index state; three states Indexed/Indexing.../Live from IndexRegistry
 
 ### Roadmap Evolution
 
@@ -115,5 +117,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 08-04-PLAN.md — LuceneEnumerator, IndexRegistry, and hybrid mode wiring in QuickOpenPanel
+Stopped at: 08-06-PLAN.md task 2 checkpoint:human-verify — Phase 8 full system verification pending
 Resume file: None
