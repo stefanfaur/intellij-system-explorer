@@ -4,6 +4,8 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
+import com.intellij.openapi.fileChooser.FileChooserFactory
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileEditor.impl.NonProjectFileWritingAccessProvider
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -34,6 +36,8 @@ import ro.faur.explorer.actions.FileActions
 import ro.faur.explorer.model.Bookmark
 import ro.faur.explorer.model.BookmarkManager
 import ro.faur.explorer.quickopen.backend.MinusculeMatcherRanker
+import ro.faur.explorer.quickopen.backend.NucleoNative
+import ro.faur.explorer.quickopen.backend.RankerSelector
 import ro.faur.explorer.quickopen.backend.RipgrepContentSearch
 import ro.faur.explorer.quickopen.backend.VfsEnumerator
 import ro.faur.explorer.quickopen.git.GitStatusProvider
@@ -74,6 +78,7 @@ class QuickOpenPanel(
     private val ranker = Ranker(textScorer)
     private val candidatePool = CandidatePool(VfsEnumerator())
     private val panelScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var currentRoot: String = currentPath
 
     companion object {
         private const val MAX_CONTENT_RESULTS = 200
@@ -85,8 +90,9 @@ class QuickOpenPanel(
     }
 
     private val listModel = CollectionListModel<SearchResult>()
+    private val resultRenderer = SearchResultRenderer()
     val resultList = JBList(listModel).apply {
-        cellRenderer = SearchResultRenderer()
+        cellRenderer = resultRenderer
         visibleRowCount = 12
         emptyText.setText("No results — try a different query")
         selectionMode = ListSelectionModel.MULTIPLE_INTERVAL_SELECTION
@@ -99,6 +105,19 @@ class QuickOpenPanel(
 
     private val truncationLabel = JBLabel("").apply { isVisible = false }
 
+    private val rankerStatusLabel = JBLabel("").apply {
+        foreground = java.awt.Color.GRAY
+        font = font.deriveFont(10f)
+        border = javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 6)
+        cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+        toolTipText = "Click to change search root"
+        addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                openRootPicker()
+            }
+        })
+    }
+
     private val previewPane = PreviewPane(project).apply { isVisible = false }
     private var previewVisible = false
 
@@ -108,22 +127,21 @@ class QuickOpenPanel(
     }
 
     private val hintLabel = JBLabel(
-        "↩: navigate  ⌘↩: open with  Tab: preview  ⌘D: bookmark  ⌘N: new  ⌘[: pop  Ctrl+R: recent  ⌘1–9: jump  /: search  Esc: close"
+        "↩ navigate · Tab preview · ⌘D bookmark · Ctrl+R recent · Esc close"
     ).apply {
         font = font.deriveFont(10f)
         foreground = java.awt.Color.GRAY
         border = javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 6)
     }
 
-    // Speed-dial: top-6 bookmarks by recency, fallback to recent
+    // Speed-dial: top frecent paths from FrecencyStore (pure recency, no bookmark-first logic)
     private val speedDialItems: List<SearchCandidate> = run {
-        val bookmarks = candidates.filter { it.type == CandidateType.BOOKMARK }
-            .sortedByDescending { it.signals.lastUsedMs }
-            .take(6)
-        if (bookmarks.isNotEmpty()) bookmarks
-        else candidates.filter { it.type == CandidateType.RECENT }
-            .sortedByDescending { it.signals.lastUsedMs }
-            .take(6)
+        val store = FrecencyStore.getInstance()
+        val count = try { QuickOpenSettings.getInstance().state.speedDialCount } catch (_: Exception) { 6 }
+        candidates
+            .filter { it.type != CandidateType.ACTION }
+            .sortedByDescending { store.recencyScore(it.fullPath) }
+            .take(count)
     }
 
     private val speedDialPanel: SpeedDialPanel = SpeedDialPanel(
@@ -153,10 +171,17 @@ class QuickOpenPanel(
     var popup: JBPopup? = null  // set by QuickOpenPopup after creation
 
     init {
-        val statusPanel = JPanel(BorderLayout()).apply {
-            add(truncationLabel, BorderLayout.WEST)
-            add(countLabel, BorderLayout.EAST)
-            add(hintLabel, BorderLayout.CENTER)
+        val statusPanel = JPanel(java.awt.GridLayout(2, 1)).apply {
+            val topRow = JPanel(BorderLayout()).apply {
+                add(truncationLabel, BorderLayout.WEST)
+                add(countLabel, BorderLayout.EAST)
+                add(hintLabel, BorderLayout.CENTER)
+            }
+            val bottomRow = JPanel(BorderLayout()).apply {
+                add(rankerStatusLabel, BorderLayout.CENTER)
+            }
+            add(topRow)
+            add(bottomRow)
         }
 
         val centerPanel = JPanel(BorderLayout())
@@ -381,6 +406,7 @@ class QuickOpenPanel(
                     truncationLabel.isVisible = false
                 }
                 scheduleSearch()
+                updateStatusBar()
             }, ModalityState.any())
         }
 
@@ -393,6 +419,35 @@ class QuickOpenPanel(
         }
 
         scheduleSearch()
+        updateStatusBar()
+    }
+
+    // ─── Status bar ───────────────────────────────────────────────────────────
+
+    private fun updateStatusBar() {
+        val rankerLabel = if (NucleoNative.isAvailable) "Nucleo"
+                          else RankerSelector.active.name
+        val rootDisplay = currentRoot.replace(System.getProperty("user.home"), "~")
+        val count = candidatePool.getCandidates().size
+        rankerStatusLabel.text = "Fuzzy: $rankerLabel · Root: $rootDisplay · ${"%,d".format(count)} files"
+    }
+
+    private fun openRootPicker() {
+        val descriptor = FileChooserDescriptor(false, true, false, false, false, false)
+        descriptor.title = "Select Search Root"
+        val chooser = FileChooserFactory.getInstance().createPathChooser(descriptor, project, this)
+        chooser.choose(null) { files ->
+            if (files.isNotEmpty()) {
+                currentRoot = files.first().path
+                updateStatusBar()
+                candidatePool.refreshAsync(currentRoot) {
+                    ApplicationManager.getApplication().invokeLater({
+                        scheduleSearch()
+                        updateStatusBar()
+                    }, ModalityState.any())
+                }
+            }
+        }
     }
 
     // ─── Preview ──────────────────────────────────────────────────────────────
@@ -585,6 +640,7 @@ class QuickOpenPanel(
 
     @RequiresEdt
     private fun updateList(results: List<SearchResult>, query: String) {
+        resultRenderer.currentQuery = query
         val prevId = selectedId ?: resultList.selectedValue?.scored?.candidate?.id
         listModel.replaceAll(results)
         resultList.setPaintBusy(false)
