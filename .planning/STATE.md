@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T10:59:09.941Z"
+last_updated: "2026-02-28T12:23:52.890Z"
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 8
+  completed_plans: 3
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 1 of 6 (GitBackend Extensions + Pull)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-02-28 — Completed plan 01-02 (Pull toolbar button with Task.Backgroundable)
+Phase: 7 of 7 (Polish QuickOpen Smart Search)
+Plan: 1 of ? in current phase
+Status: Plan 07-01 complete
+Last activity: 2026-02-28 — Completed plan 07-01 (Nucleo library bundling, ripgrep flag allowlist, null-safe popup)
 
-Progress: [██░░░░░░░░] 17%
+Progress: [███░░░░░░░] 25%
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Progress: [██░░░░░░░░] 17%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 07-polish-quickopen-smart-search P01 | 2 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,9 @@ Recent decisions affecting current work:
 - 01-02: Pull uses Task.Backgroundable (not bare executeOnPooledThread) for IDE status bar progress during network git ops
 - 01-02: pullInProgress = false placed as first invokeLater statement (before disposed check) to prevent permanent button disable on panel disposal mid-pull
 - 01-02: canBeCancelled=false in Task.Backgroundable — git CLI has no cooperative cancellation, suppress fake Cancel UI
+- [Phase 07-01]: validateExtraFlags allowlist: --hidden, --no-ignore, --follow exact + --type, --glob prefix; unknown flags silently dropped
+- [Phase 07-01]: popup changed from lateinit to JBPopup? = null with ?. safe-call on all 4 callsites
+- [Phase 07-01]: Nucleo native library committed to src/main/resources/natives/darwin-aarch64/ for JAR packaging without requiring Rust toolchain
 
 ### Roadmap Evolution
 
@@ -81,5 +85,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 01-02-PLAN.md — Pull toolbar button with Task.Backgroundable and three result paths
+Stopped at: Completed 07-01-PLAN.md — Nucleo library bundling, ripgrep flag allowlist, null-safe popup
 Resume file: None
