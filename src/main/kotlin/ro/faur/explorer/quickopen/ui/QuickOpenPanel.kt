@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 import ro.faur.explorer.actions.FileActions
 import ro.faur.explorer.model.Bookmark
 import ro.faur.explorer.model.BookmarkManager
+import ro.faur.explorer.quickopen.backend.LuceneEnumerator
 import ro.faur.explorer.quickopen.backend.MinusculeMatcherRanker
 import ro.faur.explorer.quickopen.backend.NucleoNative
 import ro.faur.explorer.quickopen.backend.RankerSelector
@@ -42,6 +43,9 @@ import ro.faur.explorer.quickopen.backend.RipgrepContentSearch
 import ro.faur.explorer.quickopen.backend.VfsEnumerator
 import ro.faur.explorer.quickopen.git.GitStatusProvider
 import ro.faur.explorer.quickopen.index.CandidatePool
+import ro.faur.explorer.quickopen.index.IndexRegistry
+import ro.faur.explorer.quickopen.index.LuceneIndexBuilder
+import java.nio.file.Paths
 import ro.faur.explorer.quickopen.model.CandidateType
 import ro.faur.explorer.quickopen.model.SearchCandidate
 import ro.faur.explorer.quickopen.model.ScoredCandidate
@@ -76,7 +80,7 @@ class QuickOpenPanel(
 
     private val textScorer = MinusculeMatcherRanker()
     private val ranker = Ranker(textScorer)
-    private val candidatePool = CandidatePool(VfsEnumerator())
+    private var candidatePool = CandidatePool(VfsEnumerator())  // replaced on hybrid switch
     private val panelScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var currentRoot: String = currentPath
 
@@ -395,20 +399,8 @@ class QuickOpenPanel(
             )
         }
 
-        // Start background enumeration; onUpdate fires on background thread — dispatch to EDT
-        candidatePool.refreshAsync(currentPath) {
-            ApplicationManager.getApplication().invokeLater({
-                if (candidatePool.isTruncated) {
-                    val cap = try { QuickOpenSettings.getInstance().state.maxIndexSize } catch (_: Exception) { 50_000 }
-                    truncationLabel.text = "\u26a0 Index truncated at $cap files. Narrow your root."
-                    truncationLabel.isVisible = true
-                } else {
-                    truncationLabel.isVisible = false
-                }
-                scheduleSearch()
-                updateStatusBar()
-            }, ModalityState.any())
-        }
+        // Start background enumeration; hybrid mode selection picks VfsEnumerator or LuceneEnumerator
+        selectEnumeratorAndRefresh(currentPath)
 
         // Pre-populate from editor cursor (Jump From Editor feature)
         if (initialQuery.isNotBlank()) {
@@ -420,6 +412,67 @@ class QuickOpenPanel(
 
         scheduleSearch()
         updateStatusBar()
+    }
+
+    // ─── Hybrid mode enumerator selection ────────────────────────────────────
+
+    private fun selectEnumeratorAndRefresh(root: String) {
+        val settings = try { QuickOpenSettings.getInstance().state } catch (_: Exception) { null } ?: return
+        val threshold = settings.luceneHybridThreshold
+
+        // Check if an index is already ready for this root
+        val existingManager = IndexRegistry.getManager(root)
+        if (existingManager != null) {
+            // Index ready: use Lucene enumerator
+            candidatePool.cancel()
+            candidatePool = CandidatePool(LuceneEnumerator(existingManager))
+            candidatePool.refreshAsync(root) {
+                ApplicationManager.getApplication().invokeLater({
+                    scheduleSearch()
+                    updateStatusBar()
+                }, ModalityState.any())
+            }
+            return
+        }
+
+        // Count files to determine mode (run on background thread, do NOT block EDT)
+        panelScope.launch(Dispatchers.IO) {
+            val fileCount = LuceneIndexBuilder.countFiles(Paths.get(root))
+            ApplicationManager.getApplication().invokeLater({
+                if (fileCount < 0 || fileCount < threshold) {
+                    // Live mode: use existing candidatePool with VfsEnumerator (or RipgrepEnumerator)
+                    // No change — the candidatePool already uses VfsEnumerator
+                    candidatePool.refreshAsync(root) {
+                        ApplicationManager.getApplication().invokeLater({
+                            scheduleSearch()
+                            updateStatusBar()
+                        }, ModalityState.any())
+                    }
+                } else {
+                    // Above threshold: start background index build; use live ripgrep while building
+                    candidatePool.refreshAsync(root) {
+                        ApplicationManager.getApplication().invokeLater({
+                            scheduleSearch()
+                            updateStatusBar()
+                        }, ModalityState.any())
+                    }
+                    // Trigger index build; onIndexReady callback will switch to LuceneEnumerator
+                    IndexRegistry.getOrBuild(root, settings) {
+                        ApplicationManager.getApplication().invokeLater({
+                            val mgr = IndexRegistry.getManager(root) ?: return@invokeLater
+                            candidatePool.cancel()
+                            candidatePool = CandidatePool(LuceneEnumerator(mgr))
+                            candidatePool.refreshAsync(root) {
+                                ApplicationManager.getApplication().invokeLater({
+                                    scheduleSearch()
+                                    updateStatusBar()
+                                }, ModalityState.any())
+                            }
+                        }, ModalityState.any())
+                    }
+                }
+            }, ModalityState.any())
+        }
     }
 
     // ─── Status bar ───────────────────────────────────────────────────────────
@@ -440,12 +493,7 @@ class QuickOpenPanel(
             if (files.isNotEmpty()) {
                 currentRoot = files.first().path
                 updateStatusBar()
-                candidatePool.refreshAsync(currentRoot) {
-                    ApplicationManager.getApplication().invokeLater({
-                        scheduleSearch()
-                        updateStatusBar()
-                    }, ModalityState.any())
-                }
+                selectEnumeratorAndRefresh(currentRoot)
             }
         }
     }
