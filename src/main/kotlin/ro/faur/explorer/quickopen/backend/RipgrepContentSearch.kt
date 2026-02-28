@@ -60,6 +60,21 @@ class RipgrepContentSearch(
     companion object {
         private val LOG = Logger.getInstance(RipgrepContentSearch::class.java)
         const val DEFAULT_MAX_CONTENT_RESULTS = 200
+
+        private val ALLOWED_FLAGS = setOf("--hidden", "--no-ignore", "--follow")
+        private val ALLOWED_PREFIXES = setOf("--type", "--glob")
+    }
+
+    private fun validateExtraFlags(flags: String): List<String> {
+        if (flags.isBlank()) return emptyList()
+        return flags.trim().split("\\s+".toRegex()).filter { token ->
+            when {
+                token.isBlank() -> false
+                token in ALLOWED_FLAGS -> true
+                ALLOWED_PREFIXES.any { token.startsWith(it) } -> true
+                else -> false
+            }
+        }
     }
 
     fun search(pattern: String): Flow<ContentMatch> = flow {
@@ -74,7 +89,7 @@ class RipgrepContentSearch(
         val depth = s?.ripgrepMaxDepth ?: 0
         if (depth > 0) { cmd.add("--max-depth"); cmd.add(depth.toString()) }
         val extra = s?.ripgrepExtraFlags?.trim() ?: ""
-        if (extra.isNotBlank()) cmd.addAll(extra.split("\\s+".toRegex()))
+        cmd.addAll(validateExtraFlags(extra))
         cmd.add(pattern)
         cmd.add(scope)
 
