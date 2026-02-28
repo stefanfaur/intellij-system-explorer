@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T12:27:58.605Z"
+last_updated: "2026-02-28T12:29:38.813Z"
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 8
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 2 of 7 (Pre-commit Diff Viewer)
-Plan: 1 of 3 in current phase
-Status: Plan 02-01 complete
-Last activity: 2026-02-28 — Completed plan 02-01 (getHeadContent on GitBackend, LocalGitBackend, RemoteGitBackend)
+Phase: 7 of 7 (Polish QuickOpen Smart Search)
+Plan: 2 of ? in current phase
+Status: Plan 07-02 complete
+Last activity: 2026-02-28 — Completed plan 07-02 (panelScope coroutine scope fix, dual-debounce, content match line navigation)
 
 Progress: [███░░░░░░░] 25%
 
@@ -49,6 +49,7 @@ Progress: [███░░░░░░░] 25%
 *Updated after each plan completion*
 | Phase 07-polish-quickopen-smart-search P01 | 2 | 3 tasks | 3 files |
 | Phase 02-pre-commit-diff-viewer P01 | 5 | 2 tasks | 3 files |
+| Phase 07 P02 | 4 | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,9 @@ Recent decisions affecting current work:
 - [Phase 07-01]: popup changed from lateinit to JBPopup? = null with ?. safe-call on all 4 callsites
 - [Phase 07-01]: Nucleo native library committed to src/main/resources/natives/darwin-aarch64/ for JAR packaging without requiring Rust toolchain
 - [Phase 02-01]: LocalGitBackend uses git show HEAD:path; RemoteGitBackend uses git show :path (index proxy); null return is the contract for untracked/new files
+- [Phase 07-02]: panelScope uses SupervisorJob so child coroutine failures do not cancel sibling coroutines
+- [Phase 07-02]: 50ms debounce for fuzzy search; 300ms for rg content search
+- [Phase 07-02]: OpenFileDescriptor with lineNumber - 1 (0-based) for line-precise content match navigation
 
 ### Roadmap Evolution
 
@@ -87,5 +91,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 02-01-PLAN.md — getHeadContent on GitBackend interface, LocalGitBackend (git show HEAD:path), RemoteGitBackend (git show :path index proxy)
+Stopped at: Completed 07-02-PLAN.md — coroutine scope leak fix, 50ms/300ms dual-debounce, content match line-precise navigation
 Resume file: None
