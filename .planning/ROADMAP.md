@@ -12,7 +12,7 @@ This roadmap delivers the current milestone on an existing IntelliJ Platform plu
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: GitBackend Extensions + Pull** - Extend GitBackend interface with all new Git operations and wire pull into the Git panel toolbar
+- [x] **Phase 1: GitBackend Extensions + Pull** - Extend GitBackend interface with all new Git operations and wire pull into the Git panel toolbar (completed 2026-02-28)
 - [ ] **Phase 2: Pre-Commit Diff Viewer** - Embed inline diff in Git panel for selected staged files and provide full-window diff popup
 - [ ] **Phase 3: Drag and Drop Polish** - Fix DnD reliability with drop highlighting, auto-scroll, ghost image, and VFS refresh
 - [ ] **Phase 4: File Tree and Context Menu Polish** - Correct icon rendering, VCS color coding, expand/collapse glitches, and complete context menu actions
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. GitBackend Extensions + Pull | 1/2 | In Progress|  |
+| 1. GitBackend Extensions + Pull | 2/2 | Complete   | 2026-02-28 |
 | 2. Pre-Commit Diff Viewer | 0/? | Not started | - |
 | 3. Drag and Drop Polish | 0/? | Not started | - |
 | 4. File Tree and Context Menu Polish | 0/? | Not started | - |
