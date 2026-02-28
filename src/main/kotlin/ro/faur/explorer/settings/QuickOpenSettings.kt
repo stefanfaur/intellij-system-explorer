@@ -34,6 +34,11 @@ class QuickOpenSettings : PersistentStateComponent<QuickOpenSettings.State> {
         var frecencyHalfLifeHours: Double = 24.0,
         var frecencyRecencyWeight: Int = 60,   // 0–100; freq weight = 100 - this, then scaled
         var showScorerDebug: Boolean = false,
+        // === Phase 8: Lucene hybrid index ===
+        var luceneHybridThreshold: Int = 5_000,
+        var luceneExtensionAllowlist: String = "kt,java,py,ts,tsx,js,jsx,go,rs,rb,c,cpp,h,cs,swift,md,txt,adoc,yaml,yml,json,toml,xml,gradle,properties,sh,env",
+        var luceneMaxIndexSizeMb: Int = 500,
+        var luceneEvictionDays: Int = 30,
     )
 
     private var myState = State()
