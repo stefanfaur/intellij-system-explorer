@@ -128,7 +128,7 @@ class QuickOpenPanel(
             selectedId = candidate.id
             FrecencyStore.getInstance().recordVisit(candidate.fullPath)
             onSelected(candidate)
-            popup.closeOk(null)
+            popup?.closeOk(null)
         },
         onEscapeUp = { searchField.requestFocus() },
     )
@@ -146,7 +146,7 @@ class QuickOpenPanel(
     private val recentQueries = mutableListOf<String>()
     private var recentQueryIndex = -1
 
-    lateinit var popup: JBPopup  // set by QuickOpenPopup after creation
+    var popup: JBPopup? = null  // set by QuickOpenPopup after creation
 
     init {
         val statusPanel = JPanel(BorderLayout()).apply {
@@ -635,7 +635,7 @@ class QuickOpenPanel(
             FrecencyStore.getInstance().recordVisit(candidate.fullPath)
         }
         selected.forEach { onSelected(it) }
-        popup.closeOk(null)
+        popup?.closeOk(null)
     }
 
     private fun activateAtIndex(index: Int) {
@@ -798,7 +798,7 @@ class QuickOpenPanel(
                 when (value) {
                     "Navigate Explorer" -> {
                         onSelected(candidate)
-                        popup.closeOk(null)
+                        popup?.closeOk(null)
                     }
                     "Open in Editor" -> {
                         val vf = LocalFileSystem.getInstance().findFileByPath(candidate.fullPath)
@@ -806,7 +806,7 @@ class QuickOpenPanel(
                             NonProjectFileWritingAccessProvider.allowWriting(listOf(vf))
                             FileEditorManager.getInstance(project).openFile(vf, true)
                         }
-                        popup.closeOk(null)
+                        popup?.closeOk(null)
                     }
                     "Reveal in Finder" -> revealInFinder()
                     "Open in Terminal" -> openInTerminal(candidate.fullPath)
