@@ -64,6 +64,11 @@ class LocalGitBackend(override val repoPath: String) : GitBackend {
         return if (result.isSuccess) result.stdout.toByteArray(Charsets.UTF_8) else null
     }
 
+    override fun getFileAtRevision(hash: String, path: String): ByteArray? {
+        val result = executor.executeBlocking(repoPath, args = arrayOf("show", "$hash:$path"))
+        return if (result.isSuccess) result.stdout.toByteArray(Charsets.UTF_8) else null
+    }
+
     override fun stageFiles(paths: List<String>): GitCommandResult {
         if (paths.isEmpty()) return GitCommandResult(0, "", "")
         return executor.executeBlocking(
