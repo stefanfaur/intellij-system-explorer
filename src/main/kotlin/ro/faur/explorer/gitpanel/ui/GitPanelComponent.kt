@@ -12,6 +12,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
@@ -41,6 +43,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     }
 
     @Volatile private var disposed = false
+    @Volatile private var pullInProgress = false
 
     // ── State ──────────────────────────────────────────────────────────────
     private var selectedBackend: GitBackend? = null
@@ -108,6 +111,18 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
             override fun getActionUpdateThread() = ActionUpdateThread.BGT
             override fun actionPerformed(e: AnActionEvent) { reloadData() }
         })
+        group.add(object : AnAction("Pull", "Pull current branch from remote", AllIcons.Vcs.Fetch) {
+            override fun getActionUpdateThread() = ActionUpdateThread.BGT
+            override fun actionPerformed(e: AnActionEvent) { doPull() }
+            override fun update(e: AnActionEvent) {
+                e.presentation.isEnabled = selectedBackend != null && !pullInProgress
+            }
+        })
+        group.add(object : AnAction("Push", "Push current branch to remote", AllIcons.Actions.Upload) {
+            override fun getActionUpdateThread() = ActionUpdateThread.BGT
+            override fun actionPerformed(e: AnActionEvent) { doPush() }
+            override fun update(e: AnActionEvent) { e.presentation.isEnabled = selectedBackend != null }
+        })
         group.add(object : AnAction("Add Local Repo", "Add a local git repository", AllIcons.General.Add) {
             override fun getActionUpdateThread() = ActionUpdateThread.BGT
             override fun actionPerformed(e: AnActionEvent) { addLocalRepo() }
@@ -115,11 +130,6 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         group.add(object : AnAction("Remove Repo", "Remove selected repository", AllIcons.General.Remove) {
             override fun getActionUpdateThread() = ActionUpdateThread.BGT
             override fun actionPerformed(e: AnActionEvent) { removeSelectedRepo() }
-            override fun update(e: AnActionEvent) { e.presentation.isEnabled = selectedBackend != null }
-        })
-        group.add(object : AnAction("Push", "Push current branch to remote", AllIcons.Actions.Upload) {
-            override fun getActionUpdateThread() = ActionUpdateThread.BGT
-            override fun actionPerformed(e: AnActionEvent) { doPush() }
             override fun update(e: AnActionEvent) { e.presentation.isEnabled = selectedBackend != null }
         })
 
@@ -409,6 +419,46 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
                 }
             }
         }
+    }
+
+    private fun doPull() {
+        val backend = selectedBackend ?: return
+        if (pullInProgress) return
+        pullInProgress = true
+
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Pulling\u2026", false) {
+            override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
+                val result = backend.pull()
+                ApplicationManager.getApplication().invokeLater {
+                    pullInProgress = false   // ALWAYS reset before disposed check
+                    if (disposed) return@invokeLater
+                    when {
+                        !result.isSuccess -> {
+                            Notifications.Bus.notify(
+                                Notification(
+                                    "SystemExplorer",
+                                    "Pull Failed",
+                                    result.stderr.takeLast(300).ifBlank { "Unknown error" },
+                                    NotificationType.ERROR
+                                ), project
+                            )
+                        }
+                        result.stdout.contains("CONFLICT") -> {
+                            Notifications.Bus.notify(
+                                Notification(
+                                    "SystemExplorer",
+                                    "Pull Conflicts",
+                                    "Pull resulted in conflicts \u2014 resolve the marked files",
+                                    NotificationType.WARNING
+                                ), project
+                            )
+                            reloadData()
+                        }
+                        else -> reloadData()
+                    }
+                }
+            }
+        })
     }
 
     // ── Disposable ────────────────────────────────────────────────────────────
