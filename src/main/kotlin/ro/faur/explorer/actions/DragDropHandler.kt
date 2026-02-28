@@ -5,8 +5,12 @@ import com.intellij.ide.dnd.DnDEvent
 import com.intellij.ide.dnd.DnDNativeTarget
 import com.intellij.ide.dnd.FileFlavorProvider
 import com.intellij.ide.dnd.TransferableWrapper
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
@@ -144,6 +148,19 @@ class DragDropHandler(
     fun performDrop(files: List<VirtualFile>, targetDir: VirtualFile, isMove: Boolean) {
         for (file in files) {
             if (file.parent == targetDir) continue
+            val existing = targetDir.findChild(file.name)
+            if (existing != null) {
+                val result = Messages.showYesNoDialog(
+                    project,
+                    "'${file.name}' already exists in '${targetDir.name}'. Replace it?",
+                    "Confirm Replace",
+                    "Replace", "Skip",
+                    Messages.getWarningIcon()
+                )
+                if (result != Messages.YES) continue
+                ApplicationManager.getApplication()
+                    .runWriteAction { existing.delete(this) }
+            }
             try {
                 if (isMove) {
                     FileActions.moveTo(file, targetDir)
@@ -153,8 +170,16 @@ class DragDropHandler(
             } catch (e: Exception) {
                 val action = if (isMove) "move" else "copy"
                 LOG.warn("Failed to $action '${file.name}' to '${targetDir.path}': ${e.message}", e)
+                notifyError("Failed to $action '${file.name}': ${e.message}")
             }
         }
+    }
+
+    private fun notifyError(message: String) {
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup("Explorer.DnD")
+            .createNotification(message, NotificationType.WARNING)
+            .notify(project)
     }
 
     /**
