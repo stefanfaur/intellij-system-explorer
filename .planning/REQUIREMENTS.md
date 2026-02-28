@@ -7,12 +7,12 @@
 
 ### Drag & Drop
 
-- [ ] **DND-01**: User can drag a file from the explorer tree and drop it into IntelliJ's project view without conflict or silent failure
-- [ ] **DND-02**: User sees a drop-target highlight row when dragging over a valid directory in the explorer
-- [ ] **DND-03**: Tree auto-scrolls when user drags near the top or bottom edge
-- [ ] **DND-04**: User sees a ghost drag image representing the dragged file(s) during the drag gesture
-- [ ] **DND-05**: Dropping a file onto another file targets the parent directory (not the file itself)
-- [ ] **DND-06**: VFS is refreshed in both source and destination directories after a drag-move completes
+- [x] **DND-01**: User can drag a file from the explorer tree and drop it into IntelliJ's project view without conflict or silent failure
+- [x] **DND-02**: User sees a drop-target highlight row when dragging over a valid directory in the explorer
+- [x] **DND-03**: Tree auto-scrolls when user drags near the top or bottom edge
+- [x] **DND-04**: User sees a ghost drag image representing the dragged file(s) during the drag gesture
+- [x] **DND-05**: Dropping a file onto another file targets the parent directory (not the file itself)
+- [x] **DND-06**: VFS is refreshed in both source and destination directories after a drag-move completes
 
 ### File Tree Rendering
 
@@ -93,12 +93,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DND-01 | Phase 3 | Pending |
-| DND-02 | Phase 3 | Pending |
-| DND-03 | Phase 3 | Pending |
-| DND-04 | Phase 3 | Pending |
-| DND-05 | Phase 3 | Pending |
-| DND-06 | Phase 3 | Pending |
+| DND-01 | Phase 3 | Complete |
+| DND-02 | Phase 3 | Complete |
+| DND-03 | Phase 3 | Complete |
+| DND-04 | Phase 3 | Complete |
+| DND-05 | Phase 3 | Complete |
+| DND-06 | Phase 3 | Complete |
 | TREE-01 | Phase 4 | Pending |
 | TREE-02 | Phase 4 | Pending |
 | TREE-03 | Phase 4 | Pending |

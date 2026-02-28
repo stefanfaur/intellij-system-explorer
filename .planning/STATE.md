@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T19:01:00.848Z"
+last_updated: "2026-02-28T19:07:43.152Z"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 17
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 ## Current Position
 
 Phase: 3 of 8 (Drag-and-Drop Polish)
-Plan: 1 of 3 in current phase
-Status: Plan 03-01 complete — drop-row hover highlight and VFS source-parent refresh on move delivered
-Last activity: 2026-02-28 — Completed plan 03-01 (dnd.hoveredRow client property tracking, VirtualFileCellRenderer highlight, DND-06 source refresh)
+Plan: 2 of 3 in current phase
+Status: Plan 03-02 complete — ghost drag image, conflict pre-check dialogs, balloon notifications for DnD errors delivered
+Last activity: 2026-02-28 — Completed plan 03-02 (buildGhostImage in FileTreeTransferHandler, conflict pre-check in both DnD paths, Explorer.DnD notification group)
 
 Progress: [███░░░░░░░] 25%
 
@@ -59,6 +59,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 08 P04 | 7 | 2 tasks | 3 files |
 | Phase 08 P06 | 2 | 1 tasks | 1 files |
 | Phase 03 P01 | 4 | 2 tasks | 2 files |
+| Phase 03 P02 | 8 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Recent decisions affecting current work:
 - [Phase 08-06]: indexModeChipLabel is separate from modeChipLabel — placed in bottomRow EAST for index state; three states Indexed/Indexing.../Live from IndexRegistry
 - [Phase 03]: RenderingUtil is at com.intellij.ui.render.RenderingUtil (not com.intellij.ui.RenderingUtil) in IJ 2024.3+
 - [Phase 03]: Source-parent refresh only runs when isMove=true — copy operations do not need to invalidate the source directory
+- [Phase 03]: AllIcons.Nodes.MultipleFiles does not exist in IJ 2024.3 — AllIcons.FileTypes.Any_type used as multi-file ghost icon fallback
+- [Phase 03]: Messages.showYesNoDialog in FileTreeTransferHandler uses null Project (no project reference available in TransferHandler)
 
 ### Roadmap Evolution
 
