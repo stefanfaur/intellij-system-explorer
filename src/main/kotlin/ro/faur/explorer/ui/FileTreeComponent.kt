@@ -201,7 +201,20 @@ class FileTreeComponent(private val project: Project) : Disposable {
                 }
             }
 
-            override fun treeWillCollapse(event: TreeExpansionEvent) {}
+            override fun treeWillCollapse(event: TreeExpansionEvent) {
+                val node = event.path.lastPathComponent as? DefaultMutableTreeNode ?: return
+                val file = node.userObject as? VirtualFile ?: return
+                if (!file.isDirectory) return
+                // Restore "loading..." placeholder so treeWillExpand guard fires correctly on re-expansion.
+                // invokeLater defers the model change until after Swing's collapse processing completes,
+                // avoiding ConcurrentModificationException and visual artifacts.
+                ApplicationManager.getApplication().invokeLater {
+                    if (isDisposed) return@invokeLater
+                    node.removeAllChildren()
+                    node.add(DefaultMutableTreeNode("loading..."))
+                    treeModel.nodeStructureChanged(node)
+                }
+            }
         }
         tree.addTreeWillExpandListener(expandListener)
 
