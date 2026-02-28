@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileEditor.impl.NonProjectFileWritingAccessProvider
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbAwareAction
@@ -630,6 +631,14 @@ class QuickOpenPanel(
 
     // ─── Actions ──────────────────────────────────────────────────────────────
 
+    private fun openContentMatchAtLine(candidate: SearchCandidate) {
+        val lineNumber = candidate.id.substringAfterLast(':').toIntOrNull() ?: 1
+        val vf = LocalFileSystem.getInstance().findFileByPath(candidate.fullPath) ?: return
+        NonProjectFileWritingAccessProvider.allowWriting(listOf(vf))
+        OpenFileDescriptor(project, vf, lineNumber - 1, 0).navigate(true)
+        popup?.closeOk(null)
+    }
+
     private fun activateSelected() {
         val selected = resultList.selectedValuesList
             .mapNotNull { it?.scored?.candidate }
@@ -639,7 +648,14 @@ class QuickOpenPanel(
             selectedId = candidate.id
             FrecencyStore.getInstance().recordVisit(candidate.fullPath)
         }
-        selected.forEach { onSelected(it) }
+        // Handle CONTENT_MATCH differently — open at exact line
+        val contentMatches = selected.filter { it.type == CandidateType.CONTENT_MATCH }
+        val otherSelected = selected.filter { it.type != CandidateType.CONTENT_MATCH }
+        if (contentMatches.isNotEmpty()) {
+            openContentMatchAtLine(contentMatches.first())
+            return  // popup already closed in openContentMatchAtLine
+        }
+        otherSelected.forEach { onSelected(it) }
         popup?.closeOk(null)
     }
 
