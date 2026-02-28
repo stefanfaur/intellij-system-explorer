@@ -50,7 +50,8 @@ Remote (SFTP) roots are out of scope — index is local-only.
 - Multiple roots can be indexed concurrently in the background
 
 ### Index Storage
-- Location: `PathManager.getPluginTempPath() / "explorer-index" / {sha256(rootPath)}`
+- Location: `PathManager.getSystemPath() / "caches" / "explorer-index" / {sha256(rootPath)}`
+- **Note:** The original discussion specified `PathManager.getPluginTempPath()`, but planning research determined that `getPluginTempPath()` is cleared on IDE restart, which defeats the purpose of a persistent index. `getSystemPath()/caches/` is the correct IntelliJ convention for plugin-owned persistent caches (same location used by the IDE's own Lucene indexes). This override is intentional and documented here.
 - **Max size per root**: 500MB (configurable). If exceeded, stop indexing content bodies but continue indexing paths only
 - **LRU eviction**: roots not opened in 30 days have their index automatically deleted
 - A "Clear Index" action available in Settings for manual cleanup
