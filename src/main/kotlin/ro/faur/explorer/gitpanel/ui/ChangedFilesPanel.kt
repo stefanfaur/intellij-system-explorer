@@ -29,6 +29,12 @@ class ChangedFilesPanel : JPanel(BorderLayout()) {
     // Tracks checked state by file path. Rebuilt on every setFiles() call.
     private val checkedPaths = mutableSetOf<String>()
 
+    /** Invoked on the EDT whenever the list selection changes. Null = deselected. */
+    var onFileSelected: ((CommitFile?) -> Unit)? = null
+
+    /** Invoked on the EDT when the user double-clicks a file row (any mode). */
+    var onFileDoubleClicked: ((CommitFile) -> Unit)? = null
+
     // ── Header row with Select All / None toggle ──────────────────────────────
 
     private val selectAllLabel = JLabel("☑ All").apply {
@@ -53,12 +59,27 @@ class ChangedFilesPanel : JPanel(BorderLayout()) {
     }
 
     init {
-        // Toggle checkbox when clicking anywhere on the row
+        // Notify selection changes
+        list.addListSelectionListener { e ->
+            if (e.valueIsAdjusting) return@addListSelectionListener
+            val selected = list.selectedValue
+            onFileSelected?.invoke(selected)
+        }
+
+        // Toggle checkbox on single click (staging mode) and open full diff on double click (any mode)
         list.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
-                if (!stagingMode) return
                 val idx = list.locationToIndex(e.point)
                 if (idx < 0) return
+
+                if (e.clickCount == 2) {
+                    val file = listModel.getElementAt(idx)
+                    onFileDoubleClicked?.invoke(file)
+                    return
+                }
+
+                // Single click: checkbox toggle in staging mode
+                if (!stagingMode) return
                 val file = listModel.getElementAt(idx)
                 if (file.status == GitFileStatus.UNMERGED || file.status == GitFileStatus.IGNORED) return
                 if (checkedPaths.contains(file.path)) checkedPaths.remove(file.path)
