@@ -8,6 +8,9 @@ import ro.faur.explorer.quickopen.model.CandidateType
 import javax.swing.JList
 
 class SearchResultRenderer : ColoredListCellRenderer<SearchResult>() {
+
+    var currentQuery: String = ""  // set by QuickOpenPanel before each list update
+
     override fun customizeCellRenderer(
         list: JList<out SearchResult>,
         value: SearchResult?,
@@ -62,9 +65,23 @@ class SearchResultRenderer : ColoredListCellRenderer<SearchResult>() {
             append(candidate.displayName, SimpleTextAttributes.REGULAR_ATTRIBUTES)
         }
 
-        // Dimmed parent path
+        // Parent path with optional query substring highlighting
         if (candidate.parentPath.isNotBlank()) {
-            append("  ${candidate.parentPath}", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+            val path = "  ${candidate.parentPath}"
+            val query = currentQuery.trim().lowercase()
+            if (query.isNotBlank() && !query.startsWith("/") && !query.startsWith(":")) {
+                val pathLower = path.lowercase()
+                val idx = pathLower.indexOf(query)
+                if (idx >= 0) {
+                    if (idx > 0) append(path.substring(0, idx), SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    append(path.substring(idx, idx + query.length), SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+                    if (idx + query.length < path.length) append(path.substring(idx + query.length), SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                } else {
+                    append(path, SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                }
+            } else {
+                append(path, SimpleTextAttributes.GRAYED_ATTRIBUTES)
+            }
         }
 
         // Badges
