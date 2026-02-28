@@ -131,6 +131,11 @@ class QuickOpenPanel(
         foreground = java.awt.Color(0x6897BB)
     }
 
+    private val indexModeChipLabel = JBLabel("").apply {
+        font = font.deriveFont(java.awt.Font.BOLD, 11f)
+        border = javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 6)
+    }
+
     private val hintLabel = JBLabel(
         "↩ navigate · Tab preview · ⌘D bookmark · Ctrl+R recent · Esc close"
     ).apply {
@@ -184,6 +189,7 @@ class QuickOpenPanel(
             }
             val bottomRow = JPanel(BorderLayout()).apply {
                 add(rankerStatusLabel, BorderLayout.CENTER)
+                add(indexModeChipLabel, BorderLayout.EAST)
             }
             add(topRow)
             add(bottomRow)
@@ -484,6 +490,18 @@ class QuickOpenPanel(
         val rootDisplay = currentRoot.replace(System.getProperty("user.home"), "~")
         val count = candidatePool.getCandidates().size
         rankerStatusLabel.text = "Fuzzy: $rankerLabel · Root: $rootDisplay · ${"%,d".format(count)} files"
+        // Index mode chip
+        val mode = when {
+            IndexRegistry.getManager(currentRoot) != null -> "Indexed"
+            IndexRegistry.isBuilding(currentRoot) -> "Indexing..."
+            else -> "Live"
+        }
+        indexModeChipLabel.text = "  [$mode]  "
+        indexModeChipLabel.foreground = when (mode) {
+            "Indexed"     -> java.awt.Color(0x59A869)  // green — index active
+            "Indexing..." -> java.awt.Color(0xF0A30A)  // amber — building
+            else          -> java.awt.Color.GRAY        // gray — live mode
+        }
     }
 
     private fun openRootPicker() {
