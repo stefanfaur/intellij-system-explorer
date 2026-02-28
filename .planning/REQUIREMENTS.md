@@ -38,9 +38,9 @@
 
 ### Git Core
 
-- [ ] **GIT-01**: User can trigger a "Pull" action from the Git panel toolbar that pulls the current branch from remote
+- [x] **GIT-01**: User can trigger a "Pull" action from the Git panel toolbar that pulls the current branch from remote
 - [ ] **GIT-02**: Pull operation runs in the background and shows progress; does not freeze the IDE
-- [ ] **GIT-03**: Pull result (success, conflicts, error) is surfaced to the user in the Git panel status area
+- [x] **GIT-03**: Pull result (success, conflicts, error) is surfaced to the user in the Git panel status area
 
 ### Branch Management
 
@@ -112,9 +112,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DIFF-03 | Phase 2 | Pending |
 | DIFF-04 | Phase 2 | Pending |
 | DIFF-05 | Phase 2 | Pending |
-| GIT-01 | Phase 1 | Pending |
+| GIT-01 | Phase 1 | Complete |
 | GIT-02 | Phase 1 | Pending |
-| GIT-03 | Phase 1 | Pending |
+| GIT-03 | Phase 1 | Complete |
 | BRANCH-01 | Phase 5 | Pending |
 | BRANCH-02 | Phase 5 | Pending |
 | BRANCH-03 | Phase 5 | Pending |

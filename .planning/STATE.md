@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 ## Current Position
 
 Phase: 1 of 6 (GitBackend Extensions + Pull)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-02-28 — Roadmap created, all 32 v1 requirements mapped across 6 phases
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-28 — Completed plan 01-01 (GitBackend interface extensions + implementations)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 8%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: 2 min
+- Total execution time: 2 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-gitbackend-extensions-pull | 1 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: none yet
+- Last 5 plans: 01-01 (2 min)
 - Trend: -
 
 *Updated after each plan completion*
@@ -45,6 +45,12 @@ Recent decisions affecting current work:
 - Architecture: TransferHandler for drag-out, DnDNativeTarget for drops — do not mix the two DnD systems
 - Architecture: Use com.intellij.diff.* exclusively (not deprecated com.intellij.openapi.diff.*)
 - Architecture: All Git CLI calls must run off EDT via executeOnPooledThread or Task.Backgroundable
+- 01-01: parseBranchLine/parseStashLine are package-internal functions in LocalGitBackend.kt, visible to RemoteGitBackend via same-package access
+- 01-01: RemoteGitBackend uses LOG.warn for list methods on failure, returns result directly for command methods (matching existing getLog() pattern)
+
+### Roadmap Evolution
+
+- Phase 7 added: Polish, improve quick open / smart search
 
 ### Pending Todos
 
@@ -59,5 +65,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Roadmap written, STATE.md initialized — ready to begin Phase 1 planning
+Stopped at: Completed 01-01-PLAN.md — GitBackend interface extensions and implementations
 Resume file: None
