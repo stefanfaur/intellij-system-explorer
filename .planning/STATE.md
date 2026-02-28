@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T14:08:11.745Z"
+last_updated: "2026-02-28T14:20:14.185Z"
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 3
-  total_plans: 15
-  completed_plans: 11
+  total_plans: 16
+  completed_plans: 13
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 ## Current Position
 
 Phase: 8 of 8 (Intelligent Indexed Local Filesystem Search with Apache Lucene and Hybrid Mode)
-Plan: 2 of 6 in current phase
-Status: Plan 08-02 complete — Lucene settings fields and UI group added
-Last activity: 2026-02-28 — Completed plan 08-02 (Lucene settings fields on QuickOpenSettings.State + Lucene Index settings UI group)
+Plan: 4 of 6 in current phase
+Status: Plan 08-04 complete — LuceneEnumerator, IndexRegistry, and hybrid mode wiring in QuickOpenPanel
+Last activity: 2026-02-28 — Completed plan 08-04 (LuceneEnumerator as EnumeratorBackend drop-in, IndexRegistry singleton, hybrid mode selection in QuickOpenPanel)
 
 Progress: [███░░░░░░░] 25%
 
@@ -56,6 +56,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02-pre-commit-diff-viewer P04 | 2 | 2 tasks | 4 files |
 | Phase 08 P02 | 2 | 2 tasks | 2 files |
 | Phase 08-01 P01 | 15 | 2 tasks | 3 files |
+| Phase 08 P04 | 7 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,8 @@ Recent decisions affecting current work:
 - [Phase 08]: NIOFSDirectory used instead of FSDirectory.open() to prevent MMapDirectory file handle leaks on plugin unload
 - [Phase 08]: indexDirForRoot uses PathManager.getSystemPath() so Lucene index survives IDE restarts (not getPluginTempPath())
 - [Phase 08]: searchPaths blank query uses MatchAllDocsQuery — WildcardQuery on empty string returns no results
+- [Phase 08-04]: candidatePool changed to var to allow runtime replacement when switching to LuceneEnumerator on hybrid threshold crossing
+- [Phase 08-04]: IndexRegistry is a Kotlin object singleton with independent registryScope not cancelled on panel dispose
 
 ### Roadmap Evolution
 
@@ -112,5 +115,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 08-01-PLAN.md — Lucene 9.12.3 bundled, LuceneIndexManager implemented with 7 passing tests
+Stopped at: Completed 08-04-PLAN.md — LuceneEnumerator, IndexRegistry, and hybrid mode wiring in QuickOpenPanel
 Resume file: None
