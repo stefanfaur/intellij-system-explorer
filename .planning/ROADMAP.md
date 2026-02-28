@@ -123,6 +123,21 @@ Plans:
 - [ ] 07-02-PLAN.md — Coroutine scope fix + dual-debounce + rg match line navigation (wave 1)
 - [ ] 07-03-PLAN.md — Status bar + speed dial frecency + hint bar + path highlighting (wave 2)
 
+### Phase 8: Intelligent Indexed Local Filesystem Search with Apache Lucene and Hybrid Mode
+
+**Goal:** Replace the in-memory CandidatePool with a persistent Lucene index for large roots; hybrid mode auto-selects between index-backed recall and live ripgrep based on directory file count
+**Requirements**: TBD
+**Depends on:** Phase 7
+**Plans:** 6 plans in 4 waves
+
+Plans:
+- [ ] 08-01-PLAN.md — Lucene 9.12.3 dependency + LuceneIndexManager (write, search, corrupt-recovery) (wave 1)
+- [ ] 08-02-PLAN.md — QuickOpenSettings extension (4 new fields) + Lucene Index settings UI group (wave 1)
+- [ ] 08-03-PLAN.md — LuceneIndexBuilder (walkFileTree initial build) + WatchService incremental daemon (wave 2)
+- [ ] 08-04-PLAN.md — LuceneEnumerator + IndexRegistry singleton + QuickOpenPanel hybrid mode selection (wave 3)
+- [ ] 08-05-PLAN.md — LuceneContentSearch + performContentSearch() parallel Lucene+rg merge (wave 3)
+- [ ] 08-06-PLAN.md — Status bar mode chip (Indexed / Indexing... / Live) + human verify checkpoint (wave 4)
+
 ## Progress
 
 **Execution Order:**
@@ -138,13 +153,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 5. Branch Management | 0/? | Not started | - |
 | 6. Stash UI | 0/? | Not started | - |
 | 7. Polish, improve quick open / smart search | 3/3 | Complete   | 2026-02-28 |
-
-### Phase 8: Intelligent Indexed Local Filesystem Search with Apache Lucene and Hybrid Mode
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 7
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 8 to break down)
+| 8. Intelligent Indexed Local Filesystem Search | 0/6 | Not started | - |
