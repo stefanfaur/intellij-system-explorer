@@ -24,6 +24,8 @@ import com.intellij.util.concurrency.annotations.RequiresEdt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
@@ -70,6 +72,7 @@ class QuickOpenPanel(
     private val textScorer = MinusculeMatcherRanker()
     private val ranker = Ranker(textScorer)
     private val candidatePool = CandidatePool(VfsEnumerator())
+    private val panelScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     companion object {
         private const val MAX_CONTENT_RESULTS = 200
@@ -512,7 +515,7 @@ class QuickOpenPanel(
         return try {
             val matches = mutableListOf<ro.faur.explorer.quickopen.backend.ContentMatch>()
             val latch = CountDownLatch(1)
-            CoroutineScope(Dispatchers.IO + Job()).launch {
+            panelScope.launch {
                 try {
                     RipgrepContentSearch(rgPath, searchScope).search(pattern)
                         .take(MAX_CONTENT_RESULTS)
@@ -832,5 +835,6 @@ class QuickOpenPanel(
         candidatePool.cancel()
         pendingSearch?.cancel(true)
         searchScheduler.shutdownNow()
+        panelScope.cancel()
     }
 }
