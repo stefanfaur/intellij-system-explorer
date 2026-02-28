@@ -93,44 +93,44 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DND-01 | — | Pending |
-| DND-02 | — | Pending |
-| DND-03 | — | Pending |
-| DND-04 | — | Pending |
-| DND-05 | — | Pending |
-| DND-06 | — | Pending |
-| TREE-01 | — | Pending |
-| TREE-02 | — | Pending |
-| TREE-03 | — | Pending |
-| TREE-04 | — | Pending |
-| CTX-01 | — | Pending |
-| CTX-02 | — | Pending |
-| CTX-03 | — | Pending |
-| CTX-04 | — | Pending |
-| DIFF-01 | — | Pending |
-| DIFF-02 | — | Pending |
-| DIFF-03 | — | Pending |
-| DIFF-04 | — | Pending |
-| DIFF-05 | — | Pending |
-| GIT-01 | — | Pending |
-| GIT-02 | — | Pending |
-| GIT-03 | — | Pending |
-| BRANCH-01 | — | Pending |
-| BRANCH-02 | — | Pending |
-| BRANCH-03 | — | Pending |
-| BRANCH-04 | — | Pending |
-| BRANCH-05 | — | Pending |
-| STASH-01 | — | Pending |
-| STASH-02 | — | Pending |
-| STASH-03 | — | Pending |
-| STASH-04 | — | Pending |
-| STASH-05 | — | Pending |
+| DND-01 | Phase 3 | Pending |
+| DND-02 | Phase 3 | Pending |
+| DND-03 | Phase 3 | Pending |
+| DND-04 | Phase 3 | Pending |
+| DND-05 | Phase 3 | Pending |
+| DND-06 | Phase 3 | Pending |
+| TREE-01 | Phase 4 | Pending |
+| TREE-02 | Phase 4 | Pending |
+| TREE-03 | Phase 4 | Pending |
+| TREE-04 | Phase 4 | Pending |
+| CTX-01 | Phase 4 | Pending |
+| CTX-02 | Phase 4 | Pending |
+| CTX-03 | Phase 4 | Pending |
+| CTX-04 | Phase 4 | Pending |
+| DIFF-01 | Phase 2 | Pending |
+| DIFF-02 | Phase 2 | Pending |
+| DIFF-03 | Phase 2 | Pending |
+| DIFF-04 | Phase 2 | Pending |
+| DIFF-05 | Phase 2 | Pending |
+| GIT-01 | Phase 1 | Pending |
+| GIT-02 | Phase 1 | Pending |
+| GIT-03 | Phase 1 | Pending |
+| BRANCH-01 | Phase 5 | Pending |
+| BRANCH-02 | Phase 5 | Pending |
+| BRANCH-03 | Phase 5 | Pending |
+| BRANCH-04 | Phase 5 | Pending |
+| BRANCH-05 | Phase 5 | Pending |
+| STASH-01 | Phase 6 | Pending |
+| STASH-02 | Phase 6 | Pending |
+| STASH-03 | Phase 6 | Pending |
+| STASH-04 | Phase 6 | Pending |
+| STASH-05 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 32 total
-- Mapped to phases: 0
-- Unmapped: 32 ⚠️
+- Mapped to phases: 32
+- Unmapped: 0 (complete coverage)
 
 ---
 *Requirements defined: 2026-02-28*
-*Last updated: 2026-02-28 after initial definition*
+*Last updated: 2026-02-28 after roadmap creation*
