@@ -1,6 +1,7 @@
 package ro.faur.explorer.quickopen.ranking
 
 import ro.faur.explorer.quickopen.backend.RankerBackend
+import ro.faur.explorer.quickopen.model.CandidateType
 import ro.faur.explorer.quickopen.model.SearchCandidate
 import ro.faur.explorer.quickopen.model.ScoredCandidate
 import ro.faur.explorer.settings.QuickOpenSettings
@@ -54,12 +55,20 @@ class Ranker(private val textScorer: RankerBackend) {
                 sc.copy(score = finalScore, candidate = sc.candidate.copy(displayName = displayName))
             }
             .sortedWith(
-                compareByDescending<ScoredCandidate> { it.score }
+                compareBy<ScoredCandidate> { typeGroup(it.candidate) }
+                    .thenByDescending { it.score }
                     .thenBy { it.candidate.displayName }
                     .thenBy { it.candidate.fullPath.length }
                     .thenBy { it.candidate.fullPath }
             )
             .take(limit)
+    }
+
+    private fun typeGroup(candidate: SearchCandidate): Int = when (candidate.type) {
+        CandidateType.BOOKMARK, CandidateType.RECENT -> 0
+        CandidateType.FILE, CandidateType.OPEN_EDITOR, CandidateType.CONTENT_MATCH -> 1
+        CandidateType.DIRECTORY -> 2
+        else -> 3
     }
 
     private fun proximityScore(path: String, currentPath: String): Double {
