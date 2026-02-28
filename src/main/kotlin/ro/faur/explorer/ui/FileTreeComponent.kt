@@ -18,6 +18,7 @@ import com.intellij.util.concurrency.AppExecutorUtil
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import com.intellij.ui.ColoredTreeCellRenderer
+import com.intellij.ui.render.RenderingUtil
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.TreeSpeedSearch
 import com.intellij.ui.treeStructure.Tree
@@ -593,6 +594,13 @@ class FileTreeComponent(private val project: Project) : Disposable {
             val node = value as? DefaultMutableTreeNode
             val vf = node?.userObject as? VirtualFile
             if (vf != null) {
+                // Paint drop-hover highlight on directory rows during drag (DND-02)
+                val hoveredRow = tree.getClientProperty("dnd.hoveredRow") as? Int ?: -1
+                if (!selected && row == hoveredRow && vf.isDirectory) {
+                    background = RenderingUtil.getSelectionBackground(tree)
+                    isOpaque = true
+                }
+
                 icon = getIconForFile(vf)
 
                 // Add file permissions if enabled (right-aligned)
