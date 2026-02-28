@@ -47,6 +47,10 @@ dependencies {
     implementation("org.apache.sshd:sshd-sftp:2.17.1")
     implementation("org.apache.sshd:sshd-common:2.17.1")
 
+    // === Lucene index for QuickOpen hybrid mode ===
+    implementation("org.apache.lucene:lucene-core:9.12.3")
+    implementation("org.apache.lucene:lucene-analysis-common:9.12.3")
+
     // === Coroutine testing ===
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
 }
