@@ -33,7 +33,7 @@
 - [ ] **DIFF-01**: User can select a changed file in the Git panel staging area and see an inline pre-commit diff embedded in the panel
 - [ ] **DIFF-02**: User can trigger "Show Diff" from the Git panel to open the full-window diff frame (DiffManager popup)
 - [x] **DIFF-03**: Diff viewer displays HEAD version vs. working-tree version of the selected file
-- [ ] **DIFF-04**: User can right-click any two files in the explorer and select "Compare With..." to open a side-by-side diff
+- [x] **DIFF-04**: User can right-click any two files in the explorer and select "Compare With..." to open a side-by-side diff
 - [ ] **DIFF-05**: Diff viewer is disposed correctly when the panel is closed or a new file is selected (no memory leak)
 
 ### Git Core
@@ -110,7 +110,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DIFF-01 | Phase 2 | Pending |
 | DIFF-02 | Phase 2 | Pending |
 | DIFF-03 | Phase 2 | Complete |
-| DIFF-04 | Phase 2 | Pending |
+| DIFF-04 | Phase 2 | Complete |
 | DIFF-05 | Phase 2 | Pending |
 | GIT-01 | Phase 1 | Complete |
 | GIT-02 | Phase 1 | Complete |

@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 7 of 7 (Polish QuickOpen Smart Search)
-Plan: 2 of ? in current phase
-Status: Plan 07-02 complete
-Last activity: 2026-02-28 — Completed plan 07-02 (panelScope coroutine scope fix, dual-debounce, content match line navigation)
+Phase: 2 of 7 (Pre-commit Diff Viewer)
+Plan: 3 of 3 in current phase
+Status: Plan 02-03 complete
+Last activity: 2026-02-28 — Completed plan 02-03 (CompareWithAction — compare two files via DiffManager context-menu action)
 
 Progress: [███░░░░░░░] 25%
 
@@ -50,6 +50,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 07-polish-quickopen-smart-search P01 | 2 | 3 tasks | 3 files |
 | Phase 02-pre-commit-diff-viewer P01 | 5 | 2 tasks | 3 files |
 | Phase 07 P02 | 4 | 3 tasks | 1 files |
+| Phase 02-pre-commit-diff-viewer P03 | 3 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,7 @@ Recent decisions affecting current work:
 - [Phase 07-02]: panelScope uses SupervisorJob so child coroutine failures do not cancel sibling coroutines
 - [Phase 07-02]: 50ms debounce for fuzzy search; 300ms for rg content search
 - [Phase 07-02]: OpenFileDescriptor with lineNumber - 1 (0-based) for line-precise content match navigation
+- [Phase 02-03]: CompareWithAction uses isEnabledAndVisible (hides action when count != 2, not just disables); tree row order = left/right assignment
 
 ### Roadmap Evolution
 
@@ -91,5 +93,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 07-02-PLAN.md — coroutine scope leak fix, 50ms/300ms dual-debounce, content match line-precise navigation
+Stopped at: Completed 02-03-PLAN.md — CompareWithAction context-menu compare for two selected files via DiffManager
 Resume file: None
