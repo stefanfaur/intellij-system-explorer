@@ -23,10 +23,10 @@
 
 ### Context Menus
 
-- [ ] **CTX-01**: Right-clicking a file shows: Open in Editor, Copy, Paste, Delete, Rename, New File, New Directory
-- [ ] **CTX-02**: Right-clicking a file shows "Reveal in Finder/Explorer" that opens the OS file manager at that path
-- [ ] **CTX-03**: Right-clicking a file shows "Open Terminal Here" that opens IntelliJ's built-in terminal at that directory
-- [ ] **CTX-04**: Context menu actions are correctly enabled/disabled based on selection state (no stale enable/disable)
+- [x] **CTX-01**: Right-clicking a file shows: Open in Editor, Copy, Paste, Delete, Rename, New File, New Directory
+- [x] **CTX-02**: Right-clicking a file shows "Reveal in Finder/Explorer" that opens the OS file manager at that path
+- [x] **CTX-03**: Right-clicking a file shows "Open Terminal Here" that opens IntelliJ's built-in terminal at that directory
+- [x] **CTX-04**: Context menu actions are correctly enabled/disabled based on selection state (no stale enable/disable)
 
 ### Diff Viewer
 
@@ -103,10 +103,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TREE-02 | Phase 4 | Complete |
 | TREE-03 | Phase 4 | Complete |
 | TREE-04 | Phase 4 | Complete |
-| CTX-01 | Phase 4 | Pending |
-| CTX-02 | Phase 4 | Pending |
-| CTX-03 | Phase 4 | Pending |
-| CTX-04 | Phase 4 | Pending |
+| CTX-01 | Phase 4 | Complete |
+| CTX-02 | Phase 4 | Complete |
+| CTX-03 | Phase 4 | Complete |
+| CTX-04 | Phase 4 | Complete |
 | DIFF-01 | Phase 2 | Complete |
 | DIFF-02 | Phase 2 | Complete |
 | DIFF-03 | Phase 2 | Complete |

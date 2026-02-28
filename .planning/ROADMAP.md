@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: GitBackend Extensions + Pull** - Extend GitBackend interface with all new Git operations and wire pull into the Git panel toolbar (completed 2026-02-28)
 - [ ] **Phase 2: Pre-Commit Diff Viewer** - Embed inline diff in Git panel for selected staged files and provide full-window diff popup
 - [ ] **Phase 3: Drag and Drop Polish** - Fix DnD reliability with drop highlighting, auto-scroll, ghost image, and VFS refresh
-- [ ] **Phase 4: File Tree and Context Menu Polish** - Correct icon rendering, VCS color coding, expand/collapse glitches, and complete context menu actions
+- [x] **Phase 4: File Tree and Context Menu Polish** - Correct icon rendering, VCS color coding, expand/collapse glitches, and complete context menu actions (completed 2026-02-28)
 - [ ] **Phase 5: Branch Management** - Add branch list panel with checkout, create, and delete; handle dirty-tree smart checkout
 - [ ] **Phase 6: Stash UI** - Add stash creation dialog and stash list panel with apply and drop actions
 - [x] **Phase 7: Polish, improve quick open / smart search** - Polish, improve quick open / smart search (completed 2026-02-28)
@@ -132,7 +132,7 @@ Plans:
 **Goal:** Replace the in-memory CandidatePool with a persistent Lucene index for large roots; hybrid mode auto-selects between index-backed recall and live ripgrep based on directory file count
 **Requirements**: TBD
 **Depends on:** Phase 7
-**Plans:** 2/3 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 08-01-PLAN.md — Lucene 9.12.3 dependency + LuceneIndexManager (write, search, corrupt-recovery) (wave 1)
@@ -153,7 +153,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. GitBackend Extensions + Pull | 2/2 | Complete   | 2026-02-28 |
 | 2. Pre-Commit Diff Viewer | 3/4 | In Progress|  |
 | 3. Drag and Drop Polish | 2/3 | In Progress|  |
-| 4. File Tree and Context Menu Polish | 0/? | Not started | - |
+| 4. File Tree and Context Menu Polish | 2/2 | Complete   | 2026-02-28 |
 | 5. Branch Management | 0/? | Not started | - |
 | 6. Stash UI | 0/? | Not started | - |
 | 7. Polish, improve quick open / smart search | 3/3 | Complete   | 2026-02-28 |

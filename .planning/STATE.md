@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T22:16:42.614Z"
+last_updated: "2026-02-28T22:19:32.774Z"
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 20
-  completed_plans: 19
+  completed_plans: 20
 ---
 
 # Project State
@@ -61,6 +61,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 03 P01 | 4 | 2 tasks | 2 files |
 | Phase 03 P02 | 8 | 2 tasks | 3 files |
 | Phase 04 P01 | 9 | 2 tasks | 1 files |
+| Phase 04 P02 | 5 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,7 @@ Recent decisions affecting current work:
 - [Phase 04-01]: FileStatusManager.addFileStatusListener used instead of FILE_STATUS_TOPIC messageBus (no such constant in IJ 2024.3)
 - [Phase 04-01]: DumbService.DUMB_MODE is correct topic constant (not DUMB_MODE_LISTENER)
 - [Phase 04-01]: directoryStatusCache uses Optional<Color> as ConcurrentHashMap cannot store null values
+- [Phase 04]: All menu items always added to menu; isEnabled set explicitly — no conditional item add/remove (per CTX-04)
 
 ### Roadmap Evolution
 
