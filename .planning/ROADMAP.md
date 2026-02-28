@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: File Tree and Context Menu Polish** - Correct icon rendering, VCS color coding, expand/collapse glitches, and complete context menu actions
 - [ ] **Phase 5: Branch Management** - Add branch list panel with checkout, create, and delete; handle dirty-tree smart checkout
 - [ ] **Phase 6: Stash UI** - Add stash creation dialog and stash list panel with apply and drop actions
-- [ ] **Phase 7: Polish, improve quick open / smart search** - Polish, improve quick open / smart search
+- [x] **Phase 7: Polish, improve quick open / smart search** - Polish, improve quick open / smart search (completed 2026-02-28)
 
 ## Phase Details
 
@@ -136,4 +136,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. File Tree and Context Menu Polish | 0/? | Not started | - |
 | 5. Branch Management | 0/? | Not started | - |
 | 6. Stash UI | 0/? | Not started | - |
-| 7. Polish, improve quick open / smart search | 2/3 | In Progress|  |
+| 7. Polish, improve quick open / smart search | 3/3 | Complete   | 2026-02-28 |

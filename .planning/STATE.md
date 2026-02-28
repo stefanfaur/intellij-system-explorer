@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T12:29:38.813Z"
+last_updated: "2026-02-28T12:34:28.808Z"
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 7
 ---
 
 # Project State
@@ -51,6 +51,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02-pre-commit-diff-viewer P01 | 5 | 2 tasks | 3 files |
 | Phase 07 P02 | 4 | 3 tasks | 1 files |
 | Phase 02-pre-commit-diff-viewer P03 | 3 | 2 tasks | 3 files |
+| Phase 07-polish-quickopen-smart-search P03 | 3 | 4 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Recent decisions affecting current work:
 - [Phase 07-02]: 50ms debounce for fuzzy search; 300ms for rg content search
 - [Phase 07-02]: OpenFileDescriptor with lineNumber - 1 (0-based) for line-precise content match navigation
 - [Phase 02-03]: CompareWithAction uses isEnabledAndVisible (hides action when count != 2, not just disables); tree row order = left/right assignment
+- [Phase 07-03]: Status bar row added using GridLayout(2,1) to avoid touching existing truncation/count/hint layout
+- [Phase 07-03]: Speed dial uses FrecencyStore.recencyScore() exclusively — bookmark-first fallback removed
+- [Phase 07-03]: typeGroup comparator is post-scoring display ordering only — frecency blend in scoring unchanged
 
 ### Roadmap Evolution
 
@@ -93,5 +97,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 02-03-PLAN.md — CompareWithAction context-menu compare for two selected files via DiffManager
+Stopped at: Completed 07-03-PLAN.md — status bar, speed dial frecency, path highlighting, result type grouping
 Resume file: None
