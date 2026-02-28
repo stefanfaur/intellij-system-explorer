@@ -65,6 +65,13 @@ class RemoteGitBackend(
         return parseCommitInfo(result.stdout)
     }
 
+    override fun getHeadContent(path: String): ByteArray? {
+        // Remote backend: reads from git index (staging area) as a proxy for working-tree.
+        // Unstaged local edits on remote won't show in diff — known limitation.
+        val result = executor.executeBlocking(repoPath, args = arrayOf("show", ":$path"))
+        return if (result.isSuccess) result.stdout.toByteArray(Charsets.UTF_8) else null
+    }
+
     override fun stageFiles(paths: List<String>): GitCommandResult {
         if (paths.isEmpty()) return GitCommandResult(0, "", "")
         return executor.executeBlocking(
