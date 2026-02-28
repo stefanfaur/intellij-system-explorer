@@ -46,12 +46,13 @@ Plans:
   2. Clicking "Show Diff" in the Git panel opens the full-window DiffManager popup showing the same HEAD vs. working-tree comparison
   3. Right-clicking two files in the explorer and selecting "Compare With..." opens a side-by-side diff of those two files
   4. Switching file selection in the staging area or closing the panel disposes the previous diff viewer with no memory leak
-**Plans**: 3 plans
+**Plans**: 4 plans
 
 Plans:
 - [ ] 02-01-PLAN.md — Add getHeadContent() to GitBackend interface + LocalGitBackend + RemoteGitBackend (wave 1)
 - [ ] 02-02-PLAN.md — InlineDiffPanel + GitPanelComponent wiring: selection-triggered diff, Show Diff button, double-click, disposal lifecycle (wave 2)
 - [ ] 02-03-PLAN.md — CompareWithAction for two-file explorer comparison + plugin.xml registration (wave 1)
+- [ ] 02-04-PLAN.md — Gap closure: getFileAtRevision() + history-mode doShowFullDiff() branch + onFileSelected guard (wave 1)
 
 ### Phase 3: Drag and Drop Polish
 **Goal**: Dragging files within the explorer and into IntelliJ's project view is reliable, visually clear, and leaves both source and destination in a consistent state
@@ -131,7 +132,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. GitBackend Extensions + Pull | 2/2 | Complete   | 2026-02-28 |
-| 2. Pre-Commit Diff Viewer | 2/3 | In Progress|  |
+| 2. Pre-Commit Diff Viewer | 3/4 | In Progress|  |
 | 3. Drag and Drop Polish | 0/? | Not started | - |
 | 4. File Tree and Context Menu Polish | 0/? | Not started | - |
 | 5. Branch Management | 0/? | Not started | - |
