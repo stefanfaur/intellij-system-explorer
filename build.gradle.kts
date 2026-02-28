@@ -50,6 +50,8 @@ dependencies {
     // === Lucene index for QuickOpen hybrid mode ===
     implementation("org.apache.lucene:lucene-core:9.12.3")
     implementation("org.apache.lucene:lucene-analysis-common:9.12.3")
+    implementation("org.apache.lucene:lucene-highlighter:9.12.3")
+    implementation("org.apache.lucene:lucene-queryparser:9.12.3")
 
     // === Coroutine testing ===
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
