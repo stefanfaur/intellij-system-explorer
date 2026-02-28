@@ -47,6 +47,12 @@ class QuickOpenConfigurable : Configurable {
     private val scorerDebugCheckBox = JBCheckBox("Show scorer debug scores in results")
     private lateinit var scorerStatusLabel: JBLabel
 
+    // Lucene index
+    private val luceneThresholdSpinner = JSpinner(SpinnerNumberModel(5_000, 100, 500_000, 1_000))
+    private val luceneExtAllowlistField = JTextField()
+    private val luceneMaxSizeSpinner = JSpinner(SpinnerNumberModel(500, 50, 10_000, 50))
+    private val luceneEvictionSpinner = JSpinner(SpinnerNumberModel(30, 1, 365, 1))
+
     // Aliases
     private lateinit var aliasTableModel: DefaultTableModel
     private lateinit var aliasTable: JBTable
@@ -62,6 +68,7 @@ class QuickOpenConfigurable : Configurable {
             null, FileChooserDescriptorFactory.createSingleFileNoJarsDescriptor()
         )
         ripgrepExtraFlagsField.preferredSize = Dimension(300, ripgrepExtraFlagsField.preferredSize.height)
+        luceneExtAllowlistField.preferredSize = Dimension(400, luceneExtAllowlistField.preferredSize.height)
 
         val rankerName = try { RankerSelector.active.name } catch (_: Exception) { "Unknown" }
         val available = NucleoNative.isAvailable
@@ -123,6 +130,30 @@ class QuickOpenConfigurable : Configurable {
             group("Teleport Aliases") {
                 row { cell(aliasDecorator).align(AlignX.FILL) }
             }
+            group("Lucene Index") {
+                row("Hybrid mode threshold (files):") { cell(luceneThresholdSpinner) }
+                    .rowComment("Roots with more files than this use the Lucene index instead of live ripgrep.")
+                row("Content-indexed extensions:") { cell(luceneExtAllowlistField).align(AlignX.FILL) }
+                    .rowComment("Comma-separated list of extensions (no dots) to index for content search.")
+                row("Max index size per root (MB):") { cell(luceneMaxSizeSpinner) }
+                    .rowComment("Content indexing stops when this limit is reached; path indexing continues.")
+                row("Evict unused index after (days):") { cell(luceneEvictionSpinner) }
+                    .rowComment("Index for a root not opened in this many days is automatically deleted.")
+                row {
+                    button("Clear All Index Caches") {
+                        val indexDir = java.io.File(com.intellij.openapi.application.PathManager.getSystemPath(), "caches/explorer-index")
+                        if (indexDir.exists()) {
+                            indexDir.deleteRecursively()
+                            com.intellij.openapi.ui.Messages.showInfoMessage(
+                                "Index caches cleared. They will be rebuilt on next QuickOpen.",
+                                "Clear Index"
+                            )
+                        } else {
+                            com.intellij.openapi.ui.Messages.showInfoMessage("No index caches found.", "Clear Index")
+                        }
+                    }
+                }
+            }
         }
         reset()
         return myPanel!!
@@ -147,6 +178,10 @@ class QuickOpenConfigurable : Configurable {
             || (halfLifeSpinner.value as Double) != s.frecencyHalfLifeHours
             || recencyWeightSlider.value != s.frecencyRecencyWeight
             || scorerDebugCheckBox.isSelected != s.showScorerDebug
+            || luceneThresholdSpinner.value as Int != s.luceneHybridThreshold
+            || luceneExtAllowlistField.text != s.luceneExtensionAllowlist
+            || luceneMaxSizeSpinner.value as Int != s.luceneMaxIndexSizeMb
+            || luceneEvictionSpinner.value as Int != s.luceneEvictionDays
             || aliasesModified()
     }
 
@@ -169,6 +204,10 @@ class QuickOpenConfigurable : Configurable {
         s.frecencyHalfLifeHours = halfLifeSpinner.value as Double
         s.frecencyRecencyWeight = recencyWeightSlider.value
         s.showScorerDebug = scorerDebugCheckBox.isSelected
+        s.luceneHybridThreshold = luceneThresholdSpinner.value as Int
+        s.luceneExtensionAllowlist = luceneExtAllowlistField.text
+        s.luceneMaxIndexSizeMb = luceneMaxSizeSpinner.value as Int
+        s.luceneEvictionDays = luceneEvictionSpinner.value as Int
         applyAliases()
     }
 
@@ -191,6 +230,10 @@ class QuickOpenConfigurable : Configurable {
         halfLifeSpinner.value = s.frecencyHalfLifeHours
         recencyWeightSlider.value = s.frecencyRecencyWeight
         scorerDebugCheckBox.isSelected = s.showScorerDebug
+        luceneThresholdSpinner.value = s.luceneHybridThreshold
+        luceneExtAllowlistField.text = s.luceneExtensionAllowlist
+        luceneMaxSizeSpinner.value = s.luceneMaxIndexSizeMb
+        luceneEvictionSpinner.value = s.luceneEvictionDays
         if (::aliasTableModel.isInitialized) resetAliases()
     }
 
