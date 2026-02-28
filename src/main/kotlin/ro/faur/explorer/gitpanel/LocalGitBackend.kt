@@ -59,6 +59,11 @@ class LocalGitBackend(override val repoPath: String) : GitBackend {
         return parseCommitInfo(result.stdout)
     }
 
+    override fun getHeadContent(path: String): ByteArray? {
+        val result = executor.executeBlocking(repoPath, args = arrayOf("show", "HEAD:$path"))
+        return if (result.isSuccess) result.stdout.toByteArray(Charsets.UTF_8) else null
+    }
+
     override fun stageFiles(paths: List<String>): GitCommandResult {
         if (paths.isEmpty()) return GitCommandResult(0, "", "")
         return executor.executeBlocking(

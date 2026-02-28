@@ -52,6 +52,7 @@ interface GitBackend : Disposable {
     fun getWorkingTreeStatus(): List<CommitFile>
     fun getCommitFiles(hash: String): List<CommitFile>
     fun getCommitInfo(hash: String): CommitInfo?
+    fun getHeadContent(path: String): ByteArray?
     fun stageFiles(paths: List<String>): ro.faur.explorer.gitpanel.exec.GitCommandResult
     fun commit(message: String): ro.faur.explorer.gitpanel.exec.GitCommandResult
     fun push(): ro.faur.explorer.gitpanel.exec.GitCommandResult
