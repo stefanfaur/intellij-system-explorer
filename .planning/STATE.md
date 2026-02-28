@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T18:54:29.800Z"
+last_updated: "2026-02-28T19:01:00.848Z"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 18
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 8 of 8 (Intelligent Indexed Local Filesystem Search with Apache Lucene and Hybrid Mode)
-Plan: 6 of 6 in current phase
-Status: Plan 08-06 task 1 complete — index mode chip added to status bar; checkpoint:human-verify pending for full Phase 8 validation
-Last activity: 2026-02-28 — Completed plan 08-06 task 1 (index mode chip Indexed/Indexing.../Live in QuickOpenPanel status bar)
+Phase: 3 of 8 (Drag-and-Drop Polish)
+Plan: 1 of 3 in current phase
+Status: Plan 03-01 complete — drop-row hover highlight and VFS source-parent refresh on move delivered
+Last activity: 2026-02-28 — Completed plan 03-01 (dnd.hoveredRow client property tracking, VirtualFileCellRenderer highlight, DND-06 source refresh)
 
 Progress: [███░░░░░░░] 25%
 
@@ -58,6 +58,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 08-01 P01 | 15 | 2 tasks | 3 files |
 | Phase 08 P04 | 7 | 2 tasks | 3 files |
 | Phase 08 P06 | 2 | 1 tasks | 1 files |
+| Phase 03 P01 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,8 @@ Recent decisions affecting current work:
 - [Phase 08-04]: candidatePool changed to var to allow runtime replacement when switching to LuceneEnumerator on hybrid threshold crossing
 - [Phase 08-04]: IndexRegistry is a Kotlin object singleton with independent registryScope not cancelled on panel dispose
 - [Phase 08-06]: indexModeChipLabel is separate from modeChipLabel — placed in bottomRow EAST for index state; three states Indexed/Indexing.../Live from IndexRegistry
+- [Phase 03]: RenderingUtil is at com.intellij.ui.render.RenderingUtil (not com.intellij.ui.RenderingUtil) in IJ 2024.3+
+- [Phase 03]: Source-parent refresh only runs when isMove=true — copy operations do not need to invalidate the source directory
 
 ### Roadmap Evolution
 
