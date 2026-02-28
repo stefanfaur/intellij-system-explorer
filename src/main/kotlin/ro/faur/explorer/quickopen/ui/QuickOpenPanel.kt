@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 import ro.faur.explorer.actions.FileActions
 import ro.faur.explorer.model.Bookmark
 import ro.faur.explorer.model.BookmarkManager
+import ro.faur.explorer.quickopen.backend.LuceneContentSearch
 import ro.faur.explorer.quickopen.backend.LuceneEnumerator
 import ro.faur.explorer.quickopen.backend.MinusculeMatcherRanker
 import ro.faur.explorer.quickopen.backend.NucleoNative
@@ -616,34 +617,72 @@ class QuickOpenPanel(
         if (pattern.isBlank()) return emptyList()
         val qs = try { QuickOpenSettings.getInstance().state } catch (_: Exception) { null }
         if (qs?.contentSearchEnabled == false) return emptyList()
-        val searchScope = currentPath
+
         val rgPath = qs?.ripgrepPath?.ifBlank { "rg" } ?: "rg"
-        return try {
-            val matches = mutableListOf<ro.faur.explorer.quickopen.backend.ContentMatch>()
-            val latch = CountDownLatch(1)
+        val luceneManager = IndexRegistry.getManager(currentRoot)
+
+        val luceneResults = mutableListOf<Pair<String, String>>()
+        val rgResults = mutableListOf<ro.faur.explorer.quickopen.backend.ContentMatch>()
+
+        // How many sources run in parallel: always rg, Lucene only if index exists
+        val sourceCount = if (luceneManager != null) 2 else 1
+        val latch = CountDownLatch(sourceCount)
+
+        // Launch Lucene content query (if index available)
+        if (luceneManager != null) {
             panelScope.launch {
                 try {
-                    RipgrepContentSearch(rgPath, searchScope).search(pattern)
-                        .take(MAX_CONTENT_RESULTS)
-                        .collect { matches.add(it) }
+                    val results = LuceneContentSearch(luceneManager).search(pattern, MAX_CONTENT_RESULTS)
+                    synchronized(luceneResults) { luceneResults.addAll(results) }
                 } finally { latch.countDown() }
             }
-            latch.await(10, TimeUnit.SECONDS)
-            matches.map { match ->
-                SearchResult(ScoredCandidate(
-                    SearchCandidate(
-                        id = "content:${match.filePath}:${match.lineNumber}",
-                        displayName = "${match.filePath.substringAfterLast('/')}:${match.lineNumber}",
-                        fullPath = match.filePath,
-                        parentPath = match.filePath.substringBeforeLast('/'),
-                        type = CandidateType.CONTENT_MATCH,
-                        contentSnippet = match.snippet,
-                        contentMatchRanges = match.matchRanges.takeIf { it.isNotEmpty() }
-                    ),
-                    score = 1.0
-                ))
-            }
-        } catch (_: Exception) { emptyList() }
+        }
+
+        // Launch ripgrep (always runs — catches freshness gap)
+        panelScope.launch {
+            try {
+                RipgrepContentSearch(rgPath, currentRoot).search(pattern)
+                    .take(MAX_CONTENT_RESULTS)
+                    .collect { synchronized(rgResults) { rgResults.add(it) } }
+            } finally { latch.countDown() }
+        }
+
+        latch.await(10, TimeUnit.SECONDS)
+
+        // Merge: Lucene results first (have snippets, higher score), rg-only appended
+        val lucenePathSet = luceneResults.map { it.first }.toHashSet()
+        val merged = mutableListOf<SearchResult>()
+
+        luceneResults.forEach { (path, snippet) ->
+            merged.add(SearchResult(ScoredCandidate(
+                SearchCandidate(
+                    id = "lucene-content:$path",
+                    displayName = path.substringAfterLast('/'),
+                    fullPath = path,
+                    parentPath = path.substringBeforeLast('/'),
+                    type = CandidateType.CONTENT_MATCH,
+                    contentSnippet = snippet
+                ),
+                score = 2.0
+            )))
+        }
+
+        rgResults.filter { it.filePath !in lucenePathSet }.forEach { match ->
+            merged.add(SearchResult(ScoredCandidate(
+                SearchCandidate(
+                    id = "content:${match.filePath}:${match.lineNumber}",
+                    displayName = "${match.filePath.substringAfterLast('/')}:${match.lineNumber}",
+                    fullPath = match.filePath,
+                    parentPath = match.filePath.substringBeforeLast('/'),
+                    type = CandidateType.CONTENT_MATCH,
+                    contentSnippet = match.snippet,
+                    contentMatchRanges = match.matchRanges.takeIf { it.isNotEmpty() }
+                ),
+                score = 1.0
+            )))
+        }
+
+        return merged
     }
 
     private fun enrichWithGitStatus(results: List<SearchResult>): List<SearchResult> {
@@ -736,10 +775,12 @@ class QuickOpenPanel(
     // ─── Actions ──────────────────────────────────────────────────────────────
 
     private fun openContentMatchAtLine(candidate: SearchCandidate) {
-        val lineNumber = candidate.id.substringAfterLast(':').toIntOrNull() ?: 1
+        // lucene-content IDs have format "lucene-content:$path" — no line number suffix
+        // rg IDs have format "content:$path:$lineNumber"
+        val lineNumber = candidate.id.substringAfterLast(':').toIntOrNull() ?: 0
         val vf = LocalFileSystem.getInstance().findFileByPath(candidate.fullPath) ?: return
         NonProjectFileWritingAccessProvider.allowWriting(listOf(vf))
-        OpenFileDescriptor(project, vf, lineNumber - 1, 0).navigate(true)
+        OpenFileDescriptor(project, vf, (lineNumber - 1).coerceAtLeast(0), 0).navigate(true)
         popup?.closeOk(null)
     }
 
