@@ -76,7 +76,11 @@ Plans:
   3. Modified files show blue VCS color and untracked files show the correct untracked color, matching IntelliJ project view conventions
   4. Right-clicking a file shows all seven actions (Open in Editor, Copy, Paste, Delete, Rename, New File, New Directory) and each action executes correctly; Reveal in Finder/Explorer and Open Terminal Here are also present and functional
   5. Context menu actions are enabled only when the current selection makes them valid; no stale enabled/disabled states
-**Plans**: TBD
+**Plans**: 2 plans in 2 waves
+
+Plans:
+- [ ] 04-01-PLAN.md — VCS color coding + FileStatusListener + DumbModeListener + expand/collapse fix + TreeSpeedSearch migration (wave 1)
+- [ ] 04-02-PLAN.md — Context menu reorganization + Reveal in Finder + Open Terminal Here + enable/disable consistency + human verify (wave 2)
 
 ### Phase 5: Branch Management
 **Goal**: Users can view, switch, create, and delete local branches from inside the Git panel, with safe handling of dirty working trees
