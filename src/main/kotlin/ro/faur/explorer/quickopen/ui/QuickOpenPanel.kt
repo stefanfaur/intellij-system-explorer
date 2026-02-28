@@ -457,12 +457,14 @@ class QuickOpenPanel(
             QueryMode.UNIFIED -> ""
         }
 
+        val isContentSearch = QueryParser.parse(raw).mode == QueryMode.CONTENT_SEARCH
+        val delayMs = if (isContentSearch) 300L else 50L
         pendingSearch = searchScheduler.schedule({
             val results = performSearch(raw)
             ApplicationManager.getApplication().invokeLater({
                 updateList(results, raw)
             }, ModalityState.any())
-        }, 150, TimeUnit.MILLISECONDS)
+        }, delayMs, TimeUnit.MILLISECONDS)
     }
 
     // ─── Search logic ─────────────────────────────────────────────────────────
