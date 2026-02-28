@@ -9,19 +9,24 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.impl.NonProjectFileWritingAccessProvider
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.SystemInfo
+import com.intellij.openapi.vcs.FileStatus
+import com.intellij.openapi.vcs.FileStatusListener
+import com.intellij.openapi.vcs.FileStatusManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.ColoredTreeCellRenderer
+import com.intellij.ui.SimpleTextAttributes
+import com.intellij.ui.TreeUIHelper
+import com.intellij.ui.render.RenderingUtil
+import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.concurrency.AppExecutorUtil
+import java.awt.Color
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
-import com.intellij.ui.ColoredTreeCellRenderer
-import com.intellij.ui.render.RenderingUtil
-import com.intellij.ui.SimpleTextAttributes
-import com.intellij.ui.TreeSpeedSearch
-import com.intellij.ui.treeStructure.Tree
 import ro.faur.explorer.actions.DragDropHandler
 import ro.faur.explorer.actions.FileActions
 import ro.faur.explorer.actions.FileTreeTransferHandler
@@ -91,6 +96,11 @@ class FileTreeComponent(private val project: Project) : Disposable {
      *  causing all icons to change twice in rapid succession → visible flash. */
     private val iconCache = ConcurrentHashMap<String, Icon>()
 
+    /** Cache for directory VCS status propagation (1-level child scan).
+     *  Uses Optional<Color> to distinguish "no color" (empty) from "not yet computed" (absent).
+     *  Invalidated on FileStatusListener callbacks, setRoot(), and refresh(). */
+    private val directoryStatusCache = ConcurrentHashMap<String, java.util.Optional<Color>>()
+
     /** The path currently displayed as the tree root. */
     var currentRootPath: String? = null
         private set
@@ -120,12 +130,43 @@ class FileTreeComponent(private val project: Project) : Disposable {
         tree.showsRootHandles = true
         tree.cellRenderer = VirtualFileCellRenderer()
 
-        @Suppress("DEPRECATION")
-        TreeSpeedSearch(tree) { path ->
-            val node = path.lastPathComponent as? DefaultMutableTreeNode
-            val vf = node?.userObject as? VirtualFile
-            vf?.name ?: node?.userObject?.toString() ?: ""
-        }
+        TreeUIHelper.getInstance().installTreeSpeedSearch(
+            tree,
+            com.intellij.util.containers.Convertor { path: javax.swing.tree.TreePath ->
+                val node = path.lastPathComponent as? DefaultMutableTreeNode
+                val vf = node?.userObject as? VirtualFile
+                vf?.name ?: node?.userObject?.toString() ?: ""
+            },
+            true
+        )
+
+        // Subscribe to VCS status changes — FileStatusManager.addFileStatusListener auto-disconnects
+        // when the given Disposable (this) is disposed.
+        FileStatusManager.getInstance(project).addFileStatusListener(object : FileStatusListener {
+            override fun fileStatusChanged(virtualFile: VirtualFile) {
+                directoryStatusCache.clear()
+                ApplicationManager.getApplication().invokeLater {
+                    if (!isDisposed) tree.repaint()
+                }
+            }
+            override fun fileStatusesChanged() {
+                directoryStatusCache.clear()
+                ApplicationManager.getApplication().invokeLater {
+                    if (!isDisposed) tree.repaint()
+                }
+            }
+        }, this)
+
+        // Subscribe to dumb-mode transitions to invalidate the icon cache on smart-mode entry.
+        val messageBusConnection = project.messageBus.connect(this)
+        messageBusConnection.subscribe(DumbService.DUMB_MODE, object : DumbService.DumbModeListener {
+            override fun exitDumbMode() {
+                iconCache.clear()
+                ApplicationManager.getApplication().invokeLater {
+                    if (!isDisposed) tree.repaint()
+                }
+            }
+        })
 
         // Lazy directory expansion — VFS read happens off the EDT to avoid SlowOperations errors.
         expandListener = object : TreeWillExpandListener {
@@ -237,6 +278,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
         currentRootPath = path
         permissionsCache.clear()
         iconCache.clear()
+        directoryStatusCache.clear()
         rootNode.removeAllChildren()
         treeModel.reload()   // show empty tree immediately
 
@@ -276,6 +318,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
     fun refresh() {
         permissionsCache.clear()
         iconCache.clear()
+        directoryStatusCache.clear()
         currentRootPath?.let { path ->
             val dir = LocalFileSystem.getInstance().findFileByPath(path)
             // Shallow refresh: only the current directory, not recursive
@@ -557,6 +600,35 @@ class FileTreeComponent(private val project: Project) : Disposable {
     }
 
     /**
+     * Returns the effective VCS color for a file or directory node.
+     * For files: looks up FileStatusManager directly.
+     * For directories: scans 1-level of children for the first modified status (cached).
+     * Returns null for NOT_CHANGED or files outside any VCS repo.
+     */
+    private fun getEffectiveVcsColor(vf: VirtualFile): Color? {
+        return try {
+            if (vf.isDirectory) {
+                val cached = directoryStatusCache[vf.path]
+                if (cached != null) return cached.orElse(null)
+                val children = vf.children ?: return null
+                var color: Color? = null
+                for (child in children) {
+                    val status = FileStatusManager.getInstance(project).getStatus(child)
+                    if (status != FileStatus.NOT_CHANGED) {
+                        color = status.color
+                        break
+                    }
+                }
+                directoryStatusCache[vf.path] = java.util.Optional.ofNullable(color)
+                color
+            } else {
+                val status = FileStatusManager.getInstance(project).getStatus(vf)
+                if (status == FileStatus.NOT_CHANGED) null else status.color
+            }
+        } catch (_: Exception) { null }
+    }
+
+    /**
      * Removes all listeners registered on the tree to prevent memory leaks.
      */
     override fun dispose() {
@@ -603,6 +675,12 @@ class FileTreeComponent(private val project: Project) : Disposable {
 
                 icon = getIconForFile(vf)
 
+                val vcsColor = getEffectiveVcsColor(vf)
+                val textStyle = if (vcsColor != null)
+                    SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, vcsColor)
+                else
+                    SimpleTextAttributes.REGULAR_ATTRIBUTES
+
                 // Add file permissions if enabled (right-aligned)
                 // Use cached flag to avoid expensive getInstance() calls on every cell render
                 if (showPermissions) {
@@ -617,8 +695,8 @@ class FileTreeComponent(private val project: Project) : Disposable {
                         val fm = getFontMetrics(font)
                         val truncatedName = truncateString(vf.name, fm, availableWidth)
 
-                        // Append truncated filename
-                        append(truncatedName)
+                        // Append truncated filename with VCS color
+                        append(truncatedName, textStyle)
 
                         // Add padding to push permissions to the right
                         appendTextPadding(treeWidth - permissionsWidth)
@@ -626,12 +704,12 @@ class FileTreeComponent(private val project: Project) : Disposable {
                         // Append permissions
                         append(perms, SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     } else {
-                        // No permissions to show, just append the filename
-                        append(vf.name)
+                        // No permissions to show, just append the filename with VCS color
+                        append(vf.name, textStyle)
                     }
                 } else {
-                    // Permissions not enabled, just append the filename
-                    append(vf.name)
+                    // Permissions not enabled, just append the filename with VCS color
+                    append(vf.name, textStyle)
                     if (showFolderItemCount && vf.isDirectory) {
                         val count = vf.children.size
                         if (count > 0) append(" ($count)", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
