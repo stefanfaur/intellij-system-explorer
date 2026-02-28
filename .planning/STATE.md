@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T12:38:22.223Z"
+last_updated: "2026-02-28T12:43:49.750Z"
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -52,6 +52,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 07 P02 | 4 | 3 tasks | 1 files |
 | Phase 02-pre-commit-diff-viewer P03 | 3 | 2 tasks | 3 files |
 | Phase 07-polish-quickopen-smart-search P03 | 3 | 4 tasks | 3 files |
+| Phase 02-pre-commit-diff-viewer P02 | 11 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,9 @@ Recent decisions affecting current work:
 - [Phase 07-03]: Status bar row added using GridLayout(2,1) to avoid touching existing truncation/count/hint layout
 - [Phase 07-03]: Speed dial uses FrecencyStore.recencyScore() exclusively — bookmark-first fallback removed
 - [Phase 07-03]: typeGroup comparator is post-scoring display ordering only — frecency blend in scoring unchanged
+- [Phase 02-02]: CardLayout used for rightSlot to exclusively show commitDetailsPanel or inlineDiffPanel
+- [Phase 02-02]: DiffContentFactory.createFromBytes is the correct API (not createDocumentFromBytes which does not exist in IJ 2024.3)
+- [Phase 02-02]: History-mode Show Diff deferred to HEAD vs working-tree; exact commit-range diff needs getFileAtRevision() on GitBackend
 
 ### Roadmap Evolution
 
@@ -97,5 +101,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 07-03-PLAN.md — status bar, speed dial frecency, path highlighting, result type grouping
+Stopped at: Completed 02-02-PLAN.md — InlineDiffPanel with spinner, Show Diff toolbar button, inline diff wiring
 Resume file: None
