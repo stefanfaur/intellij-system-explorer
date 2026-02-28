@@ -50,7 +50,24 @@ class DragDropHandler(
     // ---- DnDTarget ----
 
     override fun update(event: DnDEvent): Boolean {
-        val targetDir = resolveDropTarget(event.point)
+        val point = event.point
+        val targetDir = resolveDropTarget(point)
+
+        // Compute which row should be highlighted (-1 means no highlight)
+        val highlightRow: Int = if (targetDir != null && point != null) {
+            val node = getNodeAtPoint(point)
+            if (node != null) {
+                val path = tree.getPathForLocation(point.x, point.y)
+                if (path != null) tree.getRowForPath(path) else -1
+            } else -1
+        } else -1
+
+        val currentRow = tree.getClientProperty("dnd.hoveredRow") as? Int ?: -1
+        if (highlightRow != currentRow) {
+            tree.putClientProperty("dnd.hoveredRow", highlightRow)
+            tree.repaint()
+        }
+
         if (targetDir != null) {
             event.setDropPossible(true)
             return true
@@ -60,6 +77,10 @@ class DragDropHandler(
     }
 
     override fun drop(event: DnDEvent) {
+        // Clear the hover highlight before processing the drop
+        tree.putClientProperty("dnd.hoveredRow", -1)
+        tree.repaint()
+
         val targetDir = resolveDropTarget(event.point) ?: return
         val isMove = event.action == DnDAction.MOVE
 
@@ -73,6 +94,13 @@ class DragDropHandler(
         if (filesToDrop.isEmpty()) return
 
         performDrop(filesToDrop, targetDir, isMove)
+
+        // Refresh source parent directories after a move (DND-06)
+        if (isMove) {
+            val sourceParents = filesToDrop.map { it.parent }.toSet()
+            sourceParents.forEach { it?.refresh(false, false) }
+        }
+
         fileTreeComponent.refresh()
     }
 
