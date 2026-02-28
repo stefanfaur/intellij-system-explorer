@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T14:05:25.939Z"
+last_updated: "2026-02-28T14:08:11.745Z"
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 15
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -55,6 +55,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02-pre-commit-diff-viewer P02 | 11 | 3 tasks | 3 files |
 | Phase 02-pre-commit-diff-viewer P04 | 2 | 2 tasks | 4 files |
 | Phase 08 P02 | 2 | 2 tasks | 2 files |
+| Phase 08-01 P01 | 15 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,9 @@ Recent decisions affecting current work:
 - [Phase 02-pre-commit-diff-viewer]: 02-04: buildDiffRequest extended with leftLabel/rightLabel default params — all existing call-sites unchanged
 - [Phase 08-02]: Four Lucene fields appended at end of State data class; PersistentStateComponent serializes with defaults for existing users, no migration needed
 - [Phase 08-02]: Clear Index button uses PathManager.getSystemPath() + caches/explorer-index path — consistent with where index plans will write data
+- [Phase 08]: NIOFSDirectory used instead of FSDirectory.open() to prevent MMapDirectory file handle leaks on plugin unload
+- [Phase 08]: indexDirForRoot uses PathManager.getSystemPath() so Lucene index survives IDE restarts (not getPluginTempPath())
+- [Phase 08]: searchPaths blank query uses MatchAllDocsQuery — WildcardQuery on empty string returns no results
 
 ### Roadmap Evolution
 
@@ -108,5 +112,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 08-02-PLAN.md — Lucene settings fields on QuickOpenSettings.State and Lucene Index UI group in QuickOpenConfigurable
+Stopped at: Completed 08-01-PLAN.md — Lucene 9.12.3 bundled, LuceneIndexManager implemented with 7 passing tests
 Resume file: None
