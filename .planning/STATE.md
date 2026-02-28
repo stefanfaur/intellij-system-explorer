@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T12:43:49.750Z"
+last_updated: "2026-02-28T12:57:15.625Z"
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 9
+  completed_plans: 9
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 ## Current Position
 
 Phase: 2 of 7 (Pre-commit Diff Viewer)
-Plan: 3 of 3 in current phase
-Status: Plan 02-03 complete
-Last activity: 2026-02-28 — Completed plan 02-03 (CompareWithAction — compare two files via DiffManager context-menu action)
+Plan: 4 of 4 in current phase
+Status: Plan 02-04 complete — Phase 02 fully complete
+Last activity: 2026-02-28 — Completed plan 02-04 (getFileAtRevision backend primitive + history-mode Show Diff + onFileSelected guard)
 
 Progress: [███░░░░░░░] 25%
 
@@ -53,6 +53,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02-pre-commit-diff-viewer P03 | 3 | 2 tasks | 3 files |
 | Phase 07-polish-quickopen-smart-search P03 | 3 | 4 tasks | 3 files |
 | Phase 02-pre-commit-diff-viewer P02 | 11 | 3 tasks | 3 files |
+| Phase 02-pre-commit-diff-viewer P04 | 2 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -83,10 +84,13 @@ Recent decisions affecting current work:
 - [Phase 02-02]: CardLayout used for rightSlot to exclusively show commitDetailsPanel or inlineDiffPanel
 - [Phase 02-02]: DiffContentFactory.createFromBytes is the correct API (not createDocumentFromBytes which does not exist in IJ 2024.3)
 - [Phase 02-02]: History-mode Show Diff deferred to HEAD vs working-tree; exact commit-range diff needs getFileAtRevision() on GitBackend
+- [Phase 02-pre-commit-diff-viewer]: 02-04: Used explicit lambda label (fileSelectedLambda@) for early return in onFileSelected — Kotlin property-name labels are invalid for assigned lambdas
+- [Phase 02-pre-commit-diff-viewer]: 02-04: buildDiffRequest extended with leftLabel/rightLabel default params — all existing call-sites unchanged
 
 ### Roadmap Evolution
 
 - Phase 7 added: Polish, improve quick open / smart search
+- Phase 8 added: Intelligent Indexed Local Filesystem Search with Apache Lucene and Hybrid Mode
 
 ### Pending Todos
 
@@ -101,5 +105,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 02-02-PLAN.md — InlineDiffPanel with spinner, Show Diff toolbar button, inline diff wiring
+Stopped at: Completed 02-04-PLAN.md — getFileAtRevision backend primitive, history-mode doShowFullDiff, onFileSelected guard
 Resume file: None

@@ -138,3 +138,13 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 5. Branch Management | 0/? | Not started | - |
 | 6. Stash UI | 0/? | Not started | - |
 | 7. Polish, improve quick open / smart search | 3/3 | Complete   | 2026-02-28 |
+
+### Phase 8: Intelligent Indexed Local Filesystem Search with Apache Lucene and Hybrid Mode
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 7
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 8 to break down)
