@@ -1,9 +1,16 @@
 package ro.faur.explorer.actions
 
+import com.intellij.icons.AllIcons
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.ui.UIUtil
 import ro.faur.explorer.ui.FileTreeComponent
+import java.awt.AlphaComposite
+import java.awt.image.BufferedImage
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
 import java.awt.datatransfer.UnsupportedFlavorException
@@ -30,7 +37,33 @@ class FileTreeTransferHandler(
         private val LOG = Logger.getInstance(FileTreeTransferHandler::class.java)
     }
 
-    override fun getSourceActions(c: JComponent): Int = COPY_OR_MOVE
+    override fun getSourceActions(c: JComponent): Int {
+        val selected = fileTreeComponent.getSelectedFiles()
+        if (selected.isNotEmpty()) {
+            val img = buildGhostImage(selected, c)
+            setDragImage(img)
+            setDragImageOffset(java.awt.Point(img.width / 2, img.height / 2))
+        }
+        return COPY_OR_MOVE
+    }
+
+    private fun buildGhostImage(files: List<VirtualFile>, component: JComponent): BufferedImage {
+        val label = if (files.size == 1) files[0].name else "${files[0].name} (+${files.size - 1} more)"
+        val icon = if (files.size == 1) (files[0].fileType.icon ?: AllIcons.FileTypes.Any_type)
+                   else AllIcons.FileTypes.Any_type
+        val fm = component.getFontMetrics(component.font)
+        val w = (icon.iconWidth + 6 + fm.stringWidth(label)).coerceAtLeast(60)
+        val h = (icon.iconHeight + 4).coerceAtLeast(20)
+        val img = UIUtil.createImage(component, w, h, BufferedImage.TYPE_INT_ARGB)
+        val g = img.createGraphics()
+        g.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.7f)
+        icon.paintIcon(component, g, 2, (h - icon.iconHeight) / 2)
+        g.color = component.foreground
+        g.font = component.font
+        g.drawString(label, icon.iconWidth + 6, h / 2 + fm.ascent / 2)
+        g.dispose()
+        return img
+    }
 
     override fun createTransferable(c: JComponent): Transferable? {
         val selected = fileTreeComponent.getSelectedFiles()
@@ -84,6 +117,19 @@ class FileTreeTransferHandler(
             if (filesToDrop.isEmpty()) return false
 
             for (file in filesToDrop) {
+                val existing = targetDir.findChild(file.name)
+                if (existing != null) {
+                    val result = Messages.showYesNoDialog(
+                        null as com.intellij.openapi.project.Project?,
+                        "'${file.name}' already exists in '${targetDir.name}'. Replace it?",
+                        "Confirm Replace",
+                        "Replace", "Skip",
+                        Messages.getWarningIcon()
+                    )
+                    if (result != Messages.YES) continue
+                    com.intellij.openapi.application.ApplicationManager.getApplication()
+                        .runWriteAction { existing.delete(this@FileTreeTransferHandler) }
+                }
                 try {
                     if (isMove) {
                         FileActions.moveTo(file, targetDir)
@@ -92,6 +138,13 @@ class FileTreeTransferHandler(
                     }
                 } catch (e: Exception) {
                     LOG.warn("DnD: failed to ${if (isMove) "move" else "copy"} '${file.name}': ${e.message}", e)
+                    NotificationGroupManager.getInstance()
+                        .getNotificationGroup("Explorer.DnD")
+                        .createNotification(
+                            "Failed to ${if (isMove) "move" else "copy"} '${file.name}': ${e.message}",
+                            NotificationType.WARNING
+                        )
+                        .notify(null)
                 }
             }
             fileTreeComponent.refresh()
@@ -104,6 +157,9 @@ class FileTreeTransferHandler(
 
     override fun exportDone(source: JComponent?, data: Transferable?, action: Int) {
         if (action == MOVE) {
+            val selected = fileTreeComponent.getSelectedFiles()
+            val sourceParents = selected.map { it.parent }.toSet()
+            sourceParents.forEach { it?.refresh(false, false) }
             fileTreeComponent.refresh()
         }
     }
