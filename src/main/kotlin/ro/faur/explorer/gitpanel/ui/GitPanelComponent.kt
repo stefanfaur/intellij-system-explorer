@@ -1,5 +1,9 @@
 package ro.faur.explorer.gitpanel.ui
 
+import com.intellij.diff.DiffContentFactory
+import com.intellij.diff.DiffDialogHints
+import com.intellij.diff.DiffManager
+import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationType
@@ -12,20 +16,24 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.Task
 import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.ui.JBSplitter
 import com.intellij.ui.components.JBLabel
+import com.intellij.vcsUtil.VcsUtil
 import ro.faur.explorer.gitpanel.ActiveBrowserTracker
 import ro.faur.explorer.gitpanel.BackendType
+import ro.faur.explorer.gitpanel.CommitFile
 import ro.faur.explorer.gitpanel.GitBackend
 import ro.faur.explorer.gitpanel.GitRepositoryRegistry
 import ro.faur.explorer.gitpanel.LocalGitBackend
+import ro.faur.explorer.remote.git.GitFileStatus
 import ro.faur.explorer.remote.git.GitLogEntry
 import java.awt.BorderLayout
+import java.awt.CardLayout
 import java.awt.Component
 import java.io.File
 import javax.swing.DefaultComboBoxModel
@@ -40,6 +48,8 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
 
     companion object {
         private val LOG = Logger.getInstance(GitPanelComponent::class.java)
+        private const val CARD_DETAILS = "details"
+        private const val CARD_DIFF = "diff"
     }
 
     @Volatile private var disposed = false
@@ -49,6 +59,8 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     private var selectedBackend: GitBackend? = null
     private var currentBranch: String? = null
     private var logEntries: List<GitLogEntry> = emptyList()
+    private var selectedDiffFile: CommitFile? = null
+    private var selectedCommitHash: String? = null  // non-null in history mode
 
     // ── Toolbar widgets ────────────────────────────────────────────────────
     private val repoCombo = JComboBox<GitBackend>()
@@ -58,6 +70,9 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     internal val commitLogPanel   = CommitLogPanel()
     internal val changedFilesPanel = ChangedFilesPanel()
     internal val commitDetailsPanel = CommitDetailsPanel()
+    private val inlineDiffPanel = InlineDiffPanel(project, this)
+    private val rightSlotLayout = CardLayout()
+    private val rightSlot = JPanel(rightSlotLayout)
 
     // Suppress action listener during programmatic model rebuild to avoid double reload
     private var suppressComboAction = false
@@ -123,6 +138,13 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
             override fun actionPerformed(e: AnActionEvent) { doPush() }
             override fun update(e: AnActionEvent) { e.presentation.isEnabled = selectedBackend != null }
         })
+        group.add(object : AnAction("Show Diff", "Open full-window diff for selected file", AllIcons.Actions.Diff) {
+            override fun getActionUpdateThread() = ActionUpdateThread.BGT
+            override fun actionPerformed(e: AnActionEvent) { doShowFullDiff() }
+            override fun update(e: AnActionEvent) {
+                e.presentation.isEnabled = selectedDiffFile != null && selectedBackend != null
+            }
+        })
         group.add(object : AnAction("Add Local Repo", "Add a local git repository", AllIcons.General.Add) {
             override fun getActionUpdateThread() = ActionUpdateThread.BGT
             override fun actionPerformed(e: AnActionEvent) { addLocalRepo() }
@@ -149,9 +171,15 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     // ── Center layout ────────────────────────────────────────────────────────
 
     private fun buildCenter() {
+        // Right slot: holds commitDetailsPanel (history mode) and inlineDiffPanel (staging mode)
+        // CardLayout ensures only one is visible at a time
+        rightSlot.add(commitDetailsPanel, CARD_DETAILS)
+        rightSlot.add(inlineDiffPanel, CARD_DIFF)
+        rightSlotLayout.show(rightSlot, CARD_DETAILS)
+
         val bottomSplit = JBSplitter(false, 0.4f)
         bottomSplit.firstComponent  = changedFilesPanel
-        bottomSplit.secondComponent = commitDetailsPanel
+        bottomSplit.secondComponent = rightSlot
 
         val mainSplit = JBSplitter(true, 0.65f)
         mainSplit.firstComponent  = commitLogPanel
@@ -161,6 +189,32 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
 
         // Wire commit selection
         commitLogPanel.onCommitSelected = { entry -> onCommitSelected(entry) }
+
+        // Wire file selection callbacks
+        changedFilesPanel.onFileSelected = { file ->
+            selectedDiffFile = file
+            if (file != null) {
+                showDiffSlot()
+                loadInlineDiff(file)
+            } else {
+                inlineDiffPanel.clear()
+            }
+        }
+        changedFilesPanel.onFileDoubleClicked = { file ->
+            selectedDiffFile = file
+            doShowFullDiff()
+        }
+    }
+
+    // ── Slot visibility helpers ──────────────────────────────────────────────
+
+    private fun showDiffSlot() {
+        rightSlotLayout.show(rightSlot, CARD_DIFF)
+    }
+
+    private fun showCommitDetailsSlot() {
+        inlineDiffPanel.clear()
+        rightSlotLayout.show(rightSlot, CARD_DETAILS)
     }
 
     // ── Actions ──────────────────────────────────────────────────────────────
@@ -279,11 +333,15 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
                     ApplicationManager.getApplication().invokeLater {
                         if (disposed) return@invokeLater
                         if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                        selectedCommitHash = null
+                        selectedDiffFile = null
                         changedFilesPanel.setMode(staging = true)
                         changedFilesPanel.setFiles(files, "Working Tree — ${files.size} changes")
                         commitDetailsPanel.setWorkingTreeMode(currentBranch) { message, push ->
                             doCommit(message, push)
                         }
+                        showDiffSlot()
+                        inlineDiffPanel.clear()
                     }
                 } catch (e: Exception) {
                     LOG.warn("Failed to load working tree status", e)
@@ -298,9 +356,12 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
                     ApplicationManager.getApplication().invokeLater {
                         if (disposed) return@invokeLater
                         if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                        selectedCommitHash = entry.hash
+                        selectedDiffFile = null
                         changedFilesPanel.setMode(staging = false)
                         changedFilesPanel.setFiles(files, "Changes in ${entry.hash.take(7)}")
                         commitDetailsPanel.setCommit(info)
+                        showCommitDetailsSlot()
                     }
                 } catch (e: Exception) {
                     LOG.warn("Failed to load commit details for backend ${backend.javaClass.simpleName}", e)
@@ -459,6 +520,88 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
                 }
             }
         })
+    }
+
+    // ── Inline diff ──────────────────────────────────────────────────────────
+
+    private fun loadInlineDiff(commitFile: CommitFile) {
+        val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
+
+        inlineDiffPanel.showSpinner()
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val headBytes: ByteArray? = when (commitFile.status) {
+                GitFileStatus.UNTRACKED, GitFileStatus.ADDED -> null
+                else -> backend.getHeadContent(commitFile.path)
+            }
+            val workBytes: ByteArray? = when (commitFile.status) {
+                GitFileStatus.DELETED -> null
+                else -> runCatching {
+                    File(backend.repoPath, commitFile.path).readBytes()
+                }.getOrNull()
+            }
+
+            val request = buildDiffRequest(backend.repoPath, commitFile, headBytes, workBytes)
+
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                if (selectedDiffFile?.path != commitFile.path) return@invokeLater  // file switched
+                inlineDiffPanel.showDiffRequest(request)
+            }
+        }
+    }
+
+    private fun buildDiffRequest(
+        repoPath: String,
+        commitFile: CommitFile,
+        headBytes: ByteArray?,
+        workBytes: ByteArray?
+    ): SimpleDiffRequest {
+        val factory = DiffContentFactory.getInstance()
+        val filePath = VcsUtil.getFilePath(File(repoPath, commitFile.path).absolutePath, false)
+
+        val headContent = if (headBytes != null)
+            runCatching { factory.createFromBytes(project, headBytes, filePath) }.getOrElse { factory.createEmpty() }
+        else
+            factory.createEmpty()
+
+        val workContent = if (workBytes != null)
+            runCatching { factory.createFromBytes(project, workBytes, filePath) }.getOrElse { factory.createEmpty() }
+        else
+            factory.createEmpty()
+
+        return SimpleDiffRequest(
+            commitFile.path,
+            headContent,
+            workContent,
+            "HEAD",
+            "Working Tree"
+        )
+    }
+
+    private fun doShowFullDiff() {
+        val backend = selectedBackend ?: return
+        val file = selectedDiffFile ?: return
+        val snapshotKey = System.identityHashCode(backend)
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val headBytes: ByteArray? = when (file.status) {
+                GitFileStatus.UNTRACKED, GitFileStatus.ADDED -> null
+                else -> backend.getHeadContent(file.path)
+            }
+            val workBytes: ByteArray? = when (file.status) {
+                GitFileStatus.DELETED -> null
+                else -> runCatching { File(backend.repoPath, file.path).readBytes() }.getOrNull()
+            }
+            val request = buildDiffRequest(backend.repoPath, file, headBytes, workBytes)
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                DiffManager.getInstance().showDiff(project, request, DiffDialogHints.FRAME)
+            }
+        }
     }
 
     // ── Disposable ────────────────────────────────────────────────────────────
