@@ -18,6 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: File Tree and Context Menu Polish** - Correct icon rendering, VCS color coding, expand/collapse glitches, and complete context menu actions
 - [ ] **Phase 5: Branch Management** - Add branch list panel with checkout, create, and delete; handle dirty-tree smart checkout
 - [ ] **Phase 6: Stash UI** - Add stash creation dialog and stash list panel with apply and drop actions
+- [ ] **Phase 7: Polish, improve quick open / smart search** - Polish, improve quick open / smart search
 
 ## Phase Details
 
@@ -30,7 +31,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Pull progress is visible (background indicator) while the operation runs
   3. Pull result — success, conflicts, or error — appears in the Git panel status area after completion
   4. All new GitBackend methods (listBranches, checkoutBranch, createBranch, deleteBranch, stash, stashList, stashPop, pull) exist on the interface and both implementations compile and pass unit tests
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Extend GitBackend interface + implement all new methods in both backends + parsing helpers with unit tests
+- [ ] 01-02-PLAN.md — Wire Pull AnAction into GitPanelComponent toolbar + implement doPull() with Task.Backgroundable and result handling
 
 ### Phase 2: Pre-Commit Diff Viewer
 **Goal**: Users can inspect what changed in a file before committing, both inline in the Git panel and in a full-window frame
@@ -90,17 +95,23 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. User can select a stash entry and delete it after a confirmation prompt; the entry disappears from the list
 **Plans**: TBD
 
+### Phase 7: Polish, improve quick open / smart search
+**Goal**: Polish, improve quick open / smart search
+**Depends on**: TBD
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 (Phase 3 and Phase 4 are independent and may run in parallel with Phase 2 if capacity allows)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. GitBackend Extensions + Pull | 0/? | Not started | - |
+| 1. GitBackend Extensions + Pull | 0/2 | Planned | - |
 | 2. Pre-Commit Diff Viewer | 0/? | Not started | - |
 | 3. Drag and Drop Polish | 0/? | Not started | - |
 | 4. File Tree and Context Menu Polish | 0/? | Not started | - |
 | 5. Branch Management | 0/? | Not started | - |
 | 6. Stash UI | 0/? | Not started | - |
+| 7. Polish, improve quick open / smart search | 0/? | Not started | - |
