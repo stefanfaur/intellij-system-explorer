@@ -96,9 +96,26 @@ Plans:
 **Plans**: TBD
 
 ### Phase 7: Polish, improve quick open / smart search
-**Goal**: Polish, improve quick open / smart search
-**Depends on**: TBD
-**Plans**: TBD
+**Goal**: Polish and correctness pass for the Quick Open popup — fix bugs (coroutine scope leak, lateinit popup crash, Nucleo native not bundled, rg flag injection risk), improve UX (status bar with ranker+root+count, condensed hint bar, dual-debounce, path segment highlighting), and tighten defaults (frecency-only speed dial, rg match line navigation)
+**Depends on**: Nothing (independent polish pass)
+**Requirements**: QO-CODE-01, QO-CODE-02, QO-CODE-03, QO-CODE-04, QO-RG-01, QO-RG-02, QO-RG-03, QO-UI-01, QO-UI-02, QO-UI-03, QO-UI-04, QO-RANK-01
+**Success Criteria** (what must be TRUE):
+  1. NucleoNative loads on darwin-aarch64 — libfuzzyjni.dylib committed to src/main/resources/natives/darwin-aarch64/ and packaged in plugin JAR
+  2. ripgrepExtraFlags is allowlist-validated; --exec and unknown flags are silently dropped
+  3. popup field is null-safe (var popup: JBPopup? = null); no UninitializedPropertyAccessException possible
+  4. CoroutineScope in performContentSearch() is parented to panel lifecycle (panelScope with SupervisorJob()); cancelled in dispose()
+  5. Fuzzy search debounce is 50ms; rg content search debounce is 300ms
+  6. Pressing Enter on a CONTENT_MATCH result opens the file at the exact matched line in IntelliJ's editor
+  7. Status bar shows "Fuzzy: <ranker> · Root: <path> · <N> files"; root path is clickable to change root
+  8. Speed dial shows top frecent paths (files and dirs) from FrecencyStore, not bookmark-first logic
+  9. Hint bar condensed to 5 shortcuts: navigate, preview, bookmark, recent, close
+  10. Parent path segments in result rows highlight matched characters
+**Plans**: 3 plans in 2 waves
+
+Plans:
+- [ ] 07-01-PLAN.md — Nucleo native bundling + rg flags allowlist + popup null-safety (wave 1)
+- [ ] 07-02-PLAN.md — Coroutine scope fix + dual-debounce + rg match line navigation (wave 1)
+- [ ] 07-03-PLAN.md — Status bar + speed dial frecency + hint bar + path highlighting (wave 2)
 
 ## Progress
 
@@ -114,4 +131,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. File Tree and Context Menu Polish | 0/? | Not started | - |
 | 5. Branch Management | 0/? | Not started | - |
 | 6. Stash UI | 0/? | Not started | - |
-| 7. Polish, improve quick open / smart search | 0/? | Not started | - |
+| 7. Polish, improve quick open / smart search | 0/3 | Not started | - |
