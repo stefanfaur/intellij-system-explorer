@@ -87,5 +87,61 @@ class RemoteGitBackend(
         )
     }
 
+    override fun pull(): GitCommandResult {
+        val result = executor.executeBlocking(repoPath, args = arrayOf("pull"))
+        if (!result.isSuccess && result.stderr.isNotBlank()) {
+            LOG.warn("git pull failed for $displayName (exit ${result.exitCode}): ${result.stderr.take(300)}")
+        }
+        return result
+    }
+
+    override fun listBranches(): List<BranchInfo> {
+        val result = executor.executeBlocking(
+            repoPath,
+            args = arrayOf("branch", "--format=%(refname:short)\t%(HEAD)")
+        )
+        if (!result.isSuccess) {
+            if (result.stderr.isNotBlank()) LOG.warn("git branch failed for $displayName: ${result.stderr.take(300)}")
+            return emptyList()
+        }
+        return result.stdoutLines.mapNotNull { parseBranchLine(it) }
+    }
+
+    override fun checkoutBranch(name: String): GitCommandResult {
+        return executor.executeBlocking(repoPath, args = arrayOf("checkout", name))
+    }
+
+    override fun createBranch(name: String): GitCommandResult {
+        return executor.executeBlocking(repoPath, args = arrayOf("checkout", "-b", name))
+    }
+
+    override fun deleteBranch(name: String, force: Boolean): GitCommandResult {
+        val flag = if (force) "-D" else "-d"
+        return executor.executeBlocking(repoPath, args = arrayOf("branch", flag, name))
+    }
+
+    override fun stash(message: String?, includeUntracked: Boolean): GitCommandResult {
+        val args = mutableListOf("stash", "push")
+        if (includeUntracked) args.add("--include-untracked")
+        if (message != null) { args.add("-m"); args.add(message) }
+        return executor.executeBlocking(repoPath, args = args.toTypedArray())
+    }
+
+    override fun stashList(): List<StashEntry> {
+        val result = executor.executeBlocking(
+            repoPath,
+            args = arrayOf("stash", "list", "--format=%gd\t%s")
+        )
+        if (!result.isSuccess) {
+            if (result.stderr.isNotBlank()) LOG.warn("git stash list failed for $displayName: ${result.stderr.take(300)}")
+            return emptyList()
+        }
+        return result.stdoutLines.mapNotNull { parseStashLine(it) }
+    }
+
+    override fun stashPop(index: Int): GitCommandResult {
+        return executor.executeBlocking(repoPath, args = arrayOf("stash", "pop", "stash@{$index}"))
+    }
+
     override fun dispose() {}
 }
