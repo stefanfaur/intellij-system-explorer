@@ -191,8 +191,9 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         commitLogPanel.onCommitSelected = { entry -> onCommitSelected(entry) }
 
         // Wire file selection callbacks
-        changedFilesPanel.onFileSelected = { file ->
+        changedFilesPanel.onFileSelected = fileSelectedLambda@{ file ->
             selectedDiffFile = file
+            if (selectedCommitHash != null) return@fileSelectedLambda  // history mode: stay in CommitDetailsPanel
             if (file != null) {
                 showDiffSlot()
                 loadInlineDiff(file)
@@ -557,7 +558,9 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         repoPath: String,
         commitFile: CommitFile,
         headBytes: ByteArray?,
-        workBytes: ByteArray?
+        workBytes: ByteArray?,
+        leftLabel: String = "HEAD",
+        rightLabel: String = "Working Tree"
     ): SimpleDiffRequest {
         val factory = DiffContentFactory.getInstance()
         val filePath = VcsUtil.getFilePath(File(repoPath, commitFile.path).absolutePath, false)
@@ -576,26 +579,37 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
             commitFile.path,
             headContent,
             workContent,
-            "HEAD",
-            "Working Tree"
+            leftLabel,
+            rightLabel
         )
     }
 
     private fun doShowFullDiff() {
         val backend = selectedBackend ?: return
         val file = selectedDiffFile ?: return
+        val commitHash = selectedCommitHash  // snapshot to avoid race on EDT
         val snapshotKey = System.identityHashCode(backend)
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            val headBytes: ByteArray? = when (file.status) {
-                GitFileStatus.UNTRACKED, GitFileStatus.ADDED -> null
-                else -> backend.getHeadContent(file.path)
+            val request: SimpleDiffRequest = if (commitHash != null) {
+                // History mode: compare file at parent commit vs file at selected commit
+                val beforeBytes = backend.getFileAtRevision("$commitHash^", file.path)  // parent (before)
+                val afterBytes  = backend.getFileAtRevision(commitHash, file.path)       // at commit (after)
+                buildDiffRequest(backend.repoPath, file, beforeBytes, afterBytes,
+                    leftLabel = "$commitHash^", rightLabel = commitHash.take(8))
+            } else {
+                // Staging mode: HEAD vs working tree (existing behaviour)
+                val headBytes: ByteArray? = when (file.status) {
+                    GitFileStatus.UNTRACKED, GitFileStatus.ADDED -> null
+                    else -> backend.getHeadContent(file.path)
+                }
+                val workBytes: ByteArray? = when (file.status) {
+                    GitFileStatus.DELETED -> null
+                    else -> runCatching { File(backend.repoPath, file.path).readBytes() }.getOrNull()
+                }
+                buildDiffRequest(backend.repoPath, file, headBytes, workBytes)
             }
-            val workBytes: ByteArray? = when (file.status) {
-                GitFileStatus.DELETED -> null
-                else -> runCatching { File(backend.repoPath, file.path).readBytes() }.getOrNull()
-            }
-            val request = buildDiffRequest(backend.repoPath, file, headBytes, workBytes)
+
             ApplicationManager.getApplication().invokeLater {
                 if (disposed) return@invokeLater
                 if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
