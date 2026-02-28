@@ -27,6 +27,7 @@ class GitRepositoryRegistryTest : BasePlatformTestCase() {
             override fun getWorkingTreeStatus(): List<CommitFile> = emptyList()
             override fun getCommitFiles(hash: String): List<CommitFile> = emptyList()
             override fun getCommitInfo(hash: String): CommitInfo? = null
+            override fun getHeadContent(path: String): ByteArray? = null
             override fun stageFiles(paths: List<String>): GitCommandResult = GitCommandResult(0, "", "")
             override fun commit(message: String): GitCommandResult = GitCommandResult(0, "", "")
             override fun push(): GitCommandResult = GitCommandResult(0, "", "")
