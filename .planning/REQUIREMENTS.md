@@ -16,10 +16,10 @@
 
 ### File Tree Rendering
 
-- [ ] **TREE-01**: File tree icons are correct after dumb-mode transitions (no stale icon cache)
-- [ ] **TREE-02**: Expand/collapse does not produce duplicate placeholder children on repeated toggling
-- [ ] **TREE-03**: Modified files show VCS color coding (blue), untracked files show different color (matches IntelliJ conventions)
-- [ ] **TREE-04**: File tree uses `TreeUIHelper.installTreeSpeedSearch()` (replaces deprecated `TreeSpeedSearch` constructor)
+- [x] **TREE-01**: File tree icons are correct after dumb-mode transitions (no stale icon cache)
+- [x] **TREE-02**: Expand/collapse does not produce duplicate placeholder children on repeated toggling
+- [x] **TREE-03**: Modified files show VCS color coding (blue), untracked files show different color (matches IntelliJ conventions)
+- [x] **TREE-04**: File tree uses `TreeUIHelper.installTreeSpeedSearch()` (replaces deprecated `TreeSpeedSearch` constructor)
 
 ### Context Menus
 
@@ -99,10 +99,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DND-04 | Phase 3 | Complete |
 | DND-05 | Phase 3 | Complete |
 | DND-06 | Phase 3 | Complete |
-| TREE-01 | Phase 4 | Pending |
-| TREE-02 | Phase 4 | Pending |
-| TREE-03 | Phase 4 | Pending |
-| TREE-04 | Phase 4 | Pending |
+| TREE-01 | Phase 4 | Complete |
+| TREE-02 | Phase 4 | Complete |
+| TREE-03 | Phase 4 | Complete |
+| TREE-04 | Phase 4 | Complete |
 | CTX-01 | Phase 4 | Pending |
 | CTX-02 | Phase 4 | Pending |
 | CTX-03 | Phase 4 | Pending |

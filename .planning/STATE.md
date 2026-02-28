@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T19:50:54.921Z"
+last_updated: "2026-02-28T22:16:42.614Z"
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 5
-  total_plans: 18
-  completed_plans: 18
+  total_plans: 20
+  completed_plans: 19
 ---
 
 # Project State
@@ -60,6 +60,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 08 P06 | 2 | 1 tasks | 1 files |
 | Phase 03 P01 | 4 | 2 tasks | 2 files |
 | Phase 03 P02 | 8 | 2 tasks | 3 files |
+| Phase 04 P01 | 9 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,9 @@ Recent decisions affecting current work:
 - [Phase 03]: Source-parent refresh only runs when isMove=true — copy operations do not need to invalidate the source directory
 - [Phase 03]: AllIcons.Nodes.MultipleFiles does not exist in IJ 2024.3 — AllIcons.FileTypes.Any_type used as multi-file ghost icon fallback
 - [Phase 03]: Messages.showYesNoDialog in FileTreeTransferHandler uses null Project (no project reference available in TransferHandler)
+- [Phase 04-01]: FileStatusManager.addFileStatusListener used instead of FILE_STATUS_TOPIC messageBus (no such constant in IJ 2024.3)
+- [Phase 04-01]: DumbService.DUMB_MODE is correct topic constant (not DUMB_MODE_LISTENER)
+- [Phase 04-01]: directoryStatusCache uses Optional<Color> as ConcurrentHashMap cannot store null values
 
 ### Roadmap Evolution
 
@@ -122,6 +126,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28
-Stopped at: 08-06-PLAN.md task 2 checkpoint:human-verify — Phase 8 full system verification pending
+Last session: 2026-03-01
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
