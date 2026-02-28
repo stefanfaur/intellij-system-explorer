@@ -33,6 +33,16 @@ data class CommitInfo(
     val body: String,
 )
 
+data class BranchInfo(
+    val name: String,
+    val isCurrent: Boolean,
+)
+
+data class StashEntry(
+    val index: Int,        // 0-based, matches stash@{N}
+    val message: String,   // "WIP on branch: <hash> <subject>" or custom message
+)
+
 interface GitBackend : Disposable {
     val id: GitBackendId
     val displayName: String
@@ -45,5 +55,13 @@ interface GitBackend : Disposable {
     fun stageFiles(paths: List<String>): ro.faur.explorer.gitpanel.exec.GitCommandResult
     fun commit(message: String): ro.faur.explorer.gitpanel.exec.GitCommandResult
     fun push(): ro.faur.explorer.gitpanel.exec.GitCommandResult
+    fun pull(): ro.faur.explorer.gitpanel.exec.GitCommandResult
+    fun listBranches(): List<BranchInfo>
+    fun checkoutBranch(name: String): ro.faur.explorer.gitpanel.exec.GitCommandResult
+    fun createBranch(name: String): ro.faur.explorer.gitpanel.exec.GitCommandResult
+    fun deleteBranch(name: String, force: Boolean = false): ro.faur.explorer.gitpanel.exec.GitCommandResult
+    fun stash(message: String?, includeUntracked: Boolean): ro.faur.explorer.gitpanel.exec.GitCommandResult
+    fun stashList(): List<StashEntry>
+    fun stashPop(index: Int): ro.faur.explorer.gitpanel.exec.GitCommandResult
     override fun dispose()
 }

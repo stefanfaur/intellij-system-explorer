@@ -2,11 +2,13 @@ package ro.faur.explorer.light
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import ro.faur.explorer.gitpanel.BackendType
+import ro.faur.explorer.gitpanel.BranchInfo
 import ro.faur.explorer.gitpanel.CommitFile
 import ro.faur.explorer.gitpanel.CommitInfo
 import ro.faur.explorer.gitpanel.GitBackend
 import ro.faur.explorer.gitpanel.GitBackendId
 import ro.faur.explorer.gitpanel.GitRepositoryRegistry
+import ro.faur.explorer.gitpanel.StashEntry
 import ro.faur.explorer.gitpanel.exec.GitCommandResult
 import ro.faur.explorer.remote.git.GitLogEntry
 import java.time.Instant
@@ -28,6 +30,14 @@ class GitRepositoryRegistryTest : BasePlatformTestCase() {
             override fun stageFiles(paths: List<String>): GitCommandResult = GitCommandResult(0, "", "")
             override fun commit(message: String): GitCommandResult = GitCommandResult(0, "", "")
             override fun push(): GitCommandResult = GitCommandResult(0, "", "")
+            override fun pull(): GitCommandResult = GitCommandResult(0, "", "")
+            override fun listBranches(): List<BranchInfo> = emptyList()
+            override fun checkoutBranch(name: String): GitCommandResult = GitCommandResult(0, "", "")
+            override fun createBranch(name: String): GitCommandResult = GitCommandResult(0, "", "")
+            override fun deleteBranch(name: String, force: Boolean): GitCommandResult = GitCommandResult(0, "", "")
+            override fun stash(message: String?, includeUntracked: Boolean): GitCommandResult = GitCommandResult(0, "", "")
+            override fun stashList(): List<StashEntry> = emptyList()
+            override fun stashPop(index: Int): GitCommandResult = GitCommandResult(0, "", "")
             override fun dispose() {}
         }
     }
