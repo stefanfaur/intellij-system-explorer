@@ -24,6 +24,7 @@ import com.intellij.ui.TreeUIHelper
 import com.intellij.ui.render.RenderingUtil
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.concurrency.AppExecutorUtil
+import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 import java.awt.Color
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -387,107 +388,157 @@ class FileTreeComponent(private val project: Project) : Disposable {
         val singleFile = selected.singleOrNull()
         val contextDir = getContextDirectory()
 
-        // Open (files only)
-        if (singleFile != null && !singleFile.isDirectory) {
-            menu.add(JMenuItem("Open").apply {
-                addActionListener {
-                    openEntry(singleFile)
-                }
-            })
-        }
+        // --- Group 1: Open actions ---
+
+        // Open (visible for all, enabled for files only)
+        menu.add(JMenuItem("Open").apply {
+            isEnabled = singleFile != null && !singleFile.isDirectory
+            addActionListener {
+                if (singleFile != null) openEntry(singleFile)
+            }
+        })
 
         // Open in System
-        if (singleFile != null) {
-            menu.add(JMenuItem("Open in System").apply {
-                isEnabled = java.awt.Desktop.isDesktopSupported() &&
-                        java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)
-                addActionListener {
+        menu.add(JMenuItem("Open in System").apply {
+            isEnabled = singleFile != null &&
+                    java.awt.Desktop.isDesktopSupported() &&
+                    java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)
+            addActionListener {
+                if (singleFile != null) {
                     AppExecutorUtil.getAppExecutorService().execute {
                         runCatching { java.awt.Desktop.getDesktop().open(java.io.File(singleFile.path)) }
                             .onFailure { LOG.warn("Failed to open file in system: ${it.message}") }
                     }
                 }
-            })
+            }
+        })
+
+        // Reveal in Finder / Explorer / File Manager (OS-adaptive label)
+        val revealLabel = when {
+            SystemInfo.isMac     -> "Reveal in Finder"
+            SystemInfo.isWindows -> "Reveal in Explorer"
+            else                 -> "Open in File Manager"
         }
+        menu.add(JMenuItem(revealLabel).apply {
+            isEnabled = singleFile != null &&
+                    java.awt.Desktop.isDesktopSupported() &&
+                    java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE_FILE_DIR)
+            addActionListener {
+                if (singleFile != null) {
+                    AppExecutorUtil.getAppExecutorService().execute {
+                        runCatching {
+                            java.awt.Desktop.getDesktop().browseFileDirectory(java.io.File(singleFile.path))
+                        }.onFailure { LOG.warn("Failed to reveal file in file manager: ${it.message}") }
+                    }
+                }
+            }
+        })
+
+        // Open Terminal Here
+        menu.add(JMenuItem("Open Terminal Here").apply {
+            isEnabled = singleFile != null || contextDir != null
+            addActionListener {
+                val dir = if (singleFile?.isDirectory == true) singleFile.path
+                          else singleFile?.parent?.path ?: contextDir?.path ?: return@addActionListener
+                try {
+                    TerminalToolWindowManager.getInstance(project).createLocalShellWidget(
+                        dir, "Terminal: ${java.io.File(dir).name}", true, true
+                    )
+                } catch (e: Exception) {
+                    LOG.warn("Failed to open terminal: ${e.message}")
+                }
+            }
+        })
 
         menu.addSeparator()
+
+        // --- Group 2: Clipboard actions ---
 
         // Copy
-        if (selected.isNotEmpty()) {
-            menu.add(JMenuItem("Copy").apply {
-                addActionListener {
-                    FileActions.copyToClipboard(selected)
-                    cutFiles = null // clear any pending cut
-                }
-            })
-        }
+        menu.add(JMenuItem("Copy").apply {
+            isEnabled = selected.isNotEmpty()
+            addActionListener {
+                FileActions.copyToClipboard(selected)
+                cutFiles = null
+            }
+        })
 
         // Cut
-        if (selected.isNotEmpty()) {
-            menu.add(JMenuItem("Cut").apply {
-                addActionListener {
-                    FileActions.copyToClipboard(selected)
-                    cutFiles = selected.toList() // mark for move on paste
-                }
-            })
-        }
+        menu.add(JMenuItem("Cut").apply {
+            isEnabled = selected.isNotEmpty()
+            addActionListener {
+                FileActions.copyToClipboard(selected)
+                cutFiles = selected.toList()
+            }
+        })
 
         // Paste
-        if (contextDir != null) {
-            menu.add(JMenuItem("Paste").apply {
-                addActionListener { pasteFiles(contextDir) }
-            })
-        }
+        menu.add(JMenuItem("Paste").apply {
+            isEnabled = contextDir != null
+            addActionListener {
+                if (contextDir != null) pasteFiles(contextDir)
+            }
+        })
 
         // Copy Path
-        if (singleFile != null) {
-            menu.add(JMenuItem("Copy Path").apply {
-                addActionListener { FileActions.copyPathToClipboard(singleFile) }
-            })
-        }
+        menu.add(JMenuItem("Copy Path").apply {
+            isEnabled = singleFile != null
+            addActionListener {
+                if (singleFile != null) FileActions.copyPathToClipboard(singleFile)
+            }
+        })
 
         menu.addSeparator()
+
+        // --- Group 3: Rename / Delete ---
 
         // Rename
-        if (singleFile != null) {
-            menu.add(JMenuItem("Rename").apply {
-                addActionListener { renameFile(singleFile) }
-            })
-        }
+        menu.add(JMenuItem("Rename").apply {
+            isEnabled = singleFile != null
+            addActionListener {
+                if (singleFile != null) renameFile(singleFile)
+            }
+        })
 
         // Delete
-        if (selected.isNotEmpty()) {
-            menu.add(JMenuItem("Delete").apply {
-                addActionListener { deleteFiles(selected) }
-            })
-        }
+        menu.add(JMenuItem("Delete").apply {
+            isEnabled = selected.isNotEmpty()
+            addActionListener { deleteFiles(selected) }
+        })
 
         menu.addSeparator()
+
+        // --- Group 4: Create ---
 
         // New File
-        if (contextDir != null) {
-            menu.add(JMenuItem("New File").apply {
-                addActionListener { createNewFile(contextDir) }
-            })
-        }
+        menu.add(JMenuItem("New File").apply {
+            isEnabled = contextDir != null
+            addActionListener {
+                if (contextDir != null) createNewFile(contextDir)
+            }
+        })
 
         // New Folder
-        if (contextDir != null) {
-            menu.add(JMenuItem("New Folder").apply {
-                addActionListener { createNewFolder(contextDir) }
-            })
-        }
+        menu.add(JMenuItem("New Folder").apply {
+            isEnabled = contextDir != null
+            addActionListener {
+                if (contextDir != null) createNewFolder(contextDir)
+            }
+        })
 
         menu.addSeparator()
 
-        // Add to Bookmarks (directories only)
-        if (singleFile != null && singleFile.isDirectory) {
-            menu.add(JMenuItem("Add to Bookmarks").apply {
-                addActionListener { addToBookmarks(singleFile) }
-            })
-        }
+        // --- Group 5: Bookmarks / Refresh ---
 
-        // Refresh
+        // Add to Bookmarks (enabled for directories only)
+        menu.add(JMenuItem("Add to Bookmarks").apply {
+            isEnabled = singleFile?.isDirectory == true
+            addActionListener {
+                if (singleFile != null) addToBookmarks(singleFile)
+            }
+        })
+
+        // Refresh (always enabled)
         menu.add(JMenuItem("Refresh").apply {
             addActionListener { refresh(); onFilesModified?.invoke() }
         })
