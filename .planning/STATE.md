@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-01T13:01:41.676Z"
+last_updated: "2026-03-01T13:03:16.745Z"
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 23
-  completed_plans: 22
+  completed_plans: 23
 ---
 
 # Project State
@@ -65,6 +65,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 04 P02 | 5 | 2 tasks | 1 files |
 | Phase 05-branch-management P01 | 6 | 3 tasks | 8 files |
 | Phase 05-branch-management P03 | 3m | 2 tasks | 2 files |
+| Phase 05-branch-management P02 | 5 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -119,6 +120,9 @@ Recent decisions affecting current work:
 - [Phase 05-branch-management]: resetHard() uses one-liner override pattern with args reset --hard HEAD, same as checkoutBranch pattern
 - [Phase 05-branch-management]: ActionUpdateThread.EDT used for Create Branch/Delete Branch actions — they read cachedBranches which is EDT-only state
 - [Phase 05-branch-management]: Delete Branch attempt-and-detect: call deleteBranch(force=false) first, check stderr for 'not fully merged', show separate force-delete dialog
+- [Phase 05-branch-management]: 05-02: cachedBranches populated inside invokeLater stale-result guard — consistent with displayed branchLabel
+- [Phase 05-branch-management]: 05-02: Auto-stash message is exactly 'Auto-stash before checkout to $targetBranch' with includeUntracked=true
+- [Phase 05-branch-management]: 05-02: showDirtyTreeDialog uses defaultOptionIndex=2 (Cancel) and explicit WARNING text for Discard option
 
 ### Roadmap Evolution
 
