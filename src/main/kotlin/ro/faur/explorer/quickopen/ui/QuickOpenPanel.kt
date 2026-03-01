@@ -444,9 +444,9 @@ class QuickOpenPanel(
 
         // Count files to determine mode (run on background thread, do NOT block EDT)
         panelScope.launch(Dispatchers.IO) {
-            val fileCount = LuceneIndexBuilder.countFiles(Paths.get(root))
+            val fileCount = LuceneIndexBuilder.countFiles(Paths.get(root), stopAt = threshold)
             ApplicationManager.getApplication().invokeLater({
-                if (fileCount < 0 || fileCount < threshold) {
+                if (fileCount > 0 && fileCount < threshold) {
                     // Live mode: use existing candidatePool with VfsEnumerator (or RipgrepEnumerator)
                     // No change — the candidatePool already uses VfsEnumerator
                     candidatePool.refreshAsync(root) {
