@@ -36,18 +36,35 @@ object LuceneIndexBuilder {
     )
 
     /**
-     * Count all regular files under root, with a timeout.
-     * Returns -1 on timeout or error.
+     * Count all regular files under root, skipping HARD_EXCLUDE_DIRS.
+     * Stops counting once count exceeds [stopAt] (returns stopAt + 1).
+     * Returns -1 on error. Returns stopAt + 1 on timeout (treat as "large").
      */
-    fun countFiles(root: Path, timeoutMs: Long = 5_000): Int {
+    fun countFiles(root: Path, timeoutMs: Long = 5_000, stopAt: Int = Int.MAX_VALUE): Int {
+        class StopCounting : Exception()
         return try {
-            var count = -1
+            var result = -1
             val thread = Thread {
-                count = try {
-                    Files.walk(root).use { stream ->
-                        stream.filter(Files::isRegularFile).count().toInt()
-                    }
-                } catch (e: Exception) {
+                result = try {
+                    var count = 0
+                    Files.walkFileTree(root, object : SimpleFileVisitor<Path>() {
+                        override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                            val name = dir.fileName?.toString() ?: return FileVisitResult.CONTINUE
+                            return if (name in HARD_EXCLUDE_DIRS) FileVisitResult.SKIP_SUBTREE
+                                   else FileVisitResult.CONTINUE
+                        }
+                        override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                            count++
+                            if (count > stopAt) throw StopCounting()
+                            return FileVisitResult.CONTINUE
+                        }
+                        override fun visitFileFailed(file: Path, exc: java.io.IOException): FileVisitResult =
+                            FileVisitResult.CONTINUE
+                    })
+                    count
+                } catch (_: StopCounting) {
+                    stopAt + 1
+                } catch (_: Exception) {
                     -1
                 }
             }
@@ -56,11 +73,11 @@ object LuceneIndexBuilder {
             thread.join(timeoutMs)
             if (thread.isAlive) {
                 thread.interrupt()
-                -1
+                stopAt + 1  // timeout = treat as "large"
             } else {
-                count
+                result
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             -1
         }
     }

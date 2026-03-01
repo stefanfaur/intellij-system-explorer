@@ -39,6 +39,8 @@ class GitRepositoryRegistryTest : BasePlatformTestCase() {
             override fun stash(message: String?, includeUntracked: Boolean): GitCommandResult = GitCommandResult(0, "", "")
             override fun stashList(): List<StashEntry> = emptyList()
             override fun stashPop(index: Int): GitCommandResult = GitCommandResult(0, "", "")
+            override fun stashApply(index: Int): GitCommandResult = GitCommandResult(0, "", "")
+            override fun stashDrop(index: Int): GitCommandResult = GitCommandResult(0, "", "")
             override fun getFileAtRevision(hash: String, path: String): ByteArray? = null
             override fun resetHard(): GitCommandResult = GitCommandResult(0, "", "")
             override fun dispose() {}

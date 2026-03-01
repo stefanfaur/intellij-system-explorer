@@ -132,6 +132,24 @@ class LuceneIndexBuilderTest {
     }
 
     @Test
+    fun `test 5b - countFiles skips HARD_EXCLUDE_DIRS`(@TempDir tempDir: Path) {
+        Files.createDirectories(tempDir.resolve("node_modules"))
+        for (i in 1..5) Files.writeString(tempDir.resolve("node_modules/dep$i.kt"), "dep")
+        for (i in 1..3) Files.writeString(tempDir.resolve("file$i.kt"), "content")
+
+        val count = LuceneIndexBuilder.countFiles(tempDir)
+        assertEquals(3, count, "countFiles should skip node_modules, got: $count")
+    }
+
+    @Test
+    fun `test 5c - countFiles stops after stopAt threshold`(@TempDir tempDir: Path) {
+        for (i in 1..10) Files.writeString(tempDir.resolve("file$i.kt"), "content")
+
+        val count = LuceneIndexBuilder.countFiles(tempDir, stopAt = 5)
+        assertTrue(count > 5, "countFiles with stopAt=5 should return > 5 when 10 files exist, got: $count")
+    }
+
+    @Test
     fun `test 6 - shouldIndex returns false for a class file with binary content`(@TempDir tempDir: Path) {
         // Java .class files start with 0xCAFEBABE magic bytes
         val classFile = tempDir.resolve("Main.class")
