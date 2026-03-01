@@ -108,7 +108,13 @@ Plans:
   2. After stash creation, the new entry appears in the stash list in the Git panel
   3. User can select a stash entry and apply it; the working tree reflects the stashed changes
   4. User can select a stash entry and delete it after a confirmation prompt; the entry disappears from the list
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Add stashApply() and stashDrop() to GitBackend interface + both backends (wave 1)
+- [ ] 06-02-PLAN.md — CreateStashDialog: optional message + include-untracked checkbox (wave 1)
+- [ ] 06-03-PLAN.md — StashListPanel: JBList, secondary toolbar, right-click context menu (wave 2)
+- [ ] 06-04-PLAN.md — GitPanelComponent wiring: CardLayout integration, toolbar actions, stash handlers + human verify (wave 3)
 
 ### Phase 7: Polish, improve quick open / smart search
 **Goal**: Polish and correctness pass for the Quick Open popup — fix bugs (coroutine scope leak, lateinit popup crash, Nucleo native not bundled, rg flag injection risk), improve UX (status bar with ranker+root+count, condensed hint bar, dual-debounce, path segment highlighting), and tighten defaults (frecency-only speed dial, rg match line navigation)
