@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-01T14:23:05.444Z"
+last_updated: "2026-03-01T14:25:56.959Z"
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 27
-  completed_plans: 25
+  completed_plans: 26
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 6 of 8 (Stash UI) — IN PROGRESS (plan 01 of 4 complete)
-Next: Phase 6 plan 02 — StashListPanel UI
-Status: Phase 06-01 complete — stashApply and stashDrop added to interface and both backends
-Last activity: 2026-03-01 — Phase 06-01 executed; backend contract delivered
+Phase: 6 of 8 (Stash UI) — IN PROGRESS (plan 03 of 4 complete)
+Next: Phase 6 plan 04 — GitPanelComponent stash wiring
+Status: Phase 06-03 complete — StashListPanel UI component delivered (JBList, toolbar, context menu)
+Last activity: 2026-03-01 — Phase 06-03 executed; StashListPanel ready for embedding
 
 Progress: [█████░░░░░] 55%
 
@@ -68,6 +68,7 @@ Progress: [█████░░░░░] 55%
 | Phase 05-branch-management P02 | 5 | 2 tasks | 1 files |
 | Phase 06-stash-ui P02 | 1 | 1 tasks | 1 files |
 | Phase 06 P01 | 2 | 2 tasks | 3 files |
+| Phase 06-stash-ui P03 | 1 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,8 @@ Recent decisions affecting current work:
 - [Phase 06-stash-ui]: 06-02: OK button always enabled (isOKActionEnabled=true) — empty message valid, git uses default
 - [Phase 06-stash-ui]: 06-02: getMessage() returns null for blank input so callers can skip --message flag entirely
 - [Phase 06-01]: stashApply/stashDrop use one-liner override pattern returning executor.executeBlocking result directly — no LOG.warn for command methods in RemoteGitBackend
+- [Phase 06-stash-ui]: 06-03: StashListPanel row format uses StashEntry.message only — no stash@{N}: prefix
+- [Phase 06-stash-ui]: 06-03: setEntries() always rebuilds list model from fresh data — stale index prevention by convention
 
 ### Roadmap Evolution
 

@@ -54,7 +54,7 @@
 
 - [x] **STASH-01**: User can create a stash with an optional message from the Git panel toolbar
 - [x] **STASH-02**: Stash creation includes untracked files (--include-untracked option surfaced in dialog)
-- [ ] **STASH-03**: User can view a list of all stash entries in the Git panel
+- [x] **STASH-03**: User can view a list of all stash entries in the Git panel
 - [x] **STASH-04**: User can apply a selected stash entry
 - [x] **STASH-05**: User can drop (delete) a selected stash entry (with confirmation)
 
@@ -122,7 +122,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BRANCH-05 | Phase 5 | Complete |
 | STASH-01 | Phase 6 | Complete |
 | STASH-02 | Phase 6 | Complete |
-| STASH-03 | Phase 6 | Pending |
+| STASH-03 | Phase 6 | Complete |
 | STASH-04 | Phase 6 | Complete |
 | STASH-05 | Phase 6 | Complete |
 
