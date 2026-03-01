@@ -92,7 +92,12 @@ Plans:
   3. User can create a new branch by entering a name in a dialog; the new branch appears in the list and becomes current
   4. User can delete a local branch with a confirmation prompt; the branch disappears from the list
   5. Attempting to checkout a branch with a dirty working tree presents a dialog offering to stash, hard-reset, or cancel — no silent failure or data loss
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — BranchNameValidator (TDD) + resetHard() on GitBackend interface + both backends
+- [ ] 05-02-PLAN.md — Branch popup on branchLabel + doCheckoutBranch() + dirty-tree dialog (Stash/Discard/Cancel)
+- [ ] 05-03-PLAN.md — CreateBranchDialog + Create Branch toolbar + Delete Branch toolbar + attempt-and-detect unmerged + human verify
 
 ### Phase 6: Stash UI
 **Goal**: Users can create, view, apply, and delete stash entries from the Git panel without using a terminal
