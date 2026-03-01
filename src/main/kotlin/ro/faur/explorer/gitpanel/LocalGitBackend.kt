@@ -137,6 +137,9 @@ class LocalGitBackend(override val repoPath: String) : GitBackend {
         return executor.executeBlocking(repoPath, args = arrayOf("stash", "pop", "stash@{$index}"))
     }
 
+    override fun resetHard(): GitCommandResult =
+        executor.executeBlocking(repoPath, args = arrayOf("reset", "--hard", "HEAD"))
+
     override fun dispose() {}
 }
 

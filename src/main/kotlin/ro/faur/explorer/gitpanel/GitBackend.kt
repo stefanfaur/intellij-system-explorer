@@ -65,5 +65,6 @@ interface GitBackend : Disposable {
     fun stash(message: String?, includeUntracked: Boolean): ro.faur.explorer.gitpanel.exec.GitCommandResult
     fun stashList(): List<StashEntry>
     fun stashPop(index: Int): ro.faur.explorer.gitpanel.exec.GitCommandResult
+    fun resetHard(): ro.faur.explorer.gitpanel.exec.GitCommandResult
     override fun dispose()
 }
