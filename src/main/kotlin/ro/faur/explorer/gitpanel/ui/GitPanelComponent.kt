@@ -35,6 +35,7 @@ import ro.faur.explorer.gitpanel.CommitFile
 import ro.faur.explorer.gitpanel.GitBackend
 import ro.faur.explorer.gitpanel.GitRepositoryRegistry
 import ro.faur.explorer.gitpanel.LocalGitBackend
+import ro.faur.explorer.gitpanel.StashEntry
 import ro.faur.explorer.remote.git.GitFileStatus
 import ro.faur.explorer.remote.git.GitLogEntry
 import java.awt.BorderLayout
@@ -59,6 +60,8 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         private val LOG = Logger.getInstance(GitPanelComponent::class.java)
         private const val CARD_DETAILS = "details"
         private const val CARD_DIFF = "diff"
+        private const val CARD_MAIN  = "main"
+        private const val CARD_STASH = "stash"
     }
 
     @Volatile private var disposed = false
@@ -83,6 +86,13 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     private val inlineDiffPanel = InlineDiffPanel(project, this)
     private val rightSlotLayout = CardLayout()
     private val rightSlot = JPanel(rightSlotLayout)
+
+    // ── Stash card ─────────────────────────────────────────────────────────
+    private val mainViewLayout = CardLayout()
+    private val mainView = JPanel(mainViewLayout)
+    private val stashListPanel = StashListPanel()
+    private val stashDiffPanel = InlineDiffPanel(project, this)
+    private var onStashCard = false
 
     // Suppress action listener during programmatic model rebuild to avoid double reload
     private var suppressComboAction = false
@@ -167,6 +177,16 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
                 e.presentation.isEnabled = selectedBackend != null && cachedBranches.any { !it.isCurrent }
             }
         })
+        group.add(object : AnAction("Stash", "Create a stash of current working tree changes", AllIcons.Actions.MoveUp) {
+            override fun getActionUpdateThread() = ActionUpdateThread.BGT
+            override fun actionPerformed(e: AnActionEvent) { doCreateStash() }
+            override fun update(e: AnActionEvent) { e.presentation.isEnabled = selectedBackend != null }
+        })
+        group.add(object : AnAction("Stash List", "Toggle stash list view", AllIcons.Actions.ListFiles) {
+            override fun getActionUpdateThread() = ActionUpdateThread.BGT
+            override fun actionPerformed(e: AnActionEvent) { toggleStashCard() }
+            override fun update(e: AnActionEvent) { e.presentation.isEnabled = selectedBackend != null }
+        })
         group.add(object : AnAction("Add Local Repo", "Add a local git repository", AllIcons.General.Add) {
             override fun getActionUpdateThread() = ActionUpdateThread.BGT
             override fun actionPerformed(e: AnActionEvent) { addLocalRepo() }
@@ -238,7 +258,22 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         mainSplit.firstComponent  = commitLogPanel
         mainSplit.secondComponent = bottomSplit
 
-        add(mainSplit, BorderLayout.CENTER)
+        // Stash card: left = stash list, right = stash diff preview
+        val stashView = JBSplitter(false, 0.35f)
+        stashView.firstComponent  = stashListPanel
+        stashView.secondComponent = stashDiffPanel
+
+        mainView.add(mainSplit, CARD_MAIN)
+        mainView.add(stashView, CARD_STASH)
+        mainViewLayout.show(mainView, CARD_MAIN)
+
+        add(mainView, BorderLayout.CENTER)
+
+        // Wire stash list callbacks
+        stashListPanel.onApply         = { entry -> doStashApply(entry) }
+        stashListPanel.onPop           = { entry -> doStashPop(entry) }
+        stashListPanel.onDrop          = { entry -> doStashDrop(entry) }
+        stashListPanel.onStashSelected = { entry -> onStashEntrySelected(entry) }
 
         // Wire commit selection
         commitLogPanel.onCommitSelected = { entry -> onCommitSelected(entry) }
@@ -435,6 +470,159 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
                 }
             }
         }
+    }
+
+    // ── Stash card navigation ─────────────────────────────────────────────────
+
+    private fun toggleStashCard() {
+        if (onStashCard) return  // already on stash card — no-op
+        showStashCard()
+    }
+
+    private fun showStashCard() {
+        onStashCard = true
+        mainViewLayout.show(mainView, CARD_STASH)
+        loadStashList()
+    }
+
+    private fun showMainCard() {
+        onStashCard = false
+        stashDiffPanel.clear()
+        mainViewLayout.show(mainView, CARD_MAIN)
+    }
+
+    private fun loadStashList() {
+        val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val entries = runCatching { backend.stashList() }.getOrElse { emptyList() }
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                stashListPanel.setEntries(entries)
+            }
+        }
+    }
+
+    // ── Stash creation ────────────────────────────────────────────────────────
+
+    private fun doCreateStash() {
+        val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val branch = runCatching { backend.getCurrentBranch() }.getOrElse { null } ?: "HEAD"
+            val headLog = runCatching { backend.getLog(1) }.getOrElse { emptyList() }
+            val hint = if (headLog.isNotEmpty()) {
+                "WIP on $branch: ${headLog[0].hash.take(7)} ${headLog[0].subject}"
+            } else {
+                "WIP on $branch"
+            }
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                val dialog = CreateStashDialog(project, hint)
+                if (!dialog.showAndGet()) return@invokeLater
+                val message = dialog.getMessage()
+                val includeUntracked = dialog.isIncludeUntracked()
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    val result = backend.stash(message, includeUntracked)
+                    ApplicationManager.getApplication().invokeLater {
+                        if (disposed) return@invokeLater
+                        if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                        if (result.isSuccess) {
+                            showStashCard()
+                        } else {
+                            Notifications.Bus.notify(
+                                Notification("SystemExplorer", "Stash Error",
+                                    result.stderr.takeLast(200).ifBlank { "No local changes to save" },
+                                    NotificationType.ERROR), project)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Stash actions ──────────────────────────────────────────────────────────
+
+    private fun doStashApply(entry: StashEntry) {
+        val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val result = backend.stashApply(entry.index)
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                if (result.isSuccess) {
+                    loadStashList()
+                } else {
+                    Notifications.Bus.notify(
+                        Notification("SystemExplorer", "Stash Error",
+                            "Apply failed: ${result.stderr.takeLast(200)}",
+                            NotificationType.ERROR), project)
+                }
+            }
+        }
+    }
+
+    private fun doStashPop(entry: StashEntry) {
+        val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val result = backend.stashPop(entry.index)
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                if (result.isSuccess) {
+                    showMainCard()
+                } else {
+                    Notifications.Bus.notify(
+                        Notification("SystemExplorer", "Stash Error",
+                            "Pop failed: ${result.stderr.takeLast(200)}",
+                            NotificationType.ERROR), project)
+                }
+            }
+        }
+    }
+
+    private fun doStashDrop(entry: StashEntry) {
+        val confirmed = JOptionPane.showConfirmDialog(
+            this,
+            "Delete stash '${entry.message}'?",
+            "Confirm Drop",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        ) == JOptionPane.OK_OPTION
+        if (!confirmed) return
+        val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val result = backend.stashDrop(entry.index)
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                if (result.isSuccess) {
+                    showMainCard()
+                } else {
+                    Notifications.Bus.notify(
+                        Notification("SystemExplorer", "Stash Error",
+                            "Drop failed: ${result.stderr.takeLast(200)}",
+                            NotificationType.ERROR), project)
+                }
+            }
+        }
+    }
+
+    // ── Stash diff preview ────────────────────────────────────────────────────
+
+    private fun onStashEntrySelected(entry: StashEntry?) {
+        if (entry == null) {
+            stashDiffPanel.clear()
+            return
+        }
+        // Per-file stash diff requires listing files changed in a stash which needs an
+        // additional backend method not in scope for this phase. Show empty panel on selection.
+        stashDiffPanel.clear()
     }
 
     private fun notifyError(msg: String) {
