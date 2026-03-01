@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-01T14:22:28.385Z"
+last_updated: "2026-03-01T14:23:05.444Z"
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 27
-  completed_plans: 24
+  completed_plans: 25
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 5 of 8 (Branch Management) — COMPLETE
-Next: Phase 6 (Stash UI) — not started
-Status: Phase 05 fully verified — branch popup, checkout, dirty-tree dialog, create/delete branch all confirmed working
-Last activity: 2026-03-01 — Phase 05 human verification approved; verifier passed 5/5 criteria
+Phase: 6 of 8 (Stash UI) — IN PROGRESS (plan 01 of 4 complete)
+Next: Phase 6 plan 02 — StashListPanel UI
+Status: Phase 06-01 complete — stashApply and stashDrop added to interface and both backends
+Last activity: 2026-03-01 — Phase 06-01 executed; backend contract delivered
 
 Progress: [█████░░░░░] 55%
 
@@ -67,6 +67,7 @@ Progress: [█████░░░░░] 55%
 | Phase 05-branch-management P03 | 3m | 2 tasks | 2 files |
 | Phase 05-branch-management P02 | 5 | 2 tasks | 1 files |
 | Phase 06-stash-ui P02 | 1 | 1 tasks | 1 files |
+| Phase 06 P01 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,7 @@ Recent decisions affecting current work:
 - [Phase 05-branch-management]: 05-02: showDirtyTreeDialog uses defaultOptionIndex=2 (Cancel) and explicit WARNING text for Discard option
 - [Phase 06-stash-ui]: 06-02: OK button always enabled (isOKActionEnabled=true) — empty message valid, git uses default
 - [Phase 06-stash-ui]: 06-02: getMessage() returns null for blank input so callers can skip --message flag entirely
+- [Phase 06-01]: stashApply/stashDrop use one-liner override pattern returning executor.executeBlocking result directly — no LOG.warn for command methods in RemoteGitBackend
 
 ### Roadmap Evolution
 
@@ -144,5 +146,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Phase 05 complete (human verify approved, verifier passed). Ready for Phase 06 planning.
+Stopped at: Completed 06-01-PLAN.md — stashApply/stashDrop backend methods delivered. Ready for 06-02.
 Resume file: None
