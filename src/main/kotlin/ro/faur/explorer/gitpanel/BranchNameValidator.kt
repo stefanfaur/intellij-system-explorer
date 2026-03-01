@@ -6,7 +6,7 @@ package ro.faur.explorer.gitpanel
  */
 object BranchNameValidator {
 
-    private val INVALID_CHARS = Regex("""[\s~^:?*\[\\]""")
+    private val INVALID_CHARS = Regex("""[\s~^:?*\[\]\\]""")
 
     /**
      * Returns null if [name] is a valid git branch name, or a user-readable error
@@ -14,6 +14,7 @@ object BranchNameValidator {
      */
     fun validate(name: String): String? {
         if (name.isBlank()) return "Branch name cannot be empty"
+        if (name.any { it.code < 0x20 || it.code == 0x7F }) return "Branch name cannot contain control characters"
         if (name.startsWith(".")) return "Branch name cannot start with '.'"
         if (name.endsWith(".")) return "Branch name cannot end with '.'"
         if (name.startsWith("/")) return "Branch name cannot start with '/'"

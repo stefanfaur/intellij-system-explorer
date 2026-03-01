@@ -284,7 +284,9 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
                 if (status.isNotEmpty()) {
                     showDirtyTreeDialog(backend, targetBranch, snapshotKey)
                 } else {
-                    performCheckout(backend, targetBranch, snapshotKey)
+                    ApplicationManager.getApplication().executeOnPooledThread {
+                        performCheckout(backend, targetBranch, snapshotKey)
+                    }
                 }
             }
         }
@@ -293,7 +295,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     private fun showDirtyTreeDialog(backend: GitBackend, targetBranch: String, snapshotKey: Int) {
         val result = Messages.showDialog(
             project,
-            "You have uncommitted changes. What would you like to do?",
+            "You have uncommitted changes. Switch to '$targetBranch'?",
             "Dirty Working Tree",
             arrayOf(
                 "Stash & Switch",
