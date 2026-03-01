@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-02-28T23:14:00.762Z"
+last_updated: "2026-03-01T12:56:50.410Z"
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 6
-  total_plans: 20
-  completed_plans: 20
+  total_plans: 23
+  completed_plans: 21
 ---
 
 # Project State
@@ -63,6 +63,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 04 P01 | 9 | 2 tasks | 1 files |
 | Phase 04 P02 | 5 | 1 tasks | 1 files |
 | Phase 04 P02 | 5 | 2 tasks | 1 files |
+| Phase 05-branch-management P01 | 6 | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,8 @@ Recent decisions affecting current work:
 - [Phase 04]: All menu items always added to menu; isEnabled set explicitly — no conditional item add/remove (per CTX-04)
 - [Phase 04]: All menu items always added to menu; isEnabled set explicitly — no conditional item add/remove (per CTX-04)
 - [Phase 04]: createLocalShellWidget deprecation warning accepted — API still functional in IJ 2024.3
+- [Phase 05-branch-management]: BranchNameValidator checks: blank, leading/trailing dots, slashes, double slash, double dot, invalid chars, @{, lone @, .lock suffix — first match wins
+- [Phase 05-branch-management]: resetHard() uses one-liner override pattern with args reset --hard HEAD, same as checkoutBranch pattern
 
 ### Roadmap Evolution
 

@@ -46,9 +46,9 @@
 
 - [ ] **BRANCH-01**: User can view a list of all local branches in the Git panel, with the current branch highlighted
 - [ ] **BRANCH-02**: User can checkout an existing branch from the branch list
-- [ ] **BRANCH-03**: User can create a new branch from the current HEAD via a name-input dialog
-- [ ] **BRANCH-04**: User can delete a local branch (with confirmation) from the branch list
-- [ ] **BRANCH-05**: Checking out a branch with a dirty working tree prompts the user to stash, hard-reset, or cancel (no silent failure)
+- [x] **BRANCH-03**: User can create a new branch from the current HEAD via a name-input dialog
+- [x] **BRANCH-04**: User can delete a local branch (with confirmation) from the branch list
+- [x] **BRANCH-05**: Checking out a branch with a dirty working tree prompts the user to stash, hard-reset, or cancel (no silent failure)
 
 ### Stash
 
@@ -117,9 +117,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GIT-03 | Phase 1 | Complete |
 | BRANCH-01 | Phase 5 | Pending |
 | BRANCH-02 | Phase 5 | Pending |
-| BRANCH-03 | Phase 5 | Pending |
-| BRANCH-04 | Phase 5 | Pending |
-| BRANCH-05 | Phase 5 | Pending |
+| BRANCH-03 | Phase 5 | Complete |
+| BRANCH-04 | Phase 5 | Complete |
+| BRANCH-05 | Phase 5 | Complete |
 | STASH-01 | Phase 6 | Pending |
 | STASH-02 | Phase 6 | Pending |
 | STASH-03 | Phase 6 | Pending |
