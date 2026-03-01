@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 
 ## Current Position
 
-Phase: 3 of 8 (Drag-and-Drop Polish)
-Plan: 2 of 3 in current phase
-Status: Plan 03-02 complete — ghost drag image, conflict pre-check dialogs, balloon notifications for DnD errors delivered
-Last activity: 2026-02-28 — Completed plan 03-02 (buildGhostImage in FileTreeTransferHandler, conflict pre-check in both DnD paths, Explorer.DnD notification group)
+Phase: 5 of 8 (Branch Management) — COMPLETE
+Next: Phase 6 (Stash UI) — not started
+Status: Phase 05 fully verified — branch popup, checkout, dirty-tree dialog, create/delete branch all confirmed working
+Last activity: 2026-03-01 — Phase 05 human verification approved; verifier passed 5/5 criteria
 
-Progress: [███░░░░░░░] 25%
+Progress: [█████░░░░░] 55%
 
 ## Performance Metrics
 
@@ -135,12 +135,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 5 planning: Dirty-tree smart checkout UX needs validation against IntelliJ's own checkout flow before designing the dialog
 - Phase 6 planning: git stash --include-untracked behavior on SSH/remote repos needs live validation before planning
 - General: 2025.3 threading model (Write-Intent lock removal from AWT input events) may affect existing LocalGitBackend callsites — validate against 2025.3 EAP before release
 
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed 04-02-PLAN.md
+Stopped at: Phase 05 complete (human verify approved, verifier passed). Ready for Phase 06 planning.
 Resume file: None

@@ -127,3 +127,12 @@ None - no external service configuration required.
 ---
 *Phase: 05-branch-management*
 *Completed: 2026-03-01*
+
+## Self-Check: PASSED
+
+- FOUND: src/main/kotlin/ro/faur/explorer/gitpanel/BranchNameValidator.kt
+- FOUND: src/test/kotlin/ro/faur/explorer/unit/BranchNameValidatorTest.kt
+- FOUND: .planning/phases/05-branch-management/05-01-SUMMARY.md
+- FOUND commit: ec589e0 (RED)
+- FOUND commit: aa463d0 (GREEN)
+- FOUND commit: a33d06d (docs/metadata)
