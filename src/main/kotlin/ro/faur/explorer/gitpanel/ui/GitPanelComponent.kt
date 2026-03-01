@@ -21,11 +21,16 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.JBSplitter
+import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBLabel
 import com.intellij.vcsUtil.VcsUtil
 import ro.faur.explorer.gitpanel.ActiveBrowserTracker
 import ro.faur.explorer.gitpanel.BackendType
+import ro.faur.explorer.gitpanel.BranchInfo
 import ro.faur.explorer.gitpanel.CommitFile
 import ro.faur.explorer.gitpanel.GitBackend
 import ro.faur.explorer.gitpanel.GitRepositoryRegistry
@@ -35,10 +40,14 @@ import ro.faur.explorer.remote.git.GitLogEntry
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Component
+import java.awt.Cursor
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import java.io.File
 import javax.swing.DefaultComboBoxModel
 import javax.swing.JComboBox
 import javax.swing.JList
+import javax.swing.JOptionPane
 import javax.swing.JPanel
 import javax.swing.ListCellRenderer
 
@@ -61,6 +70,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     private var logEntries: List<GitLogEntry> = emptyList()
     private var selectedDiffFile: CommitFile? = null
     private var selectedCommitHash: String? = null  // non-null in history mode
+    private var cachedBranches: List<BranchInfo> = emptyList()
 
     // ── Toolbar widgets ────────────────────────────────────────────────────
     private val repoCombo = JComboBox<GitBackend>()
@@ -145,6 +155,18 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
                 e.presentation.isEnabled = selectedDiffFile != null && selectedBackend != null
             }
         })
+        group.add(object : AnAction("Create Branch", "Create a new local branch from current HEAD", AllIcons.General.Add) {
+            override fun getActionUpdateThread() = ActionUpdateThread.EDT
+            override fun actionPerformed(e: AnActionEvent) { doCreateBranch() }
+            override fun update(e: AnActionEvent) { e.presentation.isEnabled = selectedBackend != null }
+        })
+        group.add(object : AnAction("Delete Branch", "Delete a local branch", AllIcons.General.Remove) {
+            override fun getActionUpdateThread() = ActionUpdateThread.EDT
+            override fun actionPerformed(e: AnActionEvent) { showDeleteBranchSelectPopup(e) }
+            override fun update(e: AnActionEvent) {
+                e.presentation.isEnabled = selectedBackend != null && cachedBranches.any { !it.isCurrent }
+            }
+        })
         group.add(object : AnAction("Add Local Repo", "Add a local git repository", AllIcons.General.Add) {
             override fun getActionUpdateThread() = ActionUpdateThread.BGT
             override fun actionPerformed(e: AnActionEvent) { addLocalRepo() }
@@ -163,9 +185,40 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         comboRow.add(repoCombo, BorderLayout.CENTER)
         comboRow.add(branchLabel, BorderLayout.EAST)
 
+        branchLabel.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+        branchLabel.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                if (cachedBranches.isNotEmpty()) showBranchPopup()
+            }
+        })
+
         toolbarPanel.add(comboRow, BorderLayout.CENTER)
         toolbarPanel.add(toolbar.component, BorderLayout.EAST)
         add(toolbarPanel, BorderLayout.NORTH)
+    }
+
+    private fun showBranchPopup() {
+        val snapshot = cachedBranches
+        val popup = JBPopupFactory.getInstance()
+            .createPopupChooserBuilder(snapshot)
+            .setTitle("Switch Branch")
+            .setItemChosenCallback { branch: BranchInfo ->
+                if (!branch.isCurrent) doCheckoutBranch(branch.name)
+            }
+            .setRenderer(object : ColoredListCellRenderer<BranchInfo>() {
+                override fun customizeCellRenderer(
+                    list: JList<out BranchInfo>,
+                    value: BranchInfo,
+                    index: Int,
+                    selected: Boolean,
+                    hasFocus: Boolean
+                ) {
+                    if (value.isCurrent) append("* ", SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+                    append(value.name, SimpleTextAttributes.REGULAR_ATTRIBUTES)
+                }
+            })
+            .createPopup()
+        popup.showUnderneathOf(branchLabel)
     }
 
     // ── Center layout ────────────────────────────────────────────────────────
@@ -216,6 +269,177 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     private fun showCommitDetailsSlot() {
         inlineDiffPanel.clear()
         rightSlotLayout.show(rightSlot, CARD_DETAILS)
+    }
+
+    // ── Branch management ─────────────────────────────────────────────────────
+
+    private fun doCheckoutBranch(targetBranch: String) {
+        val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val status = runCatching { backend.getWorkingTreeStatus() }.getOrElse { emptyList() }
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                if (status.isNotEmpty()) {
+                    showDirtyTreeDialog(backend, targetBranch, snapshotKey)
+                } else {
+                    performCheckout(backend, targetBranch, snapshotKey)
+                }
+            }
+        }
+    }
+
+    private fun showDirtyTreeDialog(backend: GitBackend, targetBranch: String, snapshotKey: Int) {
+        val result = Messages.showDialog(
+            project,
+            "You have uncommitted changes. What would you like to do?",
+            "Dirty Working Tree",
+            arrayOf(
+                "Stash & Switch",
+                "Discard & Switch (WARNING: all uncommitted changes will be permanently lost)",
+                "Cancel"
+            ),
+            2,
+            Messages.getWarningIcon()
+        )
+        when (result) {
+            0 -> doStashAndCheckout(backend, targetBranch, snapshotKey)
+            1 -> doDiscardAndCheckout(backend, targetBranch, snapshotKey)
+            else -> return
+        }
+    }
+
+    private fun doStashAndCheckout(backend: GitBackend, targetBranch: String, snapshotKey: Int) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val stashResult = backend.stash("Auto-stash before checkout to $targetBranch", includeUntracked = true)
+            if (!stashResult.isSuccess) {
+                ApplicationManager.getApplication().invokeLater {
+                    if (!disposed && System.identityHashCode(selectedBackend) == snapshotKey)
+                        notifyError("Stash failed: ${stashResult.stderr.takeLast(200)}")
+                }
+                return@executeOnPooledThread
+            }
+            performCheckout(backend, targetBranch, snapshotKey)
+        }
+    }
+
+    private fun doDiscardAndCheckout(backend: GitBackend, targetBranch: String, snapshotKey: Int) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val resetResult = backend.resetHard()
+            if (!resetResult.isSuccess) {
+                ApplicationManager.getApplication().invokeLater {
+                    if (!disposed && System.identityHashCode(selectedBackend) == snapshotKey)
+                        notifyError("Reset failed: ${resetResult.stderr.takeLast(200)}")
+                }
+                return@executeOnPooledThread
+            }
+            performCheckout(backend, targetBranch, snapshotKey)
+        }
+    }
+
+    private fun performCheckout(backend: GitBackend, targetBranch: String, snapshotKey: Int) {
+        val result = backend.checkoutBranch(targetBranch)
+        ApplicationManager.getApplication().invokeLater {
+            if (disposed) return@invokeLater
+            if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+            if (result.isSuccess) reloadData()
+            else notifyError("Checkout failed: ${result.stderr.takeLast(300)}")
+        }
+    }
+
+    private fun doCreateBranch() {
+        val dialog = CreateBranchDialog(project)
+        if (!dialog.showAndGet()) return
+        val branchName = dialog.getBranchName()
+        val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val result = backend.createBranch(branchName)
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                if (result.isSuccess) reloadData()
+                else notifyError("Create branch failed: ${result.stderr.takeLast(300)}")
+            }
+        }
+    }
+
+    private fun showDeleteBranchSelectPopup(e: AnActionEvent) {
+        val deletable = cachedBranches.filter { !it.isCurrent }
+        if (deletable.isEmpty()) {
+            Messages.showInfoMessage(project, "No other local branches to delete.", "Delete Branch")
+            return
+        }
+        val popup = JBPopupFactory.getInstance()
+            .createPopupChooserBuilder(deletable)
+            .setTitle("Select Branch to Delete")
+            .setItemChosenCallback { branch: BranchInfo -> doDeleteBranch(branch.name) }
+            .setRenderer(object : ColoredListCellRenderer<BranchInfo>() {
+                override fun customizeCellRenderer(
+                    list: JList<out BranchInfo>,
+                    value: BranchInfo,
+                    index: Int,
+                    selected: Boolean,
+                    hasFocus: Boolean
+                ) {
+                    append(value.name, SimpleTextAttributes.REGULAR_ATTRIBUTES)
+                }
+            })
+            .createPopup()
+        popup.show(JBPopupFactory.getInstance().guessBestPopupLocation(e.dataContext))
+    }
+
+    private fun doDeleteBranch(branchName: String) {
+        val confirmed = JOptionPane.showConfirmDialog(
+            this,
+            "Delete branch '$branchName'?",
+            "Confirm Delete",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        ) == JOptionPane.OK_OPTION
+        if (!confirmed) return
+        val backend = selectedBackend ?: return
+        val snapshotKey = System.identityHashCode(backend)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val result = backend.deleteBranch(branchName, force = false)
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed) return@invokeLater
+                if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                when {
+                    result.isSuccess -> reloadData()
+                    result.stderr.contains("not fully merged") -> {
+                        val forceConfirmed = JOptionPane.showConfirmDialog(
+                            this,
+                            "Branch '$branchName' has commits not merged into the current branch.\n" +
+                                "Force deleting will permanently lose these commits.\n\nForce delete anyway?",
+                            "Unmerged Branch",
+                            JOptionPane.OK_CANCEL_OPTION,
+                            JOptionPane.ERROR_MESSAGE
+                        ) == JOptionPane.OK_OPTION
+                        if (forceConfirmed) {
+                            ApplicationManager.getApplication().executeOnPooledThread {
+                                val forceResult = backend.deleteBranch(branchName, force = true)
+                                ApplicationManager.getApplication().invokeLater {
+                                    if (disposed) return@invokeLater
+                                    if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater
+                                    if (forceResult.isSuccess) reloadData()
+                                    else notifyError("Force delete failed: ${forceResult.stderr.takeLast(200)}")
+                                }
+                            }
+                        }
+                    }
+                    else -> notifyError("Delete failed: ${result.stderr.takeLast(300)}")
+                }
+            }
+        }
+    }
+
+    private fun notifyError(msg: String) {
+        Notifications.Bus.notify(
+            Notification("SystemExplorer", "Branch Error", msg, NotificationType.ERROR),
+            project
+        )
     }
 
     // ── Actions ──────────────────────────────────────────────────────────────
@@ -273,14 +497,16 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         val backend = selectedBackend ?: return
         val snapshotKey = System.identityHashCode(backend)
         ApplicationManager.getApplication().executeOnPooledThread {
-            val branch = runCatching { backend.getCurrentBranch() }.getOrElse { null }
-            val log    = runCatching { backend.getLog(200) }.getOrElse { emptyList() }
-            val status = runCatching { backend.getWorkingTreeStatus() }.getOrElse { emptyList() }
+            val branch   = runCatching { backend.getCurrentBranch() }.getOrElse { null }
+            val log      = runCatching { backend.getLog(200) }.getOrElse { emptyList() }
+            val status   = runCatching { backend.getWorkingTreeStatus() }.getOrElse { emptyList() }
+            val branches = runCatching { backend.listBranches() }.getOrElse { emptyList() }
             ApplicationManager.getApplication().invokeLater {
                 if (disposed) return@invokeLater
                 if (System.identityHashCode(selectedBackend) != snapshotKey) return@invokeLater  // stale
                 currentBranch = branch
                 logEntries    = log
+                cachedBranches = branches
                 branchLabel.text = if (branch != null) "  \u2387 $branch  " else ""
                 commitLogPanel.setData(log, status.size)
                 // branch == null means getCurrentBranch() failed — a strong signal that
