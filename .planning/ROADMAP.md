@@ -143,7 +143,7 @@ Plans:
 **Goal:** Replace the in-memory CandidatePool with a persistent Lucene index for large roots; hybrid mode auto-selects between index-backed recall and live ripgrep based on directory file count
 **Requirements**: TBD
 **Depends on:** Phase 7
-**Plans:** 3/3 plans complete
+**Plans:** 1/4 plans executed
 
 Plans:
 - [ ] 08-01-PLAN.md — Lucene 9.12.3 dependency + LuceneIndexManager (write, search, corrupt-recovery) (wave 1)
@@ -166,6 +166,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Drag and Drop Polish | 2/3 | In Progress|  |
 | 4. File Tree and Context Menu Polish | 2/2 | Complete   | 2026-02-28 |
 | 5. Branch Management | 3/3 | Complete   | 2026-03-01 |
-| 6. Stash UI | 0/? | Not started | - |
+| 6. Stash UI | 1/4 | In Progress|  |
 | 7. Polish, improve quick open / smart search | 3/3 | Complete   | 2026-02-28 |
 | 8. Intelligent Indexed Local Filesystem Search | 6/6 | Complete   | 2026-02-28 |
