@@ -10,8 +10,8 @@ if [ -z "$VERSION" ]; then
 fi
 
 # Validate semantic versioning format
-if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?$ ]]; then
-  echo "Error: Invalid version format. Expected X.Y.Z or X.Y.Z-SNAPSHOT"
+if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9._-]+)?$ ]]; then
+  echo "Error: Invalid version format. Expected X.Y.Z or X.Y.Z-suffix"
   exit 1
 fi
 
