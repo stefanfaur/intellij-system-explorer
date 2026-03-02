@@ -23,7 +23,7 @@ import javax.swing.JPopupMenu
 class StashListPanel : JPanel(BorderLayout()) {
 
     private val listModel = DefaultListModel<StashEntry>()
-    val list = JBList(listModel)
+    private val list = JBList(listModel)
 
     /** Called with the selected StashEntry when the toolbar/menu Apply action is triggered. */
     var onApply: ((StashEntry) -> Unit)? = null
@@ -36,6 +36,9 @@ class StashListPanel : JPanel(BorderLayout()) {
 
     /** Called whenever the list selection changes. Null when nothing is selected. */
     var onStashSelected: ((StashEntry?) -> Unit)? = null
+
+    /** Called when the user clicks the Back button to return to the main commit log view. */
+    var onBack: (() -> Unit)? = null
 
     init {
         list.cellRenderer = object : ColoredListCellRenderer<StashEntry>() {
@@ -66,6 +69,11 @@ class StashListPanel : JPanel(BorderLayout()) {
                 buildContextMenu().show(list, e.x, e.y)
             }
         })
+
+        val backAction = object : AnAction("Back", "Return to commit log", AllIcons.Actions.Back) {
+            override fun getActionUpdateThread() = ActionUpdateThread.EDT
+            override fun actionPerformed(e: AnActionEvent) { onBack?.invoke() }
+        }
 
         val applyAction = object : AnAction("Apply", "Apply stash (keep in list)", AllIcons.Actions.Download) {
             override fun getActionUpdateThread() = ActionUpdateThread.EDT
@@ -101,6 +109,8 @@ class StashListPanel : JPanel(BorderLayout()) {
         }
 
         val group = DefaultActionGroup().apply {
+            add(backAction)
+            addSeparator()
             add(applyAction)
             add(popAction)
             add(dropAction)

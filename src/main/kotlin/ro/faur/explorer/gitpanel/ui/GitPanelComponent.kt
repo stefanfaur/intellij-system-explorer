@@ -62,6 +62,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         private const val CARD_DIFF = "diff"
         private const val CARD_MAIN  = "main"
         private const val CARD_STASH = "stash"
+        private const val STASH_SPLIT_RATIO = 0.35f
     }
 
     @Volatile private var disposed = false
@@ -259,7 +260,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         mainSplit.secondComponent = bottomSplit
 
         // Stash card: left = stash list, right = stash diff preview
-        val stashView = JBSplitter(false, 0.35f)
+        val stashView = JBSplitter(false, STASH_SPLIT_RATIO)
         stashView.firstComponent  = stashListPanel
         stashView.secondComponent = stashDiffPanel
 
@@ -274,6 +275,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         stashListPanel.onPop           = { entry -> doStashPop(entry) }
         stashListPanel.onDrop          = { entry -> doStashDrop(entry) }
         stashListPanel.onStashSelected = { entry -> onStashEntrySelected(entry) }
+        stashListPanel.onBack          = { showMainCard() }
 
         // Wire commit selection
         commitLogPanel.onCommitSelected = { entry -> onCommitSelected(entry) }
@@ -475,8 +477,7 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
     // ── Stash card navigation ─────────────────────────────────────────────────
 
     private fun toggleStashCard() {
-        if (onStashCard) return  // already on stash card — no-op
-        showStashCard()
+        if (onStashCard) showMainCard() else showStashCard()
     }
 
     private fun showStashCard() {
@@ -615,13 +616,10 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
 
     // ── Stash diff preview ────────────────────────────────────────────────────
 
+    @Suppress("UNUSED_PARAMETER")
     private fun onStashEntrySelected(entry: StashEntry?) {
-        if (entry == null) {
-            stashDiffPanel.clear()
-            return
-        }
-        // Per-file stash diff requires listing files changed in a stash which needs an
-        // additional backend method not in scope for this phase. Show empty panel on selection.
+        // TODO: show per-file diff using git diff stash@{N}^..stash@{N}
+        // Requires a new backend method to list stash files — deferred to next phase.
         stashDiffPanel.clear()
     }
 

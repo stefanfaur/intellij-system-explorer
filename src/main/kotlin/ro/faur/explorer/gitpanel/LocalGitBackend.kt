@@ -1,5 +1,6 @@
 package ro.faur.explorer.gitpanel
 
+import ro.faur.explorer.gitpanel.exec.GitCommandExecutor
 import ro.faur.explorer.gitpanel.exec.GitCommandResult
 import ro.faur.explorer.gitpanel.exec.LocalGitCommandExecutor
 import ro.faur.explorer.remote.git.GitFileStatus
@@ -8,7 +9,10 @@ import ro.faur.explorer.remote.git.GitLogParser
 import ro.faur.explorer.remote.git.GitStatusParser
 import java.time.Instant
 
-class LocalGitBackend(override val repoPath: String) : GitBackend {
+class LocalGitBackend(
+    override val repoPath: String,
+    private val executor: GitCommandExecutor = LocalGitCommandExecutor(),
+) : GitBackend {
 
     override val id: GitBackendId = GitBackendId(BackendType.LOCAL, null, repoPath)
 
@@ -16,8 +20,6 @@ class LocalGitBackend(override val repoPath: String) : GitBackend {
         val parts = repoPath.trimEnd('/').split("/")
         if (parts.size >= 2) "${parts[parts.size - 2]}/${parts.last()}" else parts.last()
     }
-
-    private val executor = LocalGitCommandExecutor()
 
     override fun getCurrentBranch(): String? {
         val result = executor.executeBlocking(repoPath, args = arrayOf("rev-parse", "--abbrev-ref", "HEAD"))

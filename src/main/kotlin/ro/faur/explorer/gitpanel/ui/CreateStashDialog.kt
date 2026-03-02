@@ -9,7 +9,7 @@ import javax.swing.JComponent
 
 class CreateStashDialog(
     project: Project,
-    private val defaultMessageHint: String
+    defaultMessageHint: String
 ) : DialogWrapper(project, true) {
 
     private val messageField = JBTextField(40).apply {

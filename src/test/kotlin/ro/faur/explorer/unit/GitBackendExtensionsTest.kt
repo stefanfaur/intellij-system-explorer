@@ -1,13 +1,18 @@
 package ro.faur.explorer.unit
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import ro.faur.explorer.gitpanel.BranchInfo
+import ro.faur.explorer.gitpanel.LocalGitBackend
 import ro.faur.explorer.gitpanel.StashEntry
 import ro.faur.explorer.gitpanel.parseBranchLine
 import ro.faur.explorer.gitpanel.parseStashLine
+import ro.faur.explorer.gitpanel.exec.GitCommandExecutor
+import ro.faur.explorer.gitpanel.exec.GitCommandResult
+import java.time.Duration
 
 class GitBackendExtensionsTest {
 
@@ -73,5 +78,47 @@ class GitBackendExtensionsTest {
     fun `parseStashLine parses stash at index 1`() {
         val result = parseStashLine("stash@{1}\tanother WIP message")
         assertEquals(StashEntry(1, "another WIP message"), result)
+    }
+
+    // --- stashApply / stashDrop argument array tests ---
+
+    private fun capturingExecutor(capture: (Array<out String>) -> Unit): GitCommandExecutor =
+        object : GitCommandExecutor {
+            override fun executeBlocking(repoPath: String, timeout: Duration, vararg args: String): GitCommandResult {
+                capture(args)
+                return GitCommandResult(0, "", "")
+            }
+        }
+
+    @Test
+    fun `stashApply passes correct git args for index 0`() {
+        var capturedArgs: Array<out String> = emptyArray()
+        val backend = LocalGitBackend("/repo", capturingExecutor { capturedArgs = it })
+        backend.stashApply(0)
+        assertArrayEquals(arrayOf("stash", "apply", "stash@{0}"), capturedArgs)
+    }
+
+    @Test
+    fun `stashApply passes correct git args for arbitrary index`() {
+        var capturedArgs: Array<out String> = emptyArray()
+        val backend = LocalGitBackend("/repo", capturingExecutor { capturedArgs = it })
+        backend.stashApply(3)
+        assertArrayEquals(arrayOf("stash", "apply", "stash@{3}"), capturedArgs)
+    }
+
+    @Test
+    fun `stashDrop passes correct git args for index 0`() {
+        var capturedArgs: Array<out String> = emptyArray()
+        val backend = LocalGitBackend("/repo", capturingExecutor { capturedArgs = it })
+        backend.stashDrop(0)
+        assertArrayEquals(arrayOf("stash", "drop", "stash@{0}"), capturedArgs)
+    }
+
+    @Test
+    fun `stashDrop passes correct git args for arbitrary index`() {
+        var capturedArgs: Array<out String> = emptyArray()
+        val backend = LocalGitBackend("/repo", capturingExecutor { capturedArgs = it })
+        backend.stashDrop(2)
+        assertArrayEquals(arrayOf("stash", "drop", "stash@{2}"), capturedArgs)
     }
 }
