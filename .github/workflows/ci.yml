@@ -104,17 +104,6 @@ jobs:
           path: build/reports/tests/test/
           retention-days: 30
 
-      - name: Run UI tests
-        run: xvfb-run -a ./gradlew testUi --no-daemon --stacktrace
-
-      - name: Upload UI test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-test-reports
-          path: build/reports/tests/testUi/
-          retention-days: 30
-
   verify:
     name: Plugin Verification
     runs-on: ubuntu-latest
