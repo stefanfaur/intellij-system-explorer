@@ -41,71 +41,94 @@ class Phase4PreviewPaneTest : BasePlatformTestCase() {
 
     fun `test PreviewPane can be instantiated without throwing`() {
         val pane = PreviewPane(project)
-        assertNotNull(pane)
+        try {
+            assertNotNull(pane)
+        } finally {
+            pane.dispose()
+        }
     }
 
     fun `test update with non-existent path does not throw`() {
         val pane = PreviewPane(project)
-        val candidate = directoryCandidate("/this/path/does/not/exist/xyz")
-        pane.update(candidate)  // must not throw
+        try {
+            val candidate = directoryCandidate("/this/path/does/not/exist/xyz")
+            pane.update(candidate)  // must not throw
+        } finally {
+            pane.dispose()
+        }
     }
 
     fun `test update with a real temporary directory does not throw`() {
         val tempDir = createTempDir("preview_pane_test")
+        val pane = PreviewPane(project)
         try {
             File(tempDir, "child1.txt").createNewFile()
             File(tempDir, "child2.txt").createNewFile()
             val candidate = directoryCandidate(tempDir.absolutePath)
-            val pane = PreviewPane(project)
             pane.update(candidate)  // must not throw
         } finally {
+            pane.dispose()
             tempDir.deleteRecursively()
         }
     }
 
     fun `test update with a real temporary file does not throw`() {
         val tempFile = File.createTempFile("preview_pane_test", ".txt")
+        val pane = PreviewPane(project)
         try {
             tempFile.writeText("Hello, World!\nLine two.\n")
             val candidate = fileCandidate(tempFile.absolutePath)
-            val pane = PreviewPane(project)
             pane.update(candidate)  // must not throw
         } finally {
+            pane.dispose()
             tempFile.delete()
         }
     }
 
     fun `test clear does not throw on fresh pane`() {
         val pane = PreviewPane(project)
-        pane.clear()  // must not throw
+        try {
+            pane.clear()  // must not throw
+        } finally {
+            pane.dispose()
+        }
     }
 
     fun `test clear after update does not throw`() {
         val tempDir = createTempDir("preview_pane_clear_test")
+        val pane = PreviewPane(project)
         try {
             val candidate = directoryCandidate(tempDir.absolutePath)
-            val pane = PreviewPane(project)
             pane.update(candidate)
             pane.clear()  // must not throw
         } finally {
+            pane.dispose()
             tempDir.deleteRecursively()
         }
     }
 
     fun `test update can be called multiple times without error`() {
         val pane = PreviewPane(project)
-        val candidate = directoryCandidate("/non/existent/path")
-        pane.update(candidate)
-        pane.update(candidate)
-        pane.update(candidate)
+        try {
+            val candidate = directoryCandidate("/non/existent/path")
+            pane.update(candidate)
+            pane.update(candidate)
+            pane.update(candidate)
+        } finally {
+            pane.dispose()
+        }
     }
 
     fun `test PreviewPane has positive preferred width`() {
         val pane = PreviewPane(project)
-        assertTrue(
-            "PreviewPane should have a positive preferred width",
-            pane.preferredSize.width > 0
-        )
+        try {
+            assertTrue(
+                "PreviewPane should have a positive preferred width",
+                pane.preferredSize.width > 0
+            )
+        } finally {
+            pane.dispose()
+        }
     }
 
     private fun createTempDir(prefix: String): File {

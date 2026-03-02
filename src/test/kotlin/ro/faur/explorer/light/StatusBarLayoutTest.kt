@@ -5,17 +5,17 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import ro.faur.explorer.settings.ExplorerSettings
 import ro.faur.explorer.ui.ExplorerPanel
 import java.awt.BorderLayout
-import javax.swing.JCheckBox
 import javax.swing.JPanel
 
 /**
  * Integration tests for the status bar layout in ExplorerPanel.
  *
  * Verifies that:
- * - Status bar is correctly laid out with BorderLayout
- * - Hidden checkbox functionality works correctly
- * - Permissions checkbox (on Unix/Mac) correctly updates settings
- * - Checkboxes trigger appropriate tree updates
+ * - The main panel uses BorderLayout
+ * - Hidden toggle button exists in BrowserPanel
+ * - Permissions toggle button exists on Unix/Mac (absent on Windows)
+ * - Toggling hidden updates fileTreeComponent.showHidden
+ * - Permissions toggle state syncs with settings
  */
 class StatusBarLayoutTest : BasePlatformTestCase() {
 
@@ -23,7 +23,6 @@ class StatusBarLayoutTest : BasePlatformTestCase() {
 
     override fun setUp() {
         super.setUp()
-        // Reset settings to defaults
         ExplorerSettings.getInstance().loadState(ExplorerSettings.State())
         explorerPanel = ExplorerPanel(project)
     }
@@ -39,109 +38,69 @@ class StatusBarLayoutTest : BasePlatformTestCase() {
     fun `test status bar exists in explorer panel`() {
         val component = explorerPanel.component
         assertNotNull(component)
-
-        // The main panel should have a SOUTH component (status bar)
         val mainPanel = component as? JPanel
         assertNotNull(mainPanel)
         assertTrue(mainPanel!!.layout is BorderLayout)
     }
 
     fun `test hidden checkbox exists and starts unchecked`() {
-        val component = explorerPanel.component as JPanel
-        val statusBar = findStatusBar(component)
-        assertNotNull("Status bar should exist", statusBar)
-
-        val hiddenCheckbox = findCheckboxByLabel(statusBar!!, "Hidden")
-        assertNotNull("Hidden checkbox should exist", hiddenCheckbox)
-        assertFalse("Hidden checkbox should start unchecked", hiddenCheckbox!!.isSelected)
+        val localPanel = explorerPanel.browserHost.localPanel
+        val hiddenToggle = localPanel.hiddenToggle
+        assertNotNull("Hidden toggle should exist", hiddenToggle)
+        assertFalse("Hidden toggle should start inactive", localPanel.showHidden)
     }
 
     fun `test permissions checkbox exists on non-Windows platforms`() {
-        val component = explorerPanel.component as JPanel
-        val statusBar = findStatusBar(component)
-        assertNotNull("Status bar should exist", statusBar)
-
-        val permissionsCheckbox = findCheckboxByLabel(statusBar!!, "Permissions")
-
+        val localPanel = explorerPanel.browserHost.localPanel
         if (SystemInfo.isWindows) {
-            assertNull("Permissions checkbox should not exist on Windows", permissionsCheckbox)
+            assertNull("Permissions toggle should not exist on Windows", localPanel.permissionsToggle)
         } else {
-            assertNotNull("Permissions checkbox should exist on Unix/Mac", permissionsCheckbox)
-            // Should initialize from settings
+            assertNotNull("Permissions toggle should exist on Unix/Mac", localPanel.permissionsToggle)
             val settings = ExplorerSettings.getInstance()
-            assertEquals("Permissions checkbox should match settings value",
-                settings.state.showFilePermissions, permissionsCheckbox!!.isSelected)
+            assertEquals(
+                "Permissions state should match settings",
+                settings.state.showFilePermissions,
+                localPanel.showPermissions
+            )
         }
     }
 
     fun `test permissions checkbox state syncs with settings`() {
-        if (SystemInfo.isWindows) {
-            // Skip on Windows
-            return
-        }
+        if (SystemInfo.isWindows) return
 
-        val component = explorerPanel.component as JPanel
-        val statusBar = findStatusBar(component)
-        val permissionsCheckbox = findCheckboxByLabel(statusBar!!, "Permissions")
-        assertNotNull(permissionsCheckbox)
+        val localPanel = explorerPanel.browserHost.localPanel
+        assertNotNull(localPanel.permissionsToggle)
 
         val settings = ExplorerSettings.getInstance()
         val initialState = settings.state.showFilePermissions
 
-        // Toggle checkbox
-        permissionsCheckbox!!.isSelected = !initialState
+        localPanel.permissionsToggle!!.doClick()
 
-        // Verify settings updated
-        assertEquals("Settings should update when checkbox is toggled",
-            !initialState, settings.state.showFilePermissions)
+        assertEquals(
+            "Settings should update when permissions toggle is clicked",
+            !initialState,
+            settings.state.showFilePermissions
+        )
     }
 
     fun `test hidden checkbox toggles tree visibility`() {
-        val component = explorerPanel.component as JPanel
-        val statusBar = findStatusBar(component)
-        val hiddenCheckbox = findCheckboxByLabel(statusBar!!, "Hidden")
-        assertNotNull(hiddenCheckbox)
+        val localPanel = explorerPanel.browserHost.localPanel
+        val initialShowHidden = localPanel.showHidden
 
-        val initialShowHidden = explorerPanel.fileTreeComponent.showHidden
+        localPanel.hiddenToggle.doClick()
 
-        // Toggle checkbox
-        hiddenCheckbox!!.doClick()
-
-        // Verify tree component updated
-        assertEquals("Tree component showHidden should toggle with checkbox",
-            !initialShowHidden, explorerPanel.fileTreeComponent.showHidden)
+        assertEquals(
+            "showHidden should toggle when hidden toggle is clicked",
+            !initialShowHidden,
+            localPanel.showHidden
+        )
     }
 
     fun `test status bar layout is BorderLayout`() {
         val component = explorerPanel.component as JPanel
-        val statusBar = findStatusBar(component)
-        assertNotNull(statusBar)
-
-        assertTrue("Status bar should use BorderLayout for left/right positioning",
-            statusBar!!.layout is BorderLayout)
-    }
-
-    // Helper methods
-
-    private fun findStatusBar(mainPanel: JPanel): JPanel? {
-        val layout = mainPanel.layout as? BorderLayout ?: return null
-        return layout.getLayoutComponent(BorderLayout.SOUTH) as? JPanel
-    }
-
-    private fun findCheckboxByLabel(parent: JPanel, label: String): JCheckBox? {
-        return findCheckboxRecursive(parent, label)
-    }
-
-    private fun findCheckboxRecursive(container: java.awt.Container, label: String): JCheckBox? {
-        for (component in container.components) {
-            if (component is JCheckBox && component.text == label) {
-                return component
-            }
-            if (component is java.awt.Container) {
-                val found = findCheckboxRecursive(component, label)
-                if (found != null) return found
-            }
-        }
-        return null
+        assertTrue(
+            "ExplorerPanel root should use BorderLayout",
+            component.layout is BorderLayout
+        )
     }
 }

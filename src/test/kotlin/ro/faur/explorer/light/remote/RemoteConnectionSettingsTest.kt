@@ -6,6 +6,11 @@ import ro.faur.explorer.remote.ConnectionProfile
 
 class RemoteConnectionSettingsTest : BasePlatformTestCase() {
 
+    override fun setUp() {
+        super.setUp()
+        RemoteConnectionSettings.getInstance(project).loadState(RemoteConnectionSettings.State())
+    }
+
     fun `test empty state by default`() {
         val settings = RemoteConnectionSettings.getInstance(project)
         assertTrue(settings.state.connections.isEmpty())

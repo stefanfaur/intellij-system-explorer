@@ -54,7 +54,11 @@ dependencies {
     implementation("org.apache.lucene:lucene-queryparser:9.12.3")
 
     // === Coroutine testing ===
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+    // Exclude coroutines-core: IntelliJ bundles its own version; pulling in a second copy
+    // causes a NoSuchMethodError on CancellableContinuation.tryResume at test runtime.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1") {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+    }
 }
 
 kotlin {

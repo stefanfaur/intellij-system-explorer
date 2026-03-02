@@ -586,6 +586,7 @@ class QuickOpenPanel(
 
         val isContentSearch = QueryParser.parse(raw).mode == QueryMode.CONTENT_SEARCH
         val delayMs = if (isContentSearch) 300L else 50L
+        if (searchScheduler.isShutdown) return
         pendingSearch = searchScheduler.schedule({
             val results = performSearch(raw)
             ApplicationManager.getApplication().invokeLater({

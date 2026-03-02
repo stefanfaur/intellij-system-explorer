@@ -218,7 +218,11 @@ class PreviewPane(private val project: Project) : JBPanel<PreviewPane>(BorderLay
         }
     }
 
+    private var disposed = false
     override fun dispose() {
-        EditorFactory.getInstance().releaseEditor(editor)
+        if (!disposed) {
+            disposed = true
+            EditorFactory.getInstance().releaseEditor(editor)
+        }
     }
 }

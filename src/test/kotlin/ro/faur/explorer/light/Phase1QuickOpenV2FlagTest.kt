@@ -11,6 +11,11 @@ import ro.faur.explorer.settings.QuickOpenSettings
  */
 class Phase1QuickOpenV2FlagTest : BasePlatformTestCase() {
 
+    override fun setUp() {
+        super.setUp()
+        QuickOpenSettings.getInstance().loadState(QuickOpenSettings.State())
+    }
+
     // -------------------------------------------------------------------------
     // ripgrepPath (Phase 6)
     // -------------------------------------------------------------------------

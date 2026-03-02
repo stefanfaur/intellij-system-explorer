@@ -46,7 +46,7 @@ class ExplorerConfigurable : Configurable {
 
     private var myPanel: JComponent? = null
 
-    override fun getDisplayName(): String = "Local Browser"
+    override fun getDisplayName(): String = "System Explorer"
 
     override fun createComponent(): JComponent {
         showHiddenFilesCheckBox = JCheckBox("Show hidden files")

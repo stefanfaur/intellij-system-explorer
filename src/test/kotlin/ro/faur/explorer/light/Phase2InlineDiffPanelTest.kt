@@ -74,6 +74,7 @@ class Phase2InlineDiffPanelTest : LightPlatformTestCase() {
             val request = SimpleDiffRequest("Foo.kt", left, right, "HEAD", "Working Tree")
             panel.showDiffRequest(request)
         }
+        panel.clear()
         assertTrue(
             "showDiffRequest() must not throw when given text content: ${result.exceptionOrNull()}",
             result.isSuccess
@@ -83,7 +84,6 @@ class Phase2InlineDiffPanelTest : LightPlatformTestCase() {
     fun `test showDiffRequest with correct diff labels HEAD and Working Tree`() {
         val panel = InlineDiffPanel(project, testRootDisposable)
         val factory = DiffContentFactory.getInstance()
-        // Staging mode: labels must be "HEAD" on the left and "Working Tree" on the right
         val request = SimpleDiffRequest(
             "Foo.kt",
             factory.create("old content"),
@@ -92,6 +92,7 @@ class Phase2InlineDiffPanelTest : LightPlatformTestCase() {
             "Working Tree"
         )
         val result = runCatching { panel.showDiffRequest(request) }
+        panel.clear()
         assertTrue(
             "showDiffRequest() with HEAD vs Working Tree labels must not throw: ${result.exceptionOrNull()}",
             result.isSuccess
@@ -102,7 +103,6 @@ class Phase2InlineDiffPanelTest : LightPlatformTestCase() {
         val panel = InlineDiffPanel(project, testRootDisposable)
         val factory = DiffContentFactory.getInstance()
         val commitHash = "abc1234"
-        // History mode: labels must be "$commitHash^" on left and short hash on right
         val request = SimpleDiffRequest(
             "Foo.kt",
             factory.create("content at parent"),
@@ -111,6 +111,7 @@ class Phase2InlineDiffPanelTest : LightPlatformTestCase() {
             commitHash.take(8)
         )
         val result = runCatching { panel.showDiffRequest(request) }
+        panel.clear()
         assertTrue(
             "showDiffRequest() with history-mode commit-range labels must not throw: ${result.exceptionOrNull()}",
             result.isSuccess

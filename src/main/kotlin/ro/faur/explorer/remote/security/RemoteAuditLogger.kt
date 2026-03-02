@@ -53,8 +53,8 @@ object RemoteAuditLogger {
 
     private fun formatSize(sizeBytes: Long): String = when {
         sizeBytes < 1024 -> "${sizeBytes}B"
-        sizeBytes < 1024 * 1024 -> "${"%.1f".format(sizeBytes / 1024.0)}KB"
-        else -> "${"%.1f".format(sizeBytes / (1024.0 * 1024.0))}MB"
+        sizeBytes < 1024 * 1024 -> "${sizeBytes / 1024}KB"
+        else -> "${sizeBytes / (1024 * 1024)}MB"
     }
 
     fun formatAuthFailure(username: String, host: String, port: Int, reason: String): String {
