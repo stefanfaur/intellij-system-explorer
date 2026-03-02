@@ -11,6 +11,8 @@ import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.table.JBTable
 import ro.faur.explorer.quickopen.aliases.TeleportAliasStore
+import ro.faur.explorer.quickopen.index.IndexRegistry
+import ro.faur.explorer.quickopen.ui.IndexBrowserDialog
 import ro.faur.explorer.quickopen.backend.NucleoNative
 import ro.faur.explorer.quickopen.backend.RankerSelector
 import java.awt.Dimension
@@ -52,6 +54,13 @@ class QuickOpenConfigurable : Configurable {
     private val luceneExtAllowlistField = JTextField()
     private val luceneMaxSizeSpinner = JSpinner(SpinnerNumberModel(500, 50, 10_000, 50))
     private val luceneEvictionSpinner = JSpinner(SpinnerNumberModel(30, 1, 365, 1))
+
+    // Index health
+    private lateinit var healthTableModel: DefaultTableModel
+    private lateinit var healthTable: JBTable
+    private lateinit var rebuildButton: javax.swing.JButton
+    private var rebuildProgressLabel: JBLabel? = null
+    private var rebuildTimer: javax.swing.Timer? = null
 
     // Aliases
     private lateinit var aliasTableModel: DefaultTableModel
@@ -139,23 +148,31 @@ class QuickOpenConfigurable : Configurable {
                     .rowComment("Content indexing stops when this limit is reached; path indexing continues.")
                 row("Evict unused index after (days):") { cell(luceneEvictionSpinner) }
                     .rowComment("Index for a root not opened in this many days is automatically deleted.")
+            }
+            group("Lucene Index Health") {
                 row {
-                    button("Clear All Index Caches") {
-                        val indexDir = java.io.File(com.intellij.openapi.application.PathManager.getSystemPath(), "caches/explorer-index")
-                        if (indexDir.exists()) {
-                            indexDir.deleteRecursively()
-                            com.intellij.openapi.ui.Messages.showInfoMessage(
-                                "Index caches cleared. They will be rebuilt on next QuickOpen.",
-                                "Clear Index"
-                            )
-                        } else {
-                            com.intellij.openapi.ui.Messages.showInfoMessage("No index caches found.", "Clear Index")
-                        }
+                    healthTableModel = DefaultTableModel(arrayOf("Root", "Docs", "Size", "Last Built"), 0)
+                    healthTable = JBTable(healthTableModel).apply {
+                        preferredScrollableViewportSize = java.awt.Dimension(600, 120)
+                        setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION)
                     }
+                    cell(com.intellij.ui.components.JBScrollPane(healthTable)).align(AlignX.FILL)
+                }
+                row {
+                    rebuildButton = javax.swing.JButton("Rebuild Selected Index").also { btn ->
+                        btn.addActionListener { onRebuildClicked() }
+                    }
+                    cell(rebuildButton)
+                    rebuildProgressLabel = JBLabel("").also { lbl -> cell(lbl) }
+                }
+                row {
+                    button("Browse Index...") { onBrowseClicked() }
+                    button("Clear All Index Caches") { onClearAllClicked() }
                 }
             }
         }
         reset()
+        refreshHealthTable()
         return myPanel!!
     }
 
@@ -272,6 +289,82 @@ class QuickOpenConfigurable : Configurable {
                 aliasTableModel.addRow(arrayOf(name, path))
             }
         } catch (_: Exception) {}
+    }
+
+    private fun refreshHealthTable() {
+        if (!::healthTableModel.isInitialized) return
+        while (healthTableModel.rowCount > 0) healthTableModel.removeRow(0)
+        try {
+            val roots = IndexRegistry.listIndexedRoots()
+            val home = System.getProperty("user.home")
+            roots.forEach { (root, stats) ->
+                val shortRoot = root.replace(home, "~")
+                val sizeStr = when {
+                    stats.diskSizeBytes < 1024 -> "${stats.diskSizeBytes} B"
+                    stats.diskSizeBytes < 1024 * 1024 -> "${"%.1f".format(stats.diskSizeBytes / 1024.0)} KB"
+                    else -> "${"%.1f".format(stats.diskSizeBytes / (1024.0 * 1024))} MB"
+                }
+                val builtStr = if (stats.lastBuiltMs == 0L) "—"
+                               else java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(java.util.Date(stats.lastBuiltMs))
+                healthTableModel.addRow(arrayOf(shortRoot, stats.docCount, sizeStr, builtStr))
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun selectedRoot(): String? {
+        val row = if (::healthTable.isInitialized) healthTable.selectedRow else -1
+        if (row < 0) return null
+        val shortRoot = healthTableModel.getValueAt(row, 0) as? String ?: return null
+        val home = System.getProperty("user.home")
+        return shortRoot.replace("~", home)
+    }
+
+    private fun onRebuildClicked() {
+        val root = selectedRoot() ?: run {
+            com.intellij.openapi.ui.Messages.showInfoMessage("Select a root in the table first.", "Rebuild Index")
+            return
+        }
+        val settings = try { QuickOpenSettings.getInstance().state } catch (_: Exception) { return }
+        rebuildButton.isEnabled = false
+        rebuildProgressLabel?.text = "  Rebuilding..."
+        IndexRegistry.rebuild(root, settings) {
+            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                rebuildTimer?.stop()
+                rebuildButton.isEnabled = true
+                rebuildProgressLabel?.text = "  Done."
+                refreshHealthTable()
+            }
+        }
+        rebuildTimer?.stop()
+        rebuildTimer = javax.swing.Timer(500) {
+            val progress = IndexRegistry.getBuildProgress(root)
+            rebuildProgressLabel?.text = "  Rebuilding... ($progress files)"
+        }.also { it.start() }
+    }
+
+    private fun onBrowseClicked() {
+        val root = selectedRoot() ?: run {
+            com.intellij.openapi.ui.Messages.showInfoMessage("Select a root in the table first.", "Browse Index")
+            return
+        }
+        val manager = IndexRegistry.getManager(root) ?: run {
+            com.intellij.openapi.ui.Messages.showInfoMessage("No ready index for this root.", "Browse Index")
+            return
+        }
+        IndexBrowserDialog(manager, root).show()
+    }
+
+    private fun onClearAllClicked() {
+        val indexDir = java.io.File(com.intellij.openapi.application.PathManager.getSystemPath(), "caches/explorer-index")
+        if (indexDir.exists()) {
+            indexDir.deleteRecursively()
+            com.intellij.openapi.ui.Messages.showInfoMessage(
+                "Index caches cleared. They will be rebuilt on next QuickOpen.", "Clear Index"
+            )
+        } else {
+            com.intellij.openapi.ui.Messages.showInfoMessage("No index caches found.", "Clear Index")
+        }
+        refreshHealthTable()
     }
 
     override fun disposeUIResources() { myPanel = null }
