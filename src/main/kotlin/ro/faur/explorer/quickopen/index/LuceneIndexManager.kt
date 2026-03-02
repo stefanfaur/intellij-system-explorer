@@ -34,6 +34,13 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.security.MessageDigest
 
+data class IndexedDocument(
+    val path: String,
+    val ext: String,
+    val hasContent: Boolean,
+    val content: String?,
+)
+
 /**
  * Single owner of an IndexWriter and search operations for one root path.
  *
@@ -250,6 +257,50 @@ class LuceneIndexManager : Closeable {
                 val snippet = snippets?.getOrNull(idx) ?: ""
                 path to snippet
             }
+        }
+    }
+
+    /**
+     * Fetch a single document by exact path. Returns null if not found.
+     */
+    fun getDocument(path: String): IndexedDocument? {
+        writer.commit()
+        val reader = DirectoryReader.open(directory)
+        return reader.use {
+            val searcher = IndexSearcher(it)
+            val topDocs = searcher.search(
+                org.apache.lucene.search.TermQuery(Term(FIELD_PATH, path)), 1
+            )
+            if (topDocs.scoreDocs.isEmpty()) return@use null
+            val stored = it.storedFields().document(topDocs.scoreDocs[0].doc)
+            val storedPath = stored.get(FIELD_PATH) ?: return@use null
+            val content = stored.get(FIELD_CONTENT)
+            val ext = storedPath.substringAfterLast('.', "").lowercase()
+            IndexedDocument(
+                path = storedPath,
+                ext = ext,
+                hasContent = content != null,
+                content = content,
+            )
+        }
+    }
+
+    /**
+     * Return distinct file extensions present in the index (lowercase, no dot).
+     */
+    fun listExtensions(): List<String> {
+        writer.commit()
+        val reader = DirectoryReader.open(directory)
+        return reader.use {
+            val searcher = IndexSearcher(it)
+            val topDocs = searcher.search(MatchAllDocsQuery(), Int.MAX_VALUE)
+            val storedFields = it.storedFields()
+            topDocs.scoreDocs
+                .mapNotNull { sd -> storedFields.document(sd.doc).get(FIELD_PATH) }
+                .map { p -> p.substringAfterLast('.', "").lowercase() }
+                .filter { e -> e.isNotBlank() }
+                .distinct()
+                .sorted()
         }
     }
 

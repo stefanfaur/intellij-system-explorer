@@ -165,6 +165,37 @@ class LuceneIndexBuilderTest {
     }
 
     @Test
+    fun `test 8 - getDocument returns stored content for indexed file`(@TempDir tempDir: Path) = runBlocking {
+        val dir = ByteBuffersDirectory()
+        val manager = LuceneIndexManager(dir)
+        Files.writeString(tempDir.resolve("Main.kt"), "fun main() {}")
+        LuceneIndexBuilder.buildIndex(tempDir, manager, defaultSettings())
+
+        val doc = manager.getDocument(tempDir.resolve("Main.kt").toString())
+        assertNotNull(doc, "getDocument should return a result for an indexed file")
+        assertEquals("kt", doc!!.ext)
+        assertTrue(doc.hasContent)
+        assertTrue(doc.content?.contains("fun main") == true)
+        manager.close()
+    }
+
+    @Test
+    fun `test 9 - listExtensions returns distinct extensions in index`(@TempDir tempDir: Path) = runBlocking {
+        val dir = ByteBuffersDirectory()
+        val manager = LuceneIndexManager(dir)
+        Files.writeString(tempDir.resolve("a.kt"), "fun a(){}")
+        Files.writeString(tempDir.resolve("b.kt"), "fun b(){}")
+        Files.writeString(tempDir.resolve("c.md"), "# readme")
+        LuceneIndexBuilder.buildIndex(tempDir, manager, defaultSettings())
+
+        val exts = manager.listExtensions()
+        assertTrue(exts.contains("kt"), "Expected 'kt' in extensions: $exts")
+        assertTrue(exts.contains("md"), "Expected 'md' in extensions: $exts")
+        assertEquals(2, exts.size, "Expected exactly 2 distinct extensions: $exts")
+        manager.close()
+    }
+
+    @Test
     fun `test 6 - shouldIndex returns false for a class file with binary content`(@TempDir tempDir: Path) {
         // Java .class files start with 0xCAFEBABE magic bytes
         val classFile = tempDir.resolve("Main.class")
