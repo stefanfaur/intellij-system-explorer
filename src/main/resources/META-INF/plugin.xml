@@ -3,57 +3,94 @@
     <name>System Explorer</name>
     <vendor email="stefan@faur.sh" url="https://faur.sh">Stefan Faur</vendor>
     <description><![CDATA[
-<p>A full-featured system file browser embedded directly in the IntelliJ IDEA tool window.
-Navigate, manage, and operate on files across your entire filesystem without leaving the IDE.</p>
+<p>File browser plugin for IntelliJ-based IDEs. Local and remote (SSH/SFTP) browsing, fuzzy Quick Open
+with Lucene-backed content search, and a full Git panel &mdash; all without leaving the IDE.</p>
 
-<h3>Features</h3>
+<h3>Local Browser</h3>
 <ul>
-  <li>Browse the entire filesystem in a tree view</li>
-  <li>Copy, move, rename, and delete files and directories</li>
-  <li>Bookmarks sidebar for quick access to frequently used directories</li>
-  <li>Drag-and-drop between System Explorer and Project view</li>
-  <li>Quick Open v2 — fuzzy search popup with frecency ranking, query language, preview pane, and content search</li>
-  <li>Quick Open dialog for fast directory navigation by path</li>
-  <li>Context menu with all file operations</li>
-  <li>Filter files by glob pattern</li>
-  <li>Status bar with selection info</li>
+  <li>Full filesystem tree with lazy directory loading and speed-search</li>
+  <li>File operations: copy, cut, paste, rename, delete (trash or permanent), new file/folder</li>
+  <li>Bookmarks sidebar &mdash; default Home/Desktop/Downloads, drag to reorder, right-click to remove</li>
+  <li>Glob filter bar with saved presets (e.g. <code>*.kt</code>, <code>*.java;*.kt</code>)</li>
+  <li>Multi-select, back/forward navigation, configurable default root path</li>
+  <li>VCS color coding: modified, added, deleted, renamed files highlighted in the tree</li>
+  <li>Status bar: item count, sizes, permissions (Unix/Mac); toggle hidden files and permissions inline</li>
+  <li>Context menu: Open, Open in System, Reveal in Finder, Open Terminal Here, Copy Path, Compare With&hellip;</li>
+  <li>Drag-and-drop: tree &harr; Project View, tree &harr; tree, external file manager &rarr; tree</li>
+  <li>Conflict detection and balloon notifications on drop errors</li>
 </ul>
 
-<h3>Settings</h3>
+<h3>Quick Open &mdash; Cmd+Shift+P</h3>
 <ul>
-  <li>Show/hide hidden files</li>
-  <li>Sort folders first</li>
-  <li>Confirm before delete</li>
-  <li>Delete to system trash</li>
+  <li>Fuzzy search with frecency ranking (frequency + recency, configurable decay)</li>
+  <li>Query language: <code>d:</code> dirs, <code>f:</code> files, <code>b:</code> bookmarks, <code>r:</code> recent, <code>&gt;</code> IDE actions, <code>~</code> regex, <code>/:</code> content search</li>
+  <li>Modifiers: <code>@ext:EXT</code> filter by extension, <code>@in:PATH</code> scope to directory</li>
+  <li>Lucene hybrid index for fast full-text content search (falls back to VFS enumeration)</li>
+  <li>Ripgrep content search with line-precise editor navigation and match highlighting</li>
+  <li>Speed dial on empty query (top frecency items, <code>Cmd+1</code>&ndash;<code>Cmd+6</code>)</li>
+  <li>Preview pane (<code>Tab</code>), recent query cycling (<code>Ctrl+R</code>), bookmark toggle (<code>Cmd+D</code>)</li>
+  <li>Teleport aliases: map short names to absolute paths in Settings</li>
+  <li>Index health dashboard: stats, rebuild, and index browser in Settings &rarr; Quick Open</li>
+</ul>
+
+<h3>Remote SSH Panels</h3>
+<ul>
+  <li>Up to 4 SFTP panels with the same UI as the local browser</li>
+  <li>Full file operations (copy, cut, paste, rename, delete, new file/folder) over SFTP</li>
+  <li>Per-connection bookmarks, directory cache, and configurable keepalive/timeout settings</li>
+  <li>Remote Git status decorations on tree items when Remote Git integration is enabled</li>
+  <li>Drag-and-drop between local and remote panels; switch panels via <code>Option+Shift+1</code>&ndash;<code>5</code></li>
+</ul>
+
+<h3>Git Panel</h3>
+<ul>
+  <li>Commit log with graph, subject, date columns; filter by subject or author</li>
+  <li>Working-tree row shows uncommitted change count; click to inspect changes</li>
+  <li>Changed files list with status codes (M/A/D/R/C/?/U) and inline diff viewer</li>
+  <li>Stage/unstage files, write commit message, and push &mdash; all from the panel</li>
+  <li>Branch management: create, checkout, and delete branches; hard reset</li>
+  <li>Stash UI: create stash (with optional message and untracked), apply, and drop</li>
+  <li>Pull button with background task and three result paths (up to date, fast-forward, conflict)</li>
+  <li>Auto-detects local repos; tracks active browser tab to sync repo selector</li>
+  <li>Supports both local and remote (SSH) repositories</li>
 </ul>
 
 <h3>Keyboard Shortcuts</h3>
 <ul>
-  <li><b>Alt+E</b> &mdash; Toggle/focus System Explorer panel</li>
-  <li><b>Enter</b> &mdash; Open selected file/folder in System Explorer</li>
-  <li><b>Backspace</b> &mdash; Go back in System Explorer history</li>
-  <li><b>Ctrl+C / Ctrl+X / Ctrl+V</b> &mdash; Copy, cut, paste files</li>
-  <li><b>F2</b> &mdash; Rename selected file</li>
-  <li><b>Delete</b> &mdash; Delete selected files</li>
-  <li><b>F5</b> &mdash; Refresh file tree</li>
-  <li><b>Cmd+Shift+P</b> &mdash; Quick Open (v2: fuzzy popup with query language; v1: path dialog)</li>
-  <li><b>Tab</b> &mdash; Toggle preview pane in Quick Open v2</li>
-  <li><b>Ctrl+R</b> &mdash; Cycle recent queries in Quick Open v2</li>
-  <li><b>Ctrl+Shift+C</b> &mdash; Copy file path</li>
+  <li><b>Alt+E</b> &mdash; Toggle/focus System Explorer</li>
+  <li><b>Cmd+Shift+P</b> &mdash; Quick Open</li>
+  <li><b>Ctrl+C / Ctrl+X / Ctrl+V</b> &mdash; Copy, cut, paste</li>
+  <li><b>F2</b> &mdash; Rename &nbsp; <b>Delete</b> &mdash; Delete &nbsp; <b>F5</b> &mdash; Refresh</li>
+  <li><b>Ctrl+Shift+C</b> &mdash; Copy path &nbsp; <b>Enter</b> &mdash; Open &nbsp; <b>Backspace</b> &mdash; Go back</li>
+  <li><b>Option+Shift+1&ndash;5</b> &mdash; Switch to panel 1 (Local) or 2&ndash;5 (SSH)</li>
 </ul>
 ]]></description>
 
     <change-notes><![CDATA[
-<h3>1.0.0-pre-2</h3>
+<h3>1.1.0</h3>
 <ul>
-  <li>Initial release</li>
-  <li>Full filesystem browser with tree view</li>
-  <li>File operations: copy, move, rename, delete</li>
-  <li>Bookmarks sidebar for quick directory access</li>
-  <li>Drag-and-drop support with Project view</li>
-  <li>Quick Open dialog for fast navigation</li>
-  <li>File filtering with glob patterns</li>
-  <li>Configurable settings and keyboard shortcuts</li>
+  <li>Remote SSH/SFTP panels: up to 4 remote browser panels with full file operations, bookmarks, and keepalive</li>
+  <li>Git Panel: commit log with graph, inline diff viewer, stage/commit/push workflow</li>
+  <li>Branch management: create, checkout, delete branches; hard reset</li>
+  <li>Stash UI: create (with message and untracked option), apply, and drop stashes</li>
+  <li>Pull button with background task; auto-detect local repos and sync with active browser tab</li>
+  <li>Quick Open v2: fuzzy popup with frecency ranking, query language, speed dial, and preview pane</li>
+  <li>Lucene hybrid index for fast content search; index health dashboard and index browser in Settings</li>
+  <li>Ripgrep content search (<code>/:</code> prefix) with line-precise editor navigation and match highlighting</li>
+  <li>Teleport aliases: short-name &rarr; absolute-path shortcuts in Quick Open</li>
+  <li>VCS color coding on local file tree (modified/added/deleted/renamed)</li>
+  <li>Remote Git status decorations on SSH tree items</li>
+  <li>Context menu additions: Reveal in Finder, Open Terminal Here, Compare With&hellip;</li>
+  <li>Drag-and-drop polish: ghost drag image, conflict pre-check, balloon notifications; external app drops</li>
+  <li>Panel switching shortcuts: <code>Option+Shift+1&ndash;5</code></li>
+  <li>Many additional settings: sort options, status bar detail levels, file permissions display, and more</li>
+</ul>
+
+<h3>1.0.0</h3>
+<ul>
+  <li>Full filesystem browser with tree view, file operations, bookmarks, glob filter, and status bar</li>
+  <li>Drag-and-drop with Project View; context menu with all file operations</li>
+  <li>Quick Open path dialog; configurable settings and keyboard shortcuts</li>
 </ul>
 ]]></change-notes>
 
