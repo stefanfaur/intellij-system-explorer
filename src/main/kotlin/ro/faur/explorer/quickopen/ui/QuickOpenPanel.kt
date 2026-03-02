@@ -84,6 +84,7 @@ class QuickOpenPanel(
     private var candidatePool = CandidatePool(VfsEnumerator())  // replaced on hybrid switch
     private val panelScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var currentRoot: String = currentPath
+    private var activeEnumeratorName: String = "VFS"
 
     companion object {
         private const val MAX_CONTENT_RESULTS = 200
@@ -432,6 +433,7 @@ class QuickOpenPanel(
         if (existingManager != null) {
             // Index ready: use Lucene enumerator
             candidatePool.cancel()
+            activeEnumeratorName = "Lucene"
             candidatePool = CandidatePool(LuceneEnumerator(existingManager))
             candidatePool.refreshAsync(root) {
                 ApplicationManager.getApplication().invokeLater({
@@ -449,6 +451,7 @@ class QuickOpenPanel(
                 if (fileCount > 0 && fileCount < threshold) {
                     // Live mode: use existing candidatePool with VfsEnumerator (or RipgrepEnumerator)
                     // No change — the candidatePool already uses VfsEnumerator
+                    activeEnumeratorName = "VFS"
                     candidatePool.refreshAsync(root) {
                         ApplicationManager.getApplication().invokeLater({
                             scheduleSearch()
@@ -468,6 +471,7 @@ class QuickOpenPanel(
                         ApplicationManager.getApplication().invokeLater({
                             val mgr = IndexRegistry.getManager(root) ?: return@invokeLater
                             candidatePool.cancel()
+                            activeEnumeratorName = "Lucene"
                             candidatePool = CandidatePool(LuceneEnumerator(mgr))
                             candidatePool.refreshAsync(root) {
                                 ApplicationManager.getApplication().invokeLater({
@@ -489,7 +493,7 @@ class QuickOpenPanel(
                           else RankerSelector.active.name
         val rootDisplay = currentRoot.replace(System.getProperty("user.home"), "~")
         val count = candidatePool.getCandidates().size
-        rankerStatusLabel.text = "Fuzzy: $rankerLabel · Root: $rootDisplay · ${"%,d".format(count)} files"
+        rankerStatusLabel.text = "Enum: $activeEnumeratorName · Fuzzy: $rankerLabel · Root: $rootDisplay · ${"%,d".format(count)} files"
         // Index mode chip
         val mode = when {
             IndexRegistry.getManager(currentRoot) != null -> "Indexed"
