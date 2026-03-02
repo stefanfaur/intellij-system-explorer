@@ -11,7 +11,7 @@ class SftpConnectionManagerTest : EmbeddedSshTestBase() {
     private val managers = mutableListOf<SftpConnectionManager>()
 
     private fun newManager(connectTimeoutMs: Long = 10_000L): SftpConnectionManager {
-        return SftpConnectionManager(connectTimeoutMs).also { managers.add(it) }
+        return SftpConnectionManager(connectTimeoutMs, testVerifier()).also { managers.add(it) }
     }
 
     @AfterEach

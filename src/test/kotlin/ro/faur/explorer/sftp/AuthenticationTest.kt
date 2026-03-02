@@ -17,7 +17,7 @@ class AuthenticationTest : EmbeddedSshTestBase() {
     private lateinit var keyFile: Path
 
     private fun newManager(): SftpConnectionManager {
-        return SftpConnectionManager(CONNECT_TIMEOUT_MS).also { managers.add(it) }
+        return SftpConnectionManager(CONNECT_TIMEOUT_MS, testVerifier()).also { managers.add(it) }
     }
 
     @BeforeEach

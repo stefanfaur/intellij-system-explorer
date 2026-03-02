@@ -81,12 +81,7 @@ object SshConfigParser {
                 "hostname" -> hostName = value
                 "port" -> port = value.toIntOrNull() ?: 22
                 "user" -> username = value
-                "identityfile" -> {
-                    val expanded = value.replaceFirst("~", System.getProperty("user.home"))
-                        .replace("%d", System.getProperty("user.home"))
-                        .replace("%h", hostName ?: currentAlias ?: "")
-                    identityFile = expanded
-                }
+                "identityfile" -> identityFile = value
                 "proxyjump" -> proxyJump = value
             }
         }

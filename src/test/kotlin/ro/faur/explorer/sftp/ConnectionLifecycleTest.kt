@@ -16,7 +16,7 @@ class ConnectionLifecycleTest : EmbeddedSshTestBase() {
     private val managers = mutableListOf<SftpConnectionManager>()
 
     private fun newManager(): SftpConnectionManager {
-        return SftpConnectionManager().also { managers.add(it) }
+        return SftpConnectionManager(keyVerifier = testVerifier()).also { managers.add(it) }
     }
 
     @AfterEach

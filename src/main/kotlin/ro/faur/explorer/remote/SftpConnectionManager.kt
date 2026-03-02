@@ -32,10 +32,11 @@ import org.apache.sshd.common.util.security.SecurityUtils
  */
 class SftpConnectionManager(
     private val connectTimeoutMs: Long = 10_000L,
+    keyVerifier: HostKeyVerifier? = null,
 ) {
     // ── Singleton SshClient ──────────────────────────────────────────────────
 
-    private val hostKeyVerifier = HostKeyVerifier(
+    private val hostKeyVerifier: HostKeyVerifier = keyVerifier ?: HostKeyVerifier(
         knownHostsPath = Paths.get(System.getProperty("user.home"), ".ssh", "known_hosts_explorer"),
         autoAcceptUnknown = false,
         tofuCallback = { host, fingerprint ->

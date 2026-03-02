@@ -12,6 +12,7 @@ import org.apache.sshd.server.Environment
 import org.apache.sshd.server.ExitCallback
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import ro.faur.explorer.remote.security.HostKeyVerifier
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Files
@@ -41,6 +42,10 @@ abstract class EmbeddedSshTestBase {
         const val CONNECT_TIMEOUT_MS = 10_000L
         const val AUTH_TIMEOUT_MS = 8_000L
     }
+
+    /** Returns a HostKeyVerifier that auto-accepts all host keys — safe for embedded test servers. */
+    protected fun testVerifier(): HostKeyVerifier =
+        HostKeyVerifier(serverRoot.resolve(".known_hosts_test"), autoAcceptUnknown = true)
 
     @BeforeEach
     fun startServer() {

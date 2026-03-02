@@ -17,7 +17,7 @@ class ConcurrentOperationsTest : EmbeddedSshTestBase() {
         val latch = CountDownLatch(threadCount)
         val startGate = CountDownLatch(1)
         // Share a single manager to avoid spawning 5 SshClient instances
-        val manager = SftpConnectionManager()
+        val manager = SftpConnectionManager(keyVerifier = testVerifier())
         val threads = (1..threadCount).map { i ->
             Thread {
                 try {
@@ -49,7 +49,7 @@ class ConcurrentOperationsTest : EmbeddedSshTestBase() {
         val threadCount = 5
         val errors = CopyOnWriteArrayList<Exception>()
         val latch = CountDownLatch(threadCount)
-        val manager = SftpConnectionManager()
+        val manager = SftpConnectionManager(keyVerifier = testVerifier())
         val threads = (1..threadCount).map { i ->
             Thread {
                 try {
