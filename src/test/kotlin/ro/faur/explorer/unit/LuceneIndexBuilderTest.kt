@@ -150,6 +150,21 @@ class LuceneIndexBuilderTest {
     }
 
     @Test
+    fun `test 7 - buildIndex reports progress via callback`(@TempDir tempDir: Path) = runBlocking {
+        val dir = ByteBuffersDirectory()
+        val manager = LuceneIndexManager(dir)
+        for (i in 1..5) Files.writeString(tempDir.resolve("file$i.kt"), "content $i")
+
+        var lastProgress = 0
+        LuceneIndexBuilder.buildIndex(tempDir, manager, defaultSettings()) { count ->
+            lastProgress = count
+        }
+
+        assertTrue(lastProgress > 0, "onProgress should have been called at least once, lastProgress=$lastProgress")
+        manager.close()
+    }
+
+    @Test
     fun `test 6 - shouldIndex returns false for a class file with binary content`(@TempDir tempDir: Path) {
         // Java .class files start with 0xCAFEBABE magic bytes
         val classFile = tempDir.resolve("Main.class")

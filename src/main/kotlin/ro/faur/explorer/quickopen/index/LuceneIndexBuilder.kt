@@ -122,7 +122,12 @@ object LuceneIndexBuilder {
      *
      * Must be called on Dispatchers.IO (suspend).
      */
-    suspend fun buildIndex(root: Path, manager: LuceneIndexManager, settings: QuickOpenSettings.State) {
+    suspend fun buildIndex(
+        root: Path,
+        manager: LuceneIndexManager,
+        settings: QuickOpenSettings.State,
+        onProgress: ((Int) -> Unit)? = null
+    ) {
         withContext(Dispatchers.IO) {
             val allowedExts = settings.luceneExtensionAllowlist
                 .split(",")
@@ -132,6 +137,7 @@ object LuceneIndexBuilder {
             val totalContentCapBytes = settings.luceneMaxIndexSizeMb.toLong() * 1024L * 1024L
             var totalIndexedBytes = 0L
             var contentCapReached = false
+            var progressCount = 0
 
             Files.walkFileTree(root, object : SimpleFileVisitor<Path>() {
                 override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
@@ -163,10 +169,14 @@ object LuceneIndexBuilder {
                         totalIndexedBytes += fileSize
                     }
 
+                    progressCount++
+                    if (progressCount % 100 == 0) onProgress?.invoke(progressCount)
+
                     return FileVisitResult.CONTINUE
                 }
             })
 
+            if (progressCount > 0) onProgress?.invoke(progressCount)
             manager.commit()
             LOG.info("Indexed ${manager.numDocs()} docs for $root")
         }
