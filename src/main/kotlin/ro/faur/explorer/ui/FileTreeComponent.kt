@@ -7,6 +7,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.impl.NonProjectFileWritingAccessProvider
+import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.DumbService
@@ -79,6 +80,9 @@ class FileTreeComponent(private val project: Project) : Disposable {
 
     /** Called when files are modified (for ExplorerPanel to refresh). */
     var onFilesModified: (() -> Unit)? = null
+
+    /** Called on the EDT after the root directory finishes loading its children. */
+    var onRootLoaded: (() -> Unit)? = null
 
     var showHidden: Boolean = false
     var filterPattern: String = ""
@@ -328,6 +332,7 @@ class FileTreeComponent(private val project: Project) : Disposable {
                 permissionsCache.putAll(newPermCache)
                 populateNode(rootNode, children)
                 treeModel.reload()
+                onRootLoaded?.invoke()
             }
         }
     }
@@ -853,7 +858,8 @@ class FileTreeComponent(private val project: Project) : Disposable {
         private fun getIconForFile(vf: VirtualFile): Icon {
             return iconCache.getOrPut(vf.path) {
                 if (vf.isDirectory) AllIcons.Nodes.Folder
-                else vf.fileType.icon ?: AllIcons.FileTypes.Any_type
+                else FileTypeManager.getInstance().getFileTypeByFileName(vf.name).icon
+                    ?: AllIcons.FileTypes.Any_type
             }
         }
 
