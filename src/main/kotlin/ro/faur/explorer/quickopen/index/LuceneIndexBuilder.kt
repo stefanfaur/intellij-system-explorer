@@ -8,6 +8,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ro.faur.explorer.settings.QuickOpenSettings
 import ro.faur.explorer.util.explorerExceptionHandler
+import java.io.IOException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
@@ -216,7 +217,11 @@ object LuceneIndexBuilder {
                         if (!settings.ripgrepSearchHidden && dirName.startsWith(".") && dir != root) {
                             return FileVisitResult.SKIP_SUBTREE
                         }
-                        dir.register(watchService, ENTRY_CREATE, ENTRY_MODIFY, ENTRY_DELETE)
+                        try {
+                            dir.register(watchService, ENTRY_CREATE, ENTRY_MODIFY, ENTRY_DELETE)
+                        } catch (e: IOException) {
+                            LOG.warn("Could not register watcher for $dir (skipping): ${e.message}")
+                        }
                         return FileVisitResult.CONTINUE
                     }
                 })
