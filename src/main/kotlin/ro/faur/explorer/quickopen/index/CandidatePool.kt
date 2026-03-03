@@ -8,6 +8,7 @@ import ro.faur.explorer.quickopen.model.CandidateType
 import ro.faur.explorer.quickopen.model.SearchCandidate
 import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.settings.QuickOpenSettings
+import ro.faur.explorer.util.explorerExceptionHandler
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -49,7 +50,7 @@ class CandidatePool(
      */
     fun refreshAsync(root: String, onUpdate: () -> Unit = {}) {
         val previousJob = enumerationJob
-        enumerationJob = scope.launch {
+        enumerationJob = scope.launch(explorerExceptionHandler(null, "Quick open file enumeration")) {
             previousJob?.cancelAndJoin()   // wait for old job to stop before clearing
             _candidates.clear()
             isTruncated = false

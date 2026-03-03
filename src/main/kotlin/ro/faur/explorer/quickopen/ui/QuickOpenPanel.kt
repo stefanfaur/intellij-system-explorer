@@ -57,6 +57,7 @@ import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.quickopen.ranking.Ranker
 import ro.faur.explorer.settings.ExplorerSettings
 import ro.faur.explorer.settings.QuickOpenSettings
+import ro.faur.explorer.util.explorerExceptionHandler
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Dimension
@@ -445,7 +446,7 @@ class QuickOpenPanel(
         }
 
         // Count files to determine mode (run on background thread, do NOT block EDT)
-        panelScope.launch(Dispatchers.IO) {
+        panelScope.launch(Dispatchers.IO + explorerExceptionHandler(project, "Quick open file enumeration")) {
             val fileCount = LuceneIndexBuilder.countFiles(Paths.get(root), stopAt = threshold)
             ApplicationManager.getApplication().invokeLater({
                 if (fileCount > 0 && fileCount < threshold) {
@@ -653,7 +654,7 @@ class QuickOpenPanel(
 
         // Launch Lucene content query (if index available)
         if (luceneManager != null) {
-            panelScope.launch {
+            panelScope.launch(explorerExceptionHandler(project, "Lucene content search")) {
                 try {
                     val results = LuceneContentSearch(luceneManager).search(pattern, MAX_CONTENT_RESULTS)
                     synchronized(luceneResults) { luceneResults.addAll(results) }
@@ -662,7 +663,7 @@ class QuickOpenPanel(
         }
 
         // Launch ripgrep (always runs — catches freshness gap)
-        panelScope.launch {
+        panelScope.launch(explorerExceptionHandler(project, "Ripgrep content search")) {
             try {
                 RipgrepContentSearch(rgPath, currentRoot).search(pattern)
                     .take(MAX_CONTENT_RESULTS)

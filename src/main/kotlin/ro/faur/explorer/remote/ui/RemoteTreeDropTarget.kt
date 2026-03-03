@@ -10,6 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import ro.faur.explorer.remote.CrossPanelTransferService
+import ro.faur.explorer.util.explorerExceptionHandler
 import java.awt.datatransfer.DataFlavor
 import java.io.File
 
@@ -62,7 +63,7 @@ class RemoteTreeDropTarget(
 
         if (virtualFiles.isEmpty()) return
 
-        dropScope.launch {
+        dropScope.launch(explorerExceptionHandler(null, "Remote file drop")) {
             try {
                 service.uploadAsync(virtualFiles, targetDir, connectionName)
                 ApplicationManager.getApplication().invokeLater {

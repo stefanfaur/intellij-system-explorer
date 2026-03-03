@@ -7,6 +7,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ro.faur.explorer.settings.QuickOpenSettings
+import ro.faur.explorer.util.explorerExceptionHandler
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
@@ -259,7 +260,7 @@ object LuceneIndexBuilder {
 
                     if (overflow) {
                         key.reset()
-                        scope.launch(Dispatchers.IO) { buildIndex(root, manager, settings) }
+                        scope.launch(Dispatchers.IO + explorerExceptionHandler(null, "Lucene index rebuild on FS overflow for $root")) { buildIndex(root, manager, settings) }
                         continue
                     }
 
