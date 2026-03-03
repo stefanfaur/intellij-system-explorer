@@ -97,10 +97,14 @@ class FileTreeComponent(private val project: Project) : Disposable {
      *  causing all icons to change twice in rapid succession → visible flash. */
     private val iconCache = ConcurrentHashMap<String, Icon>()
 
-    /** Cache for directory VCS status propagation (1-level child scan).
-     *  Uses Optional<Color> to distinguish "no color" (empty) from "not yet computed" (absent).
-     *  Invalidated on FileStatusListener callbacks, setRoot(), and refresh(). */
-    private val directoryStatusCache = ConcurrentHashMap<String, java.util.Optional<Color>>()
+    /** Cache for VCS status colors (files and directories).
+     *  Optional<Color> distinguishes "no color" (empty Optional) from "not yet computed" (absent key).
+     *  Populated asynchronously off EDT; invalidated on FileStatusListener callbacks, setRoot(), refresh(). */
+    private val vcsColorCache = ConcurrentHashMap<String, java.util.Optional<Color>>()
+
+    /** Paths currently being looked up on a background thread. Prevents thundering-herd re-dispatch
+     *  when the same file is rendered multiple times before the background task completes. */
+    private val vcsColorPending = ConcurrentHashMap.newKeySet<String>()
 
     /** The path currently displayed as the tree root. */
     var currentRootPath: String? = null
@@ -145,13 +149,15 @@ class FileTreeComponent(private val project: Project) : Disposable {
         // when the given Disposable (this) is disposed.
         FileStatusManager.getInstance(project).addFileStatusListener(object : FileStatusListener {
             override fun fileStatusChanged(virtualFile: VirtualFile) {
-                directoryStatusCache.clear()
+                vcsColorCache.clear()
+                vcsColorPending.clear()
                 ApplicationManager.getApplication().invokeLater {
                     if (!isDisposed) tree.repaint()
                 }
             }
             override fun fileStatusesChanged() {
-                directoryStatusCache.clear()
+                vcsColorCache.clear()
+                vcsColorPending.clear()
                 ApplicationManager.getApplication().invokeLater {
                     if (!isDisposed) tree.repaint()
                 }
@@ -292,7 +298,8 @@ class FileTreeComponent(private val project: Project) : Disposable {
         currentRootPath = path
         permissionsCache.clear()
         iconCache.clear()
-        directoryStatusCache.clear()
+        vcsColorCache.clear()
+        vcsColorPending.clear()
         rootNode.removeAllChildren()
         treeModel.reload()   // show empty tree immediately
 
@@ -332,7 +339,8 @@ class FileTreeComponent(private val project: Project) : Disposable {
     fun refresh() {
         permissionsCache.clear()
         iconCache.clear()
-        directoryStatusCache.clear()
+        vcsColorCache.clear()
+        vcsColorPending.clear()
         currentRootPath?.let { path ->
             val dir = LocalFileSystem.getInstance().findFileByPath(path)
             // Shallow refresh: only the current directory, not recursive
@@ -664,32 +672,53 @@ class FileTreeComponent(private val project: Project) : Disposable {
     }
 
     /**
-     * Returns the effective VCS color for a file or directory node.
-     * For files: looks up FileStatusManager directly.
-     * For directories: scans 1-level of children for the first modified status (cached).
-     * Returns null for NOT_CHANGED or files outside any VCS repo.
+     * Returns the cached VCS color for a file or directory, or null if not yet computed.
+     *
+     * On cache miss, dispatches [computeVcsColor] on a background thread via
+     * [ReadAction.nonBlocking]. The background result is stored in [vcsColorCache] and
+     * a repaint is scheduled. This ensures FileStatusManager is never called on the EDT,
+     * avoiding SlowOperations violations (IntelliJ 2025.1+).
      */
     private fun getEffectiveVcsColor(vf: VirtualFile): Color? {
-        return try {
-            if (vf.isDirectory) {
-                val cached = directoryStatusCache[vf.path]
-                if (cached != null) return cached.orElse(null)
-                val children = vf.children ?: return null
-                var color: Color? = null
-                for (child in children) {
-                    val status = FileStatusManager.getInstance(project).getStatus(child)
-                    if (status != FileStatus.NOT_CHANGED) {
-                        color = status.color
-                        break
+        val cached = vcsColorCache[vf.path]
+        if (cached != null) return cached.orElse(null)
+
+        // Cache miss: dispatch off-EDT lookup if not already in flight
+        if (vcsColorPending.add(vf.path)) {
+            ReadAction.nonBlocking<java.util.Optional<Color>> {
+                try { java.util.Optional.ofNullable(computeVcsColor(vf)) }
+                catch (_: Exception) { java.util.Optional.empty() }
+            }.submit(AppExecutorUtil.getAppExecutorService())
+                .onSuccess { result ->
+                    vcsColorPending.remove(vf.path)
+                    vcsColorCache[vf.path] = result
+                    ApplicationManager.getApplication().invokeLater {
+                        if (!isDisposed) tree.repaint()
                     }
                 }
-                directoryStatusCache[vf.path] = java.util.Optional.ofNullable(color)
-                color
-            } else {
-                val status = FileStatusManager.getInstance(project).getStatus(vf)
-                if (status == FileStatus.NOT_CHANGED) null else status.color
+                .onError { _ -> vcsColorPending.remove(vf.path) }
+        }
+        return null
+    }
+
+    /**
+     * Computes the VCS color for [vf]. May call [FileStatusManager] — must only be
+     * called from a background thread (never on the EDT).
+     *
+     * For files: returns the FileStatus color, or null if NOT_CHANGED.
+     * For directories: scans 1-level of children and returns the first non-unchanged color.
+     */
+    private fun computeVcsColor(vf: VirtualFile): Color? {
+        return if (vf.isDirectory) {
+            val children = vf.children ?: return null
+            children.firstNotNullOfOrNull { child ->
+                val status = FileStatusManager.getInstance(project).getStatus(child)
+                if (status != FileStatus.NOT_CHANGED) status.color else null
             }
-        } catch (_: Exception) { null }
+        } else {
+            val status = FileStatusManager.getInstance(project).getStatus(vf)
+            if (status == FileStatus.NOT_CHANGED) null else status.color
+        }
     }
 
     /**
