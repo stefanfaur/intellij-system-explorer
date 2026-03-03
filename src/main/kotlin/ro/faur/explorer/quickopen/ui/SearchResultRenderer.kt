@@ -1,6 +1,7 @@
 package ro.faur.explorer.quickopen.ui
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.SimpleTextAttributes
@@ -35,16 +36,22 @@ class SearchResultRenderer : ColoredListCellRenderer<SearchResult>() {
 
         val candidate = scored.candidate
 
-        // Icon — use VirtualFile-based lookup for proper file-type icons
+        // Icon — use name-based lookup (EDT-safe; content detection triggers SlowOperations)
         icon = when (candidate.type) {
-            CandidateType.DIRECTORY, CandidateType.BOOKMARK, CandidateType.RECENT -> {
+            CandidateType.DIRECTORY -> AllIcons.Nodes.Folder
+            CandidateType.BOOKMARK, CandidateType.RECENT -> {
                 val vf = LocalFileSystem.getInstance().findFileByPath(candidate.fullPath)
-                vf?.let { if (it.isDirectory) AllIcons.Nodes.Folder else it.fileType.icon }
-                    ?: AllIcons.Nodes.Folder
+                if (vf?.isDirectory == true) AllIcons.Nodes.Folder
+                else {
+                    val name = candidate.fullPath.substringAfterLast('/')
+                    FileTypeManager.getInstance().getFileTypeByFileName(name).icon
+                        ?: AllIcons.FileTypes.Any_type
+                }
             }
             CandidateType.FILE, CandidateType.OPEN_EDITOR -> {
-                val vf = LocalFileSystem.getInstance().findFileByPath(candidate.fullPath)
-                vf?.fileType?.icon ?: AllIcons.FileTypes.Any_type
+                val name = candidate.fullPath.substringAfterLast('/')
+                FileTypeManager.getInstance().getFileTypeByFileName(name).icon
+                    ?: AllIcons.FileTypes.Any_type
             }
             CandidateType.ACTION -> AllIcons.Actions.Lightning
             CandidateType.CONTENT_MATCH -> AllIcons.Actions.Find
