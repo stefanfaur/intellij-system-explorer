@@ -117,6 +117,7 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
 
         <!-- DnD error notifications -->
         <notificationGroup id="Explorer.DnD" displayType="BALLOON"/>
+        <notificationGroup id="Explorer.Errors" displayType="STICKY_BALLOON" isLogByDefault="true"/>
 
         <!-- Settings hierarchy: Tools > System Explorer > {Local Browser, Quick Open, Remote SSH, Remote Git} -->
         <applicationConfigurable
