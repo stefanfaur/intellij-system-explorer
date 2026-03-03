@@ -28,6 +28,7 @@ import org.apache.lucene.store.ByteBuffersDirectory
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.NIOFSDirectory
 import org.apache.lucene.index.CorruptIndexException
+import ro.faur.explorer.util.ExplorerErrorNotifier
 import java.io.Closeable
 import java.nio.file.Files
 import java.nio.file.Path
@@ -124,12 +125,15 @@ class LuceneIndexManager : Closeable {
             dir
         } catch (e: CorruptIndexException) {
             LOG.warn("Corrupt Lucene index at $path — rebuilding", e)
+            ExplorerErrorNotifier.notify(null, "Explorer: Index Rebuilt", "Corrupt index at $path was detected and is being rebuilt.", e)
             rebuildDirectory(path, analyzer)
         } catch (e: IndexFormatTooOldException) {
             LOG.warn("Lucene index too old at $path — rebuilding", e)
+            ExplorerErrorNotifier.notify(null, "Explorer: Index Rebuilt", "Outdated index at $path was detected and is being rebuilt.", e)
             rebuildDirectory(path, analyzer)
         } catch (e: Exception) {
             LOG.warn("Failed to open Lucene index at $path — rebuilding", e)
+            ExplorerErrorNotifier.notify(null, "Explorer: Index Error", "Failed to open index at $path — rebuilding.", e)
             rebuildDirectory(path, analyzer)
         }
     }

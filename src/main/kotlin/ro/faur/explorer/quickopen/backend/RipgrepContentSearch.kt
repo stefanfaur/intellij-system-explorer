@@ -5,6 +5,7 @@ import com.intellij.openapi.diagnostic.Logger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import ro.faur.explorer.settings.QuickOpenSettings
+import ro.faur.explorer.util.ExplorerErrorNotifier
 
 data class ContentMatch(
     val filePath: String,
@@ -111,6 +112,7 @@ class RipgrepContentSearch(
             }
         } catch (e: Exception) {
             LOG.warn("Content search error for pattern=$pattern scope=$scope", e)
+            ExplorerErrorNotifier.notify(null, "Explorer: Content Search Failed", "Ripgrep search failed for pattern '$pattern'.", e)
         } finally {
             process.destroy()
         }
