@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import ro.faur.explorer.settings.QuickOpenSettings
+import ro.faur.explorer.util.explorerExceptionHandler
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.concurrent.ConcurrentHashMap
@@ -43,7 +44,7 @@ object IndexRegistry {
 
         if (!buildingRoots.add(root)) return null  // already building
 
-        registryScope.launch(Dispatchers.IO) {
+        registryScope.launch(Dispatchers.IO + explorerExceptionHandler(null, "Lucene index build for $root")) {
             try {
                 val rootPath = Paths.get(root)
                 val indexPath = LuceneIndexManager.indexDirForRoot(root)
@@ -55,13 +56,13 @@ object IndexRegistry {
                 }
                 managers[root] = manager
                 lastBuiltMs[root] = System.currentTimeMillis()
-                buildProgress.remove(root)
-                buildingRoots.remove(root)
                 onIndexReady()  // callback so QuickOpenPanel can switch to LuceneEnumerator
                 // Start the watcher after build completes
                 LuceneIndexBuilder.startWatcher(rootPath, manager, settings, registryScope)
             } catch (e: Exception) {
+                // explorerExceptionHandler already notified; just log here
                 LOG.warn("Failed to build Lucene index for $root", e)
+            } finally {
                 buildProgress.remove(root)
                 buildingRoots.remove(root)
             }
