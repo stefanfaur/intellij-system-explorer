@@ -77,6 +77,7 @@ class QuickOpenPanel(
     private val currentPath: String,
     private val candidates: List<SearchCandidate>,
     private val initialQuery: String = "",
+    private val isRemote: Boolean = false,
     private val onSelected: (SearchCandidate) -> Unit
 ) : JPanel(BorderLayout()), Disposable {
 
@@ -447,6 +448,18 @@ class QuickOpenPanel(
 
         // Count files to determine mode (run on background thread, do NOT block EDT)
         panelScope.launch(Dispatchers.IO + explorerExceptionHandler(project, "Quick open file enumeration")) {
+            if (isRemote) {
+                // Remote paths are not on the local filesystem — skip Lucene indexing entirely
+                ApplicationManager.getApplication().invokeLater({
+                    candidatePool.refreshAsync(root) {
+                        ApplicationManager.getApplication().invokeLater({
+                            scheduleSearch()
+                            updateStatusBar()
+                        }, ModalityState.any())
+                    }
+                }, ModalityState.any())
+                return@launch
+            }
             val fileCount = LuceneIndexBuilder.countFiles(Paths.get(root), stopAt = threshold)
             ApplicationManager.getApplication().invokeLater({
                 if (fileCount > 0 && fileCount < threshold) {

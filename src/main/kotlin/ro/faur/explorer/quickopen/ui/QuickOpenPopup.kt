@@ -26,6 +26,7 @@ object QuickOpenPopup {
             currentPath = currentPath,
             candidates = candidates,
             initialQuery = effectiveQuery,
+            isRemote = panel.isRemotePanelVisible,
             onSelected = { candidate ->
                 when (candidate.type) {
                     CandidateType.DIRECTORY, CandidateType.BOOKMARK, CandidateType.RECENT ->
