@@ -131,6 +131,10 @@ object LuceneIndexBuilder {
         onProgress: ((Int) -> Unit)? = null
     ) {
         withContext(Dispatchers.IO) {
+            if (!Files.isDirectory(root)) {
+                LOG.warn("Skipping index build for $root: path does not exist or is not a directory")
+                return@withContext
+            }
             val allowedExts = settings.luceneExtensionAllowlist
                 .split(",")
                 .map { it.trim().lowercase() }
@@ -176,6 +180,11 @@ object LuceneIndexBuilder {
 
                     return FileVisitResult.CONTINUE
                 }
+
+                override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
+                    LOG.warn("Skipping unreadable path during index build: $file (${exc.message})")
+                    return FileVisitResult.CONTINUE
+                }
             })
 
             if (progressCount > 0) onProgress?.invoke(progressCount)
@@ -208,6 +217,10 @@ object LuceneIndexBuilder {
             .toSet()
 
         withContext(Dispatchers.IO) {
+            if (!Files.isDirectory(root)) {
+                LOG.warn("Skipping watcher for $root: path does not exist or is not a directory")
+                return@withContext
+            }
             java.nio.file.FileSystems.getDefault().newWatchService().use { watchService ->
                 // Register all existing subdirectories
                 Files.walkFileTree(root, object : SimpleFileVisitor<Path>() {
@@ -222,6 +235,11 @@ object LuceneIndexBuilder {
                         } catch (e: IOException) {
                             LOG.warn("Could not register watcher for $dir (skipping): ${e.message}")
                         }
+                        return FileVisitResult.CONTINUE
+                    }
+
+                    override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
+                        LOG.warn("Skipping unreadable path during watcher setup: $file (${exc.message})")
                         return FileVisitResult.CONTINUE
                     }
                 })
