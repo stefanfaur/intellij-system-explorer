@@ -113,6 +113,7 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
         fileTreeComponent.onDirectoryDoubleClicked = { vf -> navigateTo(vf.path) }
         fileTreeComponent.onSelectionChanged       = { updateStatus() }
         fileTreeComponent.onFilesModified          = { updateStatus(); loadBookmarks() }
+        fileTreeComponent.onRootLoaded             = { updateStatus() }
 
         val splitter = JBSplitter(false, 0.2f).apply {
             firstComponent  = bookmarksPanel.component
