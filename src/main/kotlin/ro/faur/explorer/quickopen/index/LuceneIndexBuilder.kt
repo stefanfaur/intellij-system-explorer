@@ -3,28 +3,22 @@ package ro.faur.explorer.quickopen.index
 import com.intellij.openapi.diagnostic.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ro.faur.explorer.settings.QuickOpenSettings
-import ro.faur.explorer.util.explorerExceptionHandler
 import java.io.IOException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
-import java.nio.file.StandardWatchEventKinds.ENTRY_CREATE
-import java.nio.file.StandardWatchEventKinds.ENTRY_DELETE
-import java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY
-import java.nio.file.StandardWatchEventKinds.OVERFLOW
 import java.nio.file.attribute.BasicFileAttributes
-import java.util.concurrent.TimeUnit
 
 /**
  * Populates and maintains a LuceneIndexManager from the filesystem.
  *
  * buildIndex: initial full walk using Files.walkFileTree on Dispatchers.IO.
- * startWatcher: incremental update daemon using JDK WatchService.
+ * startPollingWatcher: periodic re-index daemon (no FD usage).
  * countFiles: quick count helper for threshold decisions.
  * shouldIndex: filter predicate for extension, size, and binary content.
  */
@@ -194,102 +188,30 @@ object LuceneIndexBuilder {
     }
 
     /**
-     * Watch [root] for filesystem changes and update [manager] incrementally.
+     * Periodically re-indexes [root] by calling [buildIndex] on a configurable timer.
      *
-     * Handles:
-     * - ENTRY_CREATE / ENTRY_MODIFY: re-index the changed file
-     * - ENTRY_DELETE: remove from index
-     * - OVERFLOW: trigger full re-scan (prevents stale index after bulk operations)
-     * - New subdirectories: registered automatically
+     * Uses no file descriptors — avoids the kqueue/inotify FD drain caused by registering
+     * every subdirectory with JDK WatchService (which consumed one FD per directory on macOS).
+     * The poll interval is read from [settings.luceneWatcherPollIntervalMinutes].
      *
      * Runs until [scope] is cancelled.
      */
-    suspend fun startWatcher(
+    suspend fun startPollingWatcher(
         root: Path,
         manager: LuceneIndexManager,
         settings: QuickOpenSettings.State,
         scope: CoroutineScope
     ) {
-        val allowedExts = settings.luceneExtensionAllowlist
-            .split(",")
-            .map { it.trim().lowercase() }
-            .filter { it.isNotEmpty() }
-            .toSet()
-
+        val intervalMs = settings.luceneWatcherPollIntervalMinutes * 60_000L
         withContext(Dispatchers.IO) {
-            if (!Files.isDirectory(root)) {
-                LOG.warn("Skipping watcher for $root: path does not exist or is not a directory")
-                return@withContext
-            }
-            java.nio.file.FileSystems.getDefault().newWatchService().use { watchService ->
-                // Register all existing subdirectories
-                Files.walkFileTree(root, object : SimpleFileVisitor<Path>() {
-                    override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
-                        val dirName = dir.fileName?.toString() ?: return FileVisitResult.CONTINUE
-                        if (dirName in HARD_EXCLUDE_DIRS) return FileVisitResult.SKIP_SUBTREE
-                        if (!settings.ripgrepSearchHidden && dirName.startsWith(".") && dir != root) {
-                            return FileVisitResult.SKIP_SUBTREE
-                        }
-                        try {
-                            dir.register(watchService, ENTRY_CREATE, ENTRY_MODIFY, ENTRY_DELETE)
-                        } catch (e: IOException) {
-                            LOG.warn("Could not register watcher for $dir (skipping): ${e.message}")
-                        }
-                        return FileVisitResult.CONTINUE
-                    }
-
-                    override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
-                        LOG.warn("Skipping unreadable path during watcher setup: $file (${exc.message})")
-                        return FileVisitResult.CONTINUE
-                    }
-                })
-
-                while (scope.isActive) {
-                    val key = withContext(Dispatchers.IO) {
-                        watchService.poll(500, TimeUnit.MILLISECONDS)
-                    } ?: continue
-
-                    var overflow = false
-                    for (event in key.pollEvents()) {
-                        when (event.kind()) {
-                            OVERFLOW -> {
-                                // Events were lost — full re-scan to close the staleness gap
-                                overflow = true
-                                break
-                            }
-                            ENTRY_DELETE -> {
-                                val changed = (key.watchable() as Path).resolve(event.context() as Path)
-                                manager.deleteFile(changed.toString())
-                            }
-                            ENTRY_CREATE, ENTRY_MODIFY -> {
-                                val changed = (key.watchable() as Path).resolve(event.context() as Path)
-                                if (Files.isDirectory(changed)) {
-                                    // Register new subdirectory so its contents are watched too
-                                    val dirName = changed.fileName?.toString()
-                                    if (dirName != null && dirName !in HARD_EXCLUDE_DIRS) {
-                                        changed.register(watchService, ENTRY_CREATE, ENTRY_MODIFY, ENTRY_DELETE)
-                                    }
-                                } else if (shouldIndex(changed, allowedExts)) {
-                                    val content = try {
-                                        changed.toFile().readText(Charsets.UTF_8)
-                                    } catch (e: Exception) {
-                                        null
-                                    }
-                                    manager.addOrUpdateFile(changed, content, content != null)
-                                }
-                            }
-                        }
-                    }
-
-                    if (overflow) {
-                        key.reset()
-                        scope.launch(Dispatchers.IO + explorerExceptionHandler(null, "Lucene index rebuild on FS overflow for $root")) { buildIndex(root, manager, settings) }
-                        continue
-                    }
-
-                    manager.commit()
-                    if (!key.reset()) break
+            while (scope.isActive) {
+                delay(intervalMs)
+                if (!scope.isActive) break
+                if (!Files.isDirectory(root)) {
+                    LOG.warn("Stopping index poller for $root: path no longer exists or is not a directory")
+                    break
                 }
+                buildIndex(root, manager, settings)
             }
         }
     }

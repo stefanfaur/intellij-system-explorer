@@ -267,6 +267,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
     // ── Backward-compat stubs ──────────────────────────────────────────────
     fun getRemoteTreePanel() = null
     val isRemotePanelVisible: Boolean get() = browserHost.panelCount > 1
+    val isActiveRemote: Boolean get() = browserHost.activePanel is RemoteBrowserPanel
 
     /** Returns the name of the first active remote connection, or null if none. */
     fun getActiveConnectionName(): String? =

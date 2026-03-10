@@ -54,6 +54,7 @@ class QuickOpenConfigurable : Configurable {
     private val luceneExtAllowlistField = JTextField()
     private val luceneMaxSizeSpinner = JSpinner(SpinnerNumberModel(500, 50, 10_000, 50))
     private val luceneEvictionSpinner = JSpinner(SpinnerNumberModel(30, 1, 365, 1))
+    private val lucenePollerIntervalSpinner = JSpinner(SpinnerNumberModel(5, 1, 60, 1))
 
     // Index health
     private lateinit var healthTableModel: DefaultTableModel
@@ -148,6 +149,8 @@ class QuickOpenConfigurable : Configurable {
                     .rowComment("Content indexing stops when this limit is reached; path indexing continues.")
                 row("Evict unused index after (days):") { cell(luceneEvictionSpinner) }
                     .rowComment("Index for a root not opened in this many days is automatically deleted.")
+                row("Re-index poll interval (minutes):") { cell(lucenePollerIntervalSpinner) }
+                    .rowComment("How often the background poller re-scans indexed roots for changes.")
             }
             group("Lucene Index Health") {
                 row {
@@ -199,6 +202,7 @@ class QuickOpenConfigurable : Configurable {
             || luceneExtAllowlistField.text != s.luceneExtensionAllowlist
             || luceneMaxSizeSpinner.value as Int != s.luceneMaxIndexSizeMb
             || luceneEvictionSpinner.value as Int != s.luceneEvictionDays
+            || lucenePollerIntervalSpinner.value as Int != s.luceneWatcherPollIntervalMinutes
             || aliasesModified()
     }
 
@@ -225,6 +229,7 @@ class QuickOpenConfigurable : Configurable {
         s.luceneExtensionAllowlist = luceneExtAllowlistField.text
         s.luceneMaxIndexSizeMb = luceneMaxSizeSpinner.value as Int
         s.luceneEvictionDays = luceneEvictionSpinner.value as Int
+        s.luceneWatcherPollIntervalMinutes = lucenePollerIntervalSpinner.value as Int
         applyAliases()
     }
 
@@ -251,6 +256,7 @@ class QuickOpenConfigurable : Configurable {
         luceneExtAllowlistField.text = s.luceneExtensionAllowlist
         luceneMaxSizeSpinner.value = s.luceneMaxIndexSizeMb
         luceneEvictionSpinner.value = s.luceneEvictionDays
+        lucenePollerIntervalSpinner.value = s.luceneWatcherPollIntervalMinutes
         if (::aliasTableModel.isInitialized) resetAliases()
     }
 

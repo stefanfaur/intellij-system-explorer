@@ -58,7 +58,7 @@ object IndexRegistry {
                 lastBuiltMs[root] = System.currentTimeMillis()
                 onIndexReady()  // callback so QuickOpenPanel can switch to LuceneEnumerator
                 // Start the watcher after build completes
-                LuceneIndexBuilder.startWatcher(rootPath, manager, settings, registryScope)
+                LuceneIndexBuilder.startPollingWatcher(rootPath, manager, settings, registryScope)
             } catch (e: Exception) {
                 // explorerExceptionHandler already notified; just log here
                 LOG.warn("Failed to build Lucene index for $root", e)

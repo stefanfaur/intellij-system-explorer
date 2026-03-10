@@ -39,6 +39,7 @@ class QuickOpenSettings : PersistentStateComponent<QuickOpenSettings.State> {
         var luceneExtensionAllowlist: String = "kt,java,py,ts,tsx,js,jsx,go,rs,rb,c,cpp,h,cs,swift,md,txt,adoc,yaml,yml,json,toml,xml,gradle,properties,sh,env",
         var luceneMaxIndexSizeMb: Int = 500,
         var luceneEvictionDays: Int = 30,
+        var luceneWatcherPollIntervalMinutes: Int = 5,
     )
 
     private var myState = State()
