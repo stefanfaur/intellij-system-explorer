@@ -6,7 +6,10 @@ data class Breadcrumb(val name: String, val path: String)
 
 object PathUtils {
 
-    fun userHome(): String = System.getProperty("user.home")
+    fun userHome(): String =
+        System.getProperty("user.home")
+            ?: System.getenv("HOME")
+            ?: "/"
 
     fun desktopPath(): String = userHome() + "/Desktop"
 

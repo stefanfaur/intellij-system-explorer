@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import com.intellij.openapi.diagnostic.Logger
 import ro.faur.explorer.quickopen.ranking.FrecencyStore
 
 @State(
@@ -49,20 +50,31 @@ class BookmarkManager : PersistentStateComponent<BookmarkManager.State> {
             return
         }
         myState.bookmarks.add(BookmarkEntry(bookmark.name, bookmark.path))
-        try { FrecencyStore.getInstance().setBookmarked(bookmark.path, true) } catch (_: Exception) {}
+        try {
+            FrecencyStore.getInstance().setBookmarked(bookmark.path, true)
+        } catch (e: Exception) {
+            LOG.warn("FrecencyStore.setBookmarked failed for ${bookmark.path}", e)
+        }
     }
 
     fun removeBookmark(path: String) {
         myState.bookmarks.removeAll { it.path == path }
-        try { FrecencyStore.getInstance().setBookmarked(path, false) } catch (_: Exception) {}
+        try {
+            FrecencyStore.getInstance().setBookmarked(path, false)
+        } catch (e: Exception) {
+            LOG.warn("FrecencyStore.setBookmarked(false) failed for $path", e)
+        }
     }
 
     fun moveBookmark(fromIndex: Int, toIndex: Int) {
-        if (fromIndex < 0 || fromIndex >= myState.bookmarks.size) return
-        if (toIndex < 0 || toIndex >= myState.bookmarks.size) return
-
-        val entry = myState.bookmarks.removeAt(fromIndex)
-        myState.bookmarks.add(toIndex, entry)
+        if (fromIndex == toIndex) return
+        val bookmarks = myState.bookmarks
+        if (fromIndex < 0 || fromIndex >= bookmarks.size) return
+        if (toIndex < 0 || toIndex >= bookmarks.size) return
+        val entry = bookmarks.removeAt(fromIndex)
+        // After removal the list is one shorter; clamp to avoid IOOBE on edge cases
+        val insertAt = toIndex.coerceAtMost(bookmarks.size)
+        bookmarks.add(insertAt, entry)
     }
 
     fun clearAll() {
@@ -77,6 +89,8 @@ class BookmarkManager : PersistentStateComponent<BookmarkManager.State> {
     }
 
     companion object {
+        private val LOG = Logger.getInstance(BookmarkManager::class.java)
+
         fun getInstance(): BookmarkManager =
             ApplicationManager.getApplication().getService(BookmarkManager::class.java)
     }

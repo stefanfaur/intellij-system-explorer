@@ -45,7 +45,7 @@ class LuceneIndexBuilderWatcherTest {
     }
 
     @Test
-    fun `startWatcher detects a newly created file and adds it to the index`(@TempDir tempDir: Path) =
+    fun `startPollingWatcher detects a newly created file and adds it to the index`(@TempDir tempDir: Path) =
         runBlocking {
             val dir = ByteBuffersDirectory()
             val manager = LuceneIndexManager(dir)
@@ -55,7 +55,7 @@ class LuceneIndexBuilderWatcherTest {
             LuceneIndexBuilder.buildIndex(tempDir, manager, settings)
 
             val watcherJob = launch(Dispatchers.IO) {
-                LuceneIndexBuilder.startWatcher(tempDir, manager, settings, this)
+                LuceneIndexBuilder.startPollingWatcher(tempDir, manager, settings, this)
             }
 
             delay(300) // Let watcher register directories
@@ -74,7 +74,7 @@ class LuceneIndexBuilderWatcherTest {
         }
 
     @Test
-    fun `startWatcher removes a deleted file from the index`(@TempDir tempDir: Path) = runBlocking {
+    fun `startPollingWatcher removes a deleted file from the index`(@TempDir tempDir: Path) = runBlocking {
         val dir = ByteBuffersDirectory()
         val manager = LuceneIndexManager(dir)
         val settings = defaultSettings()
@@ -89,7 +89,7 @@ class LuceneIndexBuilderWatcherTest {
             "ToDelete.kt should be in index before deletion: $initialPaths")
 
         val watcherJob = launch(Dispatchers.IO) {
-            LuceneIndexBuilder.startWatcher(tempDir, manager, settings, this)
+            LuceneIndexBuilder.startPollingWatcher(tempDir, manager, settings, this)
         }
 
         delay(300) // Let watcher register
@@ -107,7 +107,7 @@ class LuceneIndexBuilderWatcherTest {
     }
 
     @Test
-    fun `startWatcher ignores files whose extension is not in the allowlist`(@TempDir tempDir: Path) =
+    fun `startPollingWatcher ignores files whose extension is not in the allowlist`(@TempDir tempDir: Path) =
         runBlocking {
             val dir = ByteBuffersDirectory()
             val manager = LuceneIndexManager(dir)
@@ -116,7 +116,7 @@ class LuceneIndexBuilderWatcherTest {
             LuceneIndexBuilder.buildIndex(tempDir, manager, settings)
 
             val watcherJob = launch(Dispatchers.IO) {
-                LuceneIndexBuilder.startWatcher(tempDir, manager, settings, this)
+                LuceneIndexBuilder.startPollingWatcher(tempDir, manager, settings, this)
             }
 
             delay(300)
@@ -140,7 +140,7 @@ class LuceneIndexBuilderWatcherTest {
         }
 
     @Test
-    fun `startWatcher registers a new subdirectory and watches files created inside it`(
+    fun `startPollingWatcher registers a new subdirectory and watches files created inside it`(
         @TempDir tempDir: Path
     ) = runBlocking {
         val dir = ByteBuffersDirectory()
@@ -150,7 +150,7 @@ class LuceneIndexBuilderWatcherTest {
         LuceneIndexBuilder.buildIndex(tempDir, manager, settings)
 
         val watcherJob = launch(Dispatchers.IO) {
-            LuceneIndexBuilder.startWatcher(tempDir, manager, settings, this)
+            LuceneIndexBuilder.startPollingWatcher(tempDir, manager, settings, this)
         }
 
         delay(300)

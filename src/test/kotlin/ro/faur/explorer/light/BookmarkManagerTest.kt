@@ -95,6 +95,18 @@ class BookmarkManagerTest : BasePlatformTestCase() {
         assertTrue(manager.getBookmarks().isEmpty())
     }
 
+    fun `test moveBookmark first to last does not throw`() {
+        manager.addBookmark(Bookmark("a", "/a"))
+        manager.addBookmark(Bookmark("b", "/b"))
+        manager.addBookmark(Bookmark("c", "/c"))
+        // Moving index 0 to last position (index 2) must not throw
+        manager.moveBookmark(0, 2)
+        val bookmarks = manager.getBookmarks()
+        assertEquals("/b", bookmarks[0].path)
+        assertEquals("/c", bookmarks[1].path)
+        assertEquals("/a", bookmarks[2].path)
+    }
+
     fun `test addToBookmarks triggers onFilesModified callback`() {
         val dir = runWriteActionAndWait {
             myFixture.tempDirFixture.findOrCreateDir("bookmarkCallbackDir")

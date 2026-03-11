@@ -68,4 +68,17 @@ class PathUtilsTest {
         assertFalse(PathUtils.isHidden("."))
         assertFalse(PathUtils.isHidden(".."))
     }
+
+    @Test
+    fun `userHome returns fallback when user_home system property is absent`() {
+        val original = System.getProperty("user.home")
+        try {
+            System.clearProperty("user.home")
+            val result = PathUtils.userHome()
+            assertNotNull(result)
+            assertTrue(result.isNotEmpty())
+        } finally {
+            if (original != null) System.setProperty("user.home", original)
+        }
+    }
 }
