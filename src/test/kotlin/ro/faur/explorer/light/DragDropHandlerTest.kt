@@ -208,6 +208,13 @@ class DragDropHandlerTest : BasePlatformTestCase() {
         assertNotNull("Original file should still exist in subDir", subDir.findChild("should-move.txt"))
     }
 
+    // ---- performDrop conflict handling ----
+    // Note: the conflict-dialog deferred behavior (invokeLater) is not tested here because
+    // BasePlatformTestCase flushes the EDT during tearDown, which fires the deferred dialog
+    // before the TestDialog mock can be safely removed. The fix is verified by code review:
+    // performDrop now partitions files into conflicts/noConflicts, processes noConflicts
+    // immediately, and defers the conflict dialog via invokeLater to release the DnD lock first.
+
     // ---- createTransferable ----
 
     fun `test createTransferable produces valid file list transferable`() {

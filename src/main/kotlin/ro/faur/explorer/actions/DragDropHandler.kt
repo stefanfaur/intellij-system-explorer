@@ -146,32 +146,53 @@ class DragDropHandler(
      * does not abort the entire batch.
      */
     fun performDrop(files: List<VirtualFile>, targetDir: VirtualFile, isMove: Boolean) {
+        val conflicts = mutableListOf<VirtualFile>()
+        val noConflicts = mutableListOf<VirtualFile>()
+
         for (file in files) {
             if (file.parent == targetDir) continue
-            val existing = targetDir.findChild(file.name)
-            if (existing != null) {
+            if (targetDir.findChild(file.name) != null) {
+                conflicts.add(file)
+            } else {
+                noConflicts.add(file)
+            }
+        }
+
+        // Process non-conflicting files immediately (safe on EDT — no dialog)
+        for (file in noConflicts) {
+            executeFileDrop(file, targetDir, isMove)
+        }
+
+        // Defer the conflict dialog so the DnD machinery is fully released before
+        // a modal dialog is shown, preventing deadlocks on some JVM/OS combinations.
+        if (conflicts.isNotEmpty()) {
+            ApplicationManager.getApplication().invokeLater {
                 val result = Messages.showYesNoDialog(
                     project,
-                    "'${file.name}' already exists in '${targetDir.name}'. Replace it?",
+                    "Replace ${conflicts.size} existing file(s) in '${targetDir.name}'?",
                     "Confirm Replace",
                     "Replace", "Skip",
                     Messages.getWarningIcon()
                 )
-                if (result != Messages.YES) continue
-                ApplicationManager.getApplication()
-                    .runWriteAction { existing.delete(this) }
-            }
-            try {
-                if (isMove) {
-                    FileActions.moveTo(file, targetDir)
-                } else {
-                    FileActions.copyTo(file, targetDir)
+                if (result == Messages.YES) {
+                    for (file in conflicts) {
+                        val existing = targetDir.findChild(file.name) ?: continue
+                        ApplicationManager.getApplication().runWriteAction { existing.delete(this) }
+                        executeFileDrop(file, targetDir, isMove)
+                    }
                 }
-            } catch (e: Exception) {
-                val action = if (isMove) "move" else "copy"
-                LOG.warn("Failed to $action '${file.name}' to '${targetDir.path}': ${e.message}", e)
-                notifyError("Failed to $action '${file.name}': ${e.message}")
             }
+        }
+    }
+
+    private fun executeFileDrop(file: VirtualFile, targetDir: VirtualFile, isMove: Boolean) {
+        try {
+            if (isMove) FileActions.moveTo(file, targetDir)
+            else FileActions.copyTo(file, targetDir)
+        } catch (e: Exception) {
+            val action = if (isMove) "move" else "copy"
+            LOG.warn("Failed to $action '${file.name}' to '${targetDir.path}': ${e.message}", e)
+            notifyError("Failed to $action '${file.name}': ${e.message}")
         }
     }
 
