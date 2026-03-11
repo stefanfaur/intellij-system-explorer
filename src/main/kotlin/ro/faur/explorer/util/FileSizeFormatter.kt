@@ -1,5 +1,6 @@
 package ro.faur.explorer.util
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.vfs.VirtualFile
 
 object FileSizeFormatter {
@@ -30,7 +31,7 @@ object FileSizeFormatter {
      */
     fun countDirectChildren(dir: VirtualFile): Int {
         if (!dir.isDirectory) return 0
-        return dir.children?.size ?: 0
+        return ApplicationManager.getApplication().runReadAction<Int> { dir.children.size }
     }
 
     /**
@@ -39,6 +40,8 @@ object FileSizeFormatter {
      */
     fun computeDirectoryImmediateSize(dir: VirtualFile): Long {
         if (!dir.isDirectory) return dir.length
-        return dir.children?.filter { !it.isDirectory }?.sumOf { it.length } ?: 0L
+        return ApplicationManager.getApplication().runReadAction<Long> {
+            dir.children.filter { !it.isDirectory }.sumOf { it.length }
+        }
     }
 }

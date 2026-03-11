@@ -35,7 +35,7 @@ class ExplorerConfigurable : Configurable {
         private set
 
     // Display settings
-    private lateinit var sortByComboBox: JComboBox<String>
+    private lateinit var sortByComboBox: JComboBox<ExplorerSettings.SortBy>
     private lateinit var showFolderItemCountCheckBox: JCheckBox
     private lateinit var statusBarDetailComboBox: JComboBox<String>
     private lateinit var globPresetsTableModel: DefaultTableModel
@@ -67,7 +67,7 @@ class ExplorerConfigurable : Configurable {
             FileChooserDescriptorFactory.createSingleFolderDescriptor()
         )
 
-        sortByComboBox = JComboBox(arrayOf("name", "size", "modified", "type"))
+        sortByComboBox = JComboBox(ExplorerSettings.SortBy.values())
         statusBarDetailComboBox = JComboBox(arrayOf("minimal", "normal", "verbose"))
 
         globPresetsTableModel = DefaultTableModel(arrayOf("Name", "Pattern"), 0)
@@ -132,7 +132,7 @@ class ExplorerConfigurable : Configurable {
         if (expandOnSingleClickCheckBox.isSelected != s.expandDirectoriesOnSingleClick) return true
         if (rememberLastPathCheckBox.isSelected != s.rememberLastPath) return true
         if (!::sortByComboBox.isInitialized) return false
-        if (sortByComboBox.selectedItem as? String != s.sortBy) return true
+        if (sortByComboBox.selectedItem as? ExplorerSettings.SortBy != s.sortBy) return true
         if (showFolderItemCountCheckBox.isSelected != s.showFolderItemCount) return true
         if (statusBarDetailComboBox.selectedItem as? String != s.statusBarDetail) return true
         if (globPresetsModified(s)) return true
@@ -169,7 +169,7 @@ class ExplorerConfigurable : Configurable {
         s.expandDirectoriesOnSingleClick = expandOnSingleClickCheckBox.isSelected
         s.rememberLastPath = rememberLastPathCheckBox.isSelected
         if (::sortByComboBox.isInitialized) {
-            s.sortBy = sortByComboBox.selectedItem as? String ?: s.sortBy
+            s.sortBy = sortByComboBox.selectedItem as? ExplorerSettings.SortBy ?: s.sortBy
             s.showFolderItemCount = showFolderItemCountCheckBox.isSelected
             s.statusBarDetail = statusBarDetailComboBox.selectedItem as? String ?: s.statusBarDetail
             s.globPresets = collectGlobPresets().toMutableList()

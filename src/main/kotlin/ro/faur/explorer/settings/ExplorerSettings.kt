@@ -24,7 +24,7 @@ class ExplorerSettings : PersistentStateComponent<ExplorerSettings.State> {
         var defaultRoot: String = "",
         var showFileSizeInTree: Boolean = true,
         var showFilePermissions: Boolean = false,
-        var sortBy: String = "name",  // "name", "size", "modified"
+        var sortBy: SortBy = SortBy.NAME,
         var expandDirectoriesOnSingleClick: Boolean = true,
         var rememberLastPath: Boolean = true,
         var showFolderItemCount: Boolean = false,
@@ -38,6 +38,12 @@ class ExplorerSettings : PersistentStateComponent<ExplorerSettings.State> {
 
     override fun loadState(state: State) {
         myState = state
+    }
+
+    enum class SortBy {
+        NAME, SIZE, MODIFIED;
+
+        override fun toString() = name.lowercase()
     }
 
     companion object {

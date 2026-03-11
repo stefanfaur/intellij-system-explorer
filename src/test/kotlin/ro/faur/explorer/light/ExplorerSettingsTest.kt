@@ -2,6 +2,7 @@ package ro.faur.explorer.light
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import ro.faur.explorer.settings.ExplorerSettings
+import ro.faur.explorer.settings.ExplorerSettings.SortBy
 
 class ExplorerSettingsTest : BasePlatformTestCase() {
 
@@ -56,7 +57,7 @@ class ExplorerSettingsTest : BasePlatformTestCase() {
         // New settings with defaults
         assertTrue(settings.state.showFileSizeInTree)
         assertFalse(settings.state.showFilePermissions)
-        assertEquals("name", settings.state.sortBy)
+        assertEquals(SortBy.NAME, settings.state.sortBy)
         assertTrue(settings.state.expandDirectoriesOnSingleClick)
         assertTrue(settings.state.rememberLastPath)
     }

@@ -1,5 +1,6 @@
 package ro.faur.explorer.model
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.vfs.VirtualFile
 import ro.faur.explorer.util.GlobFilter
 
@@ -16,6 +17,14 @@ class FileTreeModel(
     val foldersFirst: Boolean,
 ) {
 
+    private val fileComparator = FileComparator(foldersFirst)
+    private val vfComparator = Comparator<VirtualFile> { a, b ->
+        fileComparator.compare(FileEntry(a.name, a.isDirectory), FileEntry(b.name, b.isDirectory))
+    }
+
+    @Volatile private var cachedGlobFilter: GlobFilter? = null
+    @Volatile private var cachedGlobPattern: String = ""
+
     /**
      * Returns the children of [parent], filtered and sorted according to the model's settings.
      * Hidden files (names starting with '.') are excluded unless [showHidden] is true.
@@ -23,10 +32,12 @@ class FileTreeModel(
      * sorted case-insensitively by name.
      */
     fun getChildren(parent: VirtualFile): List<VirtualFile> {
-        val children = parent.children?.toList() ?: emptyList()
+        val children = ApplicationManager.getApplication().runReadAction<Array<VirtualFile>?> {
+            parent.children
+        }?.toList() ?: emptyList()
         return children
             .filter { showHidden || !it.name.startsWith(".") }
-            .sortedWith(virtualFileComparator())
+            .sortedWith(vfComparator)
     }
 
     /**
@@ -36,8 +47,7 @@ class FileTreeModel(
      * Hidden file filtering and sorting are still applied.
      */
     fun getFilteredChildren(parent: VirtualFile, pattern: String): List<VirtualFile> {
-        val globFilter = GlobFilter(pattern)
-        return getChildren(parent).filter { it.isDirectory || globFilter.matches(it.name) }
+        return getChildren(parent).filter { it.isDirectory || getOrCreateGlobFilter(pattern).matches(it.name) }
     }
 
     /**
@@ -45,11 +55,11 @@ class FileTreeModel(
      */
     fun isLeaf(file: VirtualFile): Boolean = !file.isDirectory
 
-    private fun virtualFileComparator(): Comparator<VirtualFile> = Comparator { a, b ->
-        if (foldersFirst) {
-            if (a.isDirectory && !b.isDirectory) return@Comparator -1
-            if (!a.isDirectory && b.isDirectory) return@Comparator 1
+    private fun getOrCreateGlobFilter(pattern: String): GlobFilter {
+        if (pattern != cachedGlobPattern || cachedGlobFilter == null) {
+            cachedGlobFilter = GlobFilter(pattern)
+            cachedGlobPattern = pattern
         }
-        a.name.compareTo(b.name, ignoreCase = true)
+        return cachedGlobFilter!!
     }
 }
