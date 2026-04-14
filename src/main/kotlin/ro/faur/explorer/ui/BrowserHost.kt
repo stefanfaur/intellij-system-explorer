@@ -173,7 +173,8 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
             else
                 BorderFactory.createEmptyBorder(0, 0, 2, 0)
             toolTipText            = panel.panelLabel
-            addActionListener      { switchToPanel(index) }
+            val capturedPanel = panel   // capture reference, not index (which may go stale after removePanel)
+            addActionListener      { switchToPanel(panels.indexOf(capturedPanel)) }
         }
 
         if (!isRemote) return nameBtn
