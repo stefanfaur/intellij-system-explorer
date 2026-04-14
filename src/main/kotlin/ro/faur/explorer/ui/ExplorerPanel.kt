@@ -2,9 +2,11 @@ package ro.faur.explorer.ui
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.JBUI
 import ro.faur.explorer.actions.NavigationActions
 import ro.faur.explorer.gitpanel.ActiveBrowserTracker
@@ -51,7 +53,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
     // ── Icon buttons ────────────────────────────────────────────────────────
     private val backBtn     = iconButton(AllIcons.Actions.Back,           "Back (Alt+Left)")
     private val forwardBtn  = iconButton(AllIcons.Actions.Forward,        "Forward (Alt+Right)")
-    private val upBtn       = iconButton(AllIcons.Actions.MoveUp,         "Up")
+    private val upBtn       = iconButton(AllIcons.Actions.MoveUp,         "Up (Alt+Up)")
     private val homeBtn     = iconButton(AllIcons.Nodes.HomeFolder,       "Home")
     private val refreshBtn  = iconButton(AllIcons.Actions.Refresh,        "Refresh (F5)")
     private val connectBtn  = iconButton(AllIcons.Webreferences.Server,   "Connect to SSH\u2026")
@@ -209,58 +211,57 @@ class ExplorerPanel(private val project: Project) : Disposable {
             catch (_: Exception) { null }
         }
 
-        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
-        executor.submit {
-            val password: String? = when (profile.authMethod) {
-                ConnectionProfile.AuthMethod.PASSWORD -> {
-                    var resolved = preloadedPassword
-                        ?: ro.faur.explorer.remote.security.CredentialHandler.getPassword(profile.name)
-                    if (resolved == null) {
-                        var cancelled = false
-                        var shouldRememberPassword = false
-                        javax.swing.SwingUtilities.invokeAndWait {
-                            val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, profile.name)
+        // Phase 1: Resolve password — may need to show a dialog on EDT
+        fun doConnect(password: String?, keyPassphrase: String?) {
+            AppExecutorUtil.getAppExecutorService().execute {
+                try {
+                    val ops = ro.faur.explorer.remote.SftpFileOperations.create(profile, password, keyPassphrase)
+                    val gm  = connectGitManager(password, keyPassphrase)
+                    ApplicationManager.getApplication().invokeLater { onSuccess(ops, gm) }
+                } catch (e: Exception) {
+                    if (profile.authMethod == ConnectionProfile.AuthMethod.KEY_FILE && keyPassphrase == null) {
+                        // Need key passphrase — prompt on EDT, then retry
+                        ApplicationManager.getApplication().invokeLater {
+                            val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, "'${profile.name}' key file")
                             if (dialog.showAndGet()) {
-                                resolved = String(dialog.getPassword())
-                                shouldRememberPassword = dialog.rememberPassword.isSelected
-                            } else cancelled = true
+                                val kp = String(dialog.getPassword())
+                                val shouldRememberKp = dialog.rememberPassword.isSelected
+                                if (shouldRememberKp)
+                                    ro.faur.explorer.remote.security.CredentialHandler.storeKeyPassphrase(profile.name, kp)
+                                doConnect(password, kp)
+                            } else onCancelled()
                         }
-                        if (cancelled) { javax.swing.SwingUtilities.invokeLater { onCancelled() }; return@submit }
-                        if (shouldRememberPassword && resolved != null)
-                            ro.faur.explorer.remote.security.CredentialHandler
-                                .storePassword(profile.name, profile.username, resolved!!)
+                    } else {
+                        ApplicationManager.getApplication().invokeLater { onError(e) }
                     }
-                    resolved
                 }
-                else -> null
             }
-            val storedKP = if (profile.authMethod == ConnectionProfile.AuthMethod.KEY_FILE)
-                ro.faur.explorer.remote.security.CredentialHandler.getKeyPassphrase(profile.name) else null
+        }
 
-            try {
-                val ops = ro.faur.explorer.remote.SftpFileOperations.create(profile, password, storedKP)
-                val gm  = connectGitManager(password, storedKP)
-                javax.swing.SwingUtilities.invokeLater { onSuccess(ops, gm) }
-            } catch (e: Exception) {
-                if (profile.authMethod == ConnectionProfile.AuthMethod.KEY_FILE && storedKP == null) {
-                    var kp: String? = null; var cancelled = false; var shouldRememberKp = false
-                    javax.swing.SwingUtilities.invokeAndWait {
-                        val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, "'${profile.name}' key file")
-                        if (dialog.showAndGet()) {
-                            kp = String(dialog.getPassword())
-                            shouldRememberKp = dialog.rememberPassword.isSelected
-                        } else cancelled = true
-                    }
-                    if (shouldRememberKp && kp != null)
-                        ro.faur.explorer.remote.security.CredentialHandler.storeKeyPassphrase(profile.name, kp!!)
-                    if (cancelled || kp == null) javax.swing.SwingUtilities.invokeLater { onCancelled() }
-                    else try {
-                        val ops = ro.faur.explorer.remote.SftpFileOperations.create(profile, password, kp)
-                        val gm  = connectGitManager(password, kp)
-                        javax.swing.SwingUtilities.invokeLater { onSuccess(ops, gm) }
-                    } catch (e2: Exception) { javax.swing.SwingUtilities.invokeLater { onError(e2) } }
-                } else javax.swing.SwingUtilities.invokeLater { onError(e) }
-            } finally { executor.shutdown() }
+        when (profile.authMethod) {
+            ConnectionProfile.AuthMethod.PASSWORD -> {
+                val resolved = preloadedPassword
+                    ?: ro.faur.explorer.remote.security.CredentialHandler.getPassword(profile.name)
+                if (resolved != null) {
+                    doConnect(resolved, null)
+                } else {
+                    // Need password — prompt on EDT, then connect in background
+                    val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, profile.name)
+                    if (dialog.showAndGet()) {
+                        val pw = String(dialog.getPassword())
+                        val shouldRememberPassword = dialog.rememberPassword.isSelected
+                        if (shouldRememberPassword)
+                            ro.faur.explorer.remote.security.CredentialHandler
+                                .storePassword(profile.name, profile.username, pw)
+                        doConnect(pw, null)
+                    } else onCancelled()
+                }
+            }
+            else -> {
+                val storedKP = if (profile.authMethod == ConnectionProfile.AuthMethod.KEY_FILE)
+                    ro.faur.explorer.remote.security.CredentialHandler.getKeyPassphrase(profile.name) else null
+                doConnect(null, storedKP)
+            }
         }
     }
 
@@ -278,10 +279,12 @@ class ExplorerPanel(private val project: Project) : Disposable {
 
     /** Disconnects all remote panels and removes them from BrowserHost. */
     fun disconnectRemote() {
-        val toRemove = (browserHost.panelCount - 1 downTo 1).toList()
-        for (i in toRemove) {
-            (browserHost.getPanels().getOrNull(i) as? RemoteBrowserPanel)?.disconnect()
-            browserHost.removePanel(i)
+        val toRemove = browserHost.getPanels()
+            .drop(1)  // keep panel 0 (local)
+            .filterIsInstance<RemoteBrowserPanel>()
+        for (panel in toRemove) {
+            panel.disconnect()
+            browserHost.removePanel(panel)
         }
     }
 

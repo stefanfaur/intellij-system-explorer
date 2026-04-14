@@ -211,3 +211,22 @@ class RefreshTreeAction : AnAction("Refresh") {
                 ExplorerActionUtil.isExplorerActive(e)
     }
 }
+
+/**
+ * Navigate up one directory level (Alt+Up when tree is focused).
+ */
+class NavigateUpAction : AnAction("Navigate Up") {
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val panel = ExplorerActionUtil.findExplorerPanel(e) ?: return
+        panel.browserHost.activePanel.navigateUp()
+    }
+
+    override fun update(e: AnActionEvent) {
+        val panel = ExplorerActionUtil.findExplorerPanel(e)
+        val treeHasFocus = panel?.fileTreeComponent?.tree?.isFocusOwner == true
+        e.presentation.isEnabled = panel != null &&
+                ExplorerActionUtil.isExplorerActive(e) &&
+                treeHasFocus
+    }
+}
