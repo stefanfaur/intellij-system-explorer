@@ -223,10 +223,7 @@ class NavigateUpAction : AnAction("Navigate Up") {
     }
 
     override fun update(e: AnActionEvent) {
-        val panel = ExplorerActionUtil.findExplorerPanel(e)
-        val treeHasFocus = panel?.fileTreeComponent?.tree?.isFocusOwner == true
-        e.presentation.isEnabled = panel != null &&
-                ExplorerActionUtil.isExplorerActive(e) &&
-                treeHasFocus
+        e.presentation.isEnabled = ExplorerActionUtil.findExplorerPanel(e) != null &&
+                ExplorerActionUtil.isExplorerActive(e)
     }
 }
