@@ -4,6 +4,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.ide.dnd.DnDManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.impl.NonProjectFileWritingAccessProvider
@@ -27,6 +28,7 @@ import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 import java.awt.Color
+import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import ro.faur.explorer.actions.DragDropHandler
@@ -101,6 +103,13 @@ class FileTreeComponent(private val project: Project) : Disposable {
      *  causing all icons to change twice in rapid succession → visible flash. */
     private val iconCache = ConcurrentHashMap<String, Icon>()
 
+    /** Cache for folder child counts to avoid VFS I/O on the EDT during cell rendering. */
+    private val childCountCache = ConcurrentHashMap<String, Int>()
+    private val childCountPending = ConcurrentHashMap.newKeySet<String>()
+
+    /** Pending set for permissions background lookups. */
+    private val permissionsPending = ConcurrentHashMap.newKeySet<String>()
+
     /** Cache for VCS status colors (files and directories).
      *  Optional<Color> distinguishes "no color" (empty Optional) from "not yet computed" (absent key).
      *  Populated asynchronously off EDT; invalidated on FileStatusListener callbacks, setRoot(), refresh(). */
@@ -153,6 +162,8 @@ class FileTreeComponent(private val project: Project) : Disposable {
         // when the given Disposable (this) is disposed.
         FileStatusManager.getInstance(project).addFileStatusListener(object : FileStatusListener {
             override fun fileStatusChanged(virtualFile: VirtualFile) {
+                childCountCache.clear()
+                childCountPending.clear()
                 vcsColorCache.clear()
                 vcsColorPending.clear()
                 ApplicationManager.getApplication().invokeLater {
@@ -160,6 +171,8 @@ class FileTreeComponent(private val project: Project) : Disposable {
                 }
             }
             override fun fileStatusesChanged() {
+                childCountCache.clear()
+                childCountPending.clear()
                 vcsColorCache.clear()
                 vcsColorPending.clear()
                 ApplicationManager.getApplication().invokeLater {
@@ -301,7 +314,10 @@ class FileTreeComponent(private val project: Project) : Disposable {
     fun setRoot(path: String) {
         currentRootPath = path
         permissionsCache.clear()
+        permissionsPending.clear()
         iconCache.clear()
+        childCountCache.clear()
+        childCountPending.clear()
         vcsColorCache.clear()
         vcsColorPending.clear()
         rootNode.removeAllChildren()
@@ -343,7 +359,10 @@ class FileTreeComponent(private val project: Project) : Disposable {
      */
     fun refresh() {
         permissionsCache.clear()
+        permissionsPending.clear()
         iconCache.clear()
+        childCountCache.clear()
+        childCountPending.clear()
         vcsColorCache.clear()
         vcsColorPending.clear()
         currentRootPath?.let { path ->
@@ -809,8 +828,18 @@ class FileTreeComponent(private val project: Project) : Disposable {
                     // Permissions not enabled, just append the filename with VCS color
                     append(vf.name, textStyle)
                     if (showFolderItemCount && vf.isDirectory) {
-                        val count = vf.children.size
-                        if (count > 0) append(" ($count)", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                        val cachedCount = childCountCache[vf.path]
+                        if (cachedCount != null) {
+                            if (cachedCount > 0) append(" ($cachedCount)", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                        } else if (childCountPending.add(vf.path)) {
+                            ReadAction.nonBlocking(Callable { vf.children.size })
+                                .finishOnUiThread(ModalityState.any()) { count ->
+                                    childCountCache[vf.path] = count
+                                    childCountPending.remove(vf.path)
+                                    tree.repaint()
+                                }
+                                .submit(AppExecutorUtil.getAppExecutorService())
+                        }
                     }
                 }
             } else {
@@ -868,13 +897,19 @@ class FileTreeComponent(private val project: Project) : Disposable {
          * This avoids expensive disk I/O on every cell render.
          */
         private fun getCachedPermissions(file: VirtualFile): String {
-            return permissionsCache.getOrPut(file.path) {
-                formatPermissions(file)
+            val cached = permissionsCache[file.path]
+            if (cached != null) return cached
+            if (permissionsPending.add(file.path)) {
+                ReadAction.nonBlocking(Callable { formatPermissionsForFile(file) })
+                    .finishOnUiThread(ModalityState.any()) { perms ->
+                        permissionsCache[file.path] = perms
+                        permissionsPending.remove(file.path)
+                        tree.repaint()
+                    }
+                    .submit(AppExecutorUtil.getAppExecutorService())
             }
+            return ""
         }
-
-        private fun formatPermissions(file: VirtualFile): String =
-            formatPermissionsForFile(file)
     }
 
     private fun formatPermissionsForFile(file: VirtualFile): String {
