@@ -44,6 +44,8 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
     override val panelLabel: String = "Local"
     override val panelIcon: Icon    = AllIcons.Nodes.HomeFolder
 
+    @Volatile private var isDisposed = false
+
     internal val fileTreeComponent = FileTreeComponent(project)
 
     private val bookmarksPanel = BookmarksPanel(
@@ -288,7 +290,7 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
                     }
                 }
                 ApplicationManager.getApplication().invokeLater {
-                    statusLabel.text = statusText
+                    if (!isDisposed) statusLabel.text = statusText
                 }
             }
         } else {
@@ -300,6 +302,7 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
     }
 
     override fun dispose() {
+        isDisposed = true
         super.dispose()
         // FileTreeComponent is registered as child disposable via Disposer.register above
     }
