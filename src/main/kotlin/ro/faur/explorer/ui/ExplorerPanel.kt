@@ -53,7 +53,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
     // ── Icon buttons ────────────────────────────────────────────────────────
     private val backBtn     = iconButton(AllIcons.Actions.Back,           "Back (Alt+Left)")
     private val forwardBtn  = iconButton(AllIcons.Actions.Forward,        "Forward (Alt+Right)")
-    private val upBtn       = iconButton(AllIcons.Actions.MoveUp,         "Up (Alt+Up)")
+    private val upBtn       = iconButton(AllIcons.Actions.MoveUp,         "Up (Alt+Left)")
     private val homeBtn     = iconButton(AllIcons.Nodes.HomeFolder,       "Home")
     private val refreshBtn  = iconButton(AllIcons.Actions.Refresh,        "Refresh (F5)")
     private val connectBtn  = iconButton(AllIcons.Webreferences.Server,   "Connect to SSH\u2026")

@@ -78,7 +78,7 @@ All shortcuts configurable via Settings → Keymap → "System Explorer".
 | Shortcut | Action |
 |----------|--------|
 | `Enter` | Open file / navigate into directory |
-| `Alt+Up` | Navigate up one level |
+| `Alt+Left` | Navigate up one level |
 | `Backspace` | Go back |
 | `F2` | Rename |
 | `Delete` | Delete |

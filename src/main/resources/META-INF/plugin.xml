@@ -61,7 +61,7 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
   <li><b>Cmd+Shift+P</b> &mdash; Quick Open</li>
   <li><b>Ctrl+C / Ctrl+X / Ctrl+V</b> &mdash; Copy, cut, paste</li>
   <li><b>F2</b> &mdash; Rename &nbsp; <b>Delete</b> &mdash; Delete &nbsp; <b>F5</b> &mdash; Refresh</li>
-  <li><b>Ctrl+Shift+C</b> &mdash; Copy path &nbsp; <b>Enter</b> &mdash; Open &nbsp; <b>Backspace</b> &mdash; Go back &nbsp; <b>Alt+Up</b> &mdash; Up one level</li>
+  <li><b>Ctrl+Shift+C</b> &mdash; Copy path &nbsp; <b>Enter</b> &mdash; Open &nbsp; <b>Backspace</b> &mdash; Go back &nbsp; <b>Alt+Left</b> &mdash; Up one level</li>
   <li><b>Option+Shift+1&ndash;5</b> &mdash; Switch to panel 1 (Local) or 2&ndash;5 (SSH)</li>
 </ul>
 ]]></description>
@@ -254,7 +254,7 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
                     class="ro.faur.explorer.actions.NavigateUpAction"
                     text="Navigate Up"
                     description="Navigate up one directory level">
-                <keyboard-shortcut keymap="$default" first-keystroke="alt UP"/>
+                <keyboard-shortcut keymap="$default" first-keystroke="alt LEFT"/>
             </action>
 
             <action id="SystemExplorer.CompareWith"
