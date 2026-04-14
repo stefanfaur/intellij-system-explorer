@@ -188,6 +188,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [verify, build-natives]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -231,9 +233,26 @@ jobs:
       - name: Build plugin
         run: ./gradlew buildPlugin -PskipCargo=true --no-daemon --stacktrace
 
-      - name: Upload plugin artifact
-        uses: actions/upload-artifact@v4
+      - name: Create snapshot pre-release
+        uses: softprops/action-gh-release@v2
         with:
-          name: plugin-${{ steps.version.outputs.snapshot_version }}
-          path: build/distributions/*.zip
-          retention-days: 90
+          tag_name: snapshot-build.${{ github.run_number }}
+          name: Snapshot ${{ steps.version.outputs.snapshot_version }}
+          body: |
+            Automated snapshot build from main branch.
+
+            **Version:** `${{ steps.version.outputs.snapshot_version }}`
+            **Commit:** `${{ github.sha }}`
+
+            Install: Settings → Plugins → ⚙️ → Install Plugin from Disk…
+          files: build/distributions/*.zip
+          prerelease: true
+
+      - name: Cleanup old snapshot releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --limit 100 --json tagName,isPrerelease \
+            --jq '.[] | select(.isPrerelease and (.tagName | startswith("snapshot-build."))) | .tagName' \
+            | tail -n +6 \
+            | xargs -I {} gh release delete {} --yes --cleanup-tag
