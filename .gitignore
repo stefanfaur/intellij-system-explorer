@@ -1,10 +1,28 @@
+# Gradle
 .gradle/
 build/
 bin/
+
+# IntelliJ / IDE
 .idea/
 *.iml
 out/
 .DS_Store
+
+# Eclipse / IntelliJ plugin project files
+.classpath
+.project
+.settings/
+
+# Kotlin compiler error logs
+.kotlin/
+
+# Local scripts (CI automation uses .github/workflows)
+scripts/
+
+# Claude Code & thoughts
 .claude/
 thoughts/
+
+# Platform SDK
 .intellijPlatform/
