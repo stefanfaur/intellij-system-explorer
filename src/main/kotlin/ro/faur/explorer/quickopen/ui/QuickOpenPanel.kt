@@ -42,7 +42,7 @@ import ro.faur.explorer.quickopen.backend.NucleoNative
 import ro.faur.explorer.quickopen.backend.RankerSelector
 import ro.faur.explorer.quickopen.backend.RipgrepContentSearch
 import ro.faur.explorer.quickopen.backend.EnumeratorBackend
-import ro.faur.explorer.quickopen.backend.SftpEnumerator
+import ro.faur.explorer.quickopen.backend.SshFindEnumerator
 import ro.faur.explorer.quickopen.backend.VfsEnumerator
 import ro.faur.explorer.quickopen.git.GitStatusProvider
 import ro.faur.explorer.remote.SftpConnectionManager
@@ -89,14 +89,14 @@ class QuickOpenPanel(
     private val textScorer = MinusculeMatcherRanker()
     private val ranker = Ranker(textScorer)
     private val enumerator: EnumeratorBackend = if (isRemote && sftpConnectionManager != null && connectionName != null) {
-        SftpEnumerator(sftpConnectionManager, connectionName, currentPath)
+        SshFindEnumerator(sftpConnectionManager, connectionName, currentPath)
     } else {
         VfsEnumerator()
     }
     private var candidatePool = CandidatePool(enumerator)
     private val panelScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var currentRoot: String = currentPath
-    private var activeEnumeratorName: String = if (isRemote) "SFTP" else "VFS"
+    private var activeEnumeratorName: String = if (isRemote) "SSH-FIND" else "VFS"
 
     companion object {
         private const val MAX_CONTENT_RESULTS = 200
