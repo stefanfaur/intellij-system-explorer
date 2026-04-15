@@ -41,8 +41,11 @@ import ro.faur.explorer.quickopen.backend.MinusculeMatcherRanker
 import ro.faur.explorer.quickopen.backend.NucleoNative
 import ro.faur.explorer.quickopen.backend.RankerSelector
 import ro.faur.explorer.quickopen.backend.RipgrepContentSearch
+import ro.faur.explorer.quickopen.backend.EnumeratorBackend
+import ro.faur.explorer.quickopen.backend.SftpEnumerator
 import ro.faur.explorer.quickopen.backend.VfsEnumerator
 import ro.faur.explorer.quickopen.git.GitStatusProvider
+import ro.faur.explorer.remote.SftpConnectionManager
 import ro.faur.explorer.quickopen.index.CandidatePool
 import ro.faur.explorer.quickopen.index.IndexRegistry
 import ro.faur.explorer.quickopen.index.LuceneIndexBuilder
@@ -78,15 +81,22 @@ class QuickOpenPanel(
     private val candidates: List<SearchCandidate>,
     private val initialQuery: String = "",
     private val isRemote: Boolean = false,
-    private val onSelected: (SearchCandidate) -> Unit
+    private val onSelected: (SearchCandidate) -> Unit,
+    private val sftpConnectionManager: SftpConnectionManager? = null,
+    private val connectionName: String? = null
 ) : JPanel(BorderLayout()), Disposable {
 
     private val textScorer = MinusculeMatcherRanker()
     private val ranker = Ranker(textScorer)
-    private var candidatePool = CandidatePool(VfsEnumerator())  // replaced on hybrid switch
+    private val enumerator: EnumeratorBackend = if (isRemote && sftpConnectionManager != null && connectionName != null) {
+        SftpEnumerator(sftpConnectionManager, connectionName, currentPath)
+    } else {
+        VfsEnumerator()
+    }
+    private var candidatePool = CandidatePool(enumerator)
     private val panelScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var currentRoot: String = currentPath
-    private var activeEnumeratorName: String = "VFS"
+    private var activeEnumeratorName: String = if (isRemote) "SFTP" else "VFS"
 
     companion object {
         private const val MAX_CONTENT_RESULTS = 200

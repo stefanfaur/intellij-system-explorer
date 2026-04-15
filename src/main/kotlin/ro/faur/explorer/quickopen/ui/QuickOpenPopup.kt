@@ -11,6 +11,7 @@ import ro.faur.explorer.model.BookmarkManager
 import ro.faur.explorer.quickopen.model.CandidateType
 import ro.faur.explorer.quickopen.model.SearchCandidate
 import ro.faur.explorer.quickopen.ranking.FrecencyStore
+import ro.faur.explorer.remote.SftpConnectionManager
 import ro.faur.explorer.ui.ExplorerPanel
 import java.awt.Dimension
 
@@ -20,6 +21,16 @@ object QuickOpenPopup {
         val effectiveQuery = initialQuery.ifBlank { tryReadClipboardPath() }
         val currentPath = panel.currentPath
         val candidates = buildCandidates(project, panel)
+
+        // Get remote connection details if connected to remote
+        val connectionDetails = if (panel.isActiveRemote) {
+            val remotePanel = panel.browserHost.activePanel as? ro.faur.explorer.remote.ui.RemoteBrowserPanel
+            val manager = remotePanel?.connectionManager
+            val name = remotePanel?.getConnectionName()
+            if (manager != null && name != null && manager.isConnected(name)) {
+                name to manager
+            } else null
+        } else null
 
         val qoPanel = QuickOpenPanel(
             project = project,
@@ -39,7 +50,9 @@ object QuickOpenPopup {
                     }
                     else -> panel.navigateTo(candidate.fullPath)
                 }
-            }
+            },
+            sftpConnectionManager = connectionDetails?.second,
+            connectionName = connectionDetails?.first
         )
 
         val popup = JBPopupFactory.getInstance()

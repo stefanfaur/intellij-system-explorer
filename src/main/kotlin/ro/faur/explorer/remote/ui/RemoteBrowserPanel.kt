@@ -70,7 +70,7 @@ import javax.swing.tree.DefaultMutableTreeNode
 class RemoteBrowserPanel(
     private val project: Project,
     private val transferService: CrossPanelTransferService? = null,
-    private val connectionManager: SftpConnectionManager? = null,
+    val connectionManager: SftpConnectionManager? = null,
 ) : BrowserPanel() {
 
     private val directoryCache = DirectoryCache(ttl = Duration.ofMinutes(2), maxEntries = 200)
