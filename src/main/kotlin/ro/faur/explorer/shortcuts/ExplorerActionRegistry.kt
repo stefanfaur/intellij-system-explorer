@@ -2,7 +2,6 @@ package ro.faur.explorer.shortcuts
 
 import com.intellij.openapi.project.Project
 import ro.faur.explorer.actions.ExplorerActionUtil
-import ro.faur.explorer.shortcuts.actions.FileBrowserShortcuts
 import ro.faur.explorer.shortcuts.actions.GitPanelShortcuts
 import ro.faur.explorer.shortcuts.actions.QuickOpenShortcuts
 
@@ -21,26 +20,17 @@ class ExplorerActionRegistry {
         // Get the ExplorerPanel
         val explorerPanel = ExplorerActionUtil.activateAndFindPanel(project)
         
+        // File operations - delegate to FileBrowserShortcuts (same as working actions)
         when (actionId) {
-            // File operations - delegate to existing IntelliJ actions
-            "copy" -> invokeAction(project, "SystemExplorer.CopyFiles")
-            "cut" -> invokeAction(project, "SystemExplorer.CutFiles")
-            "paste" -> invokeAction(project, "SystemExplorer.PasteFiles")
-            "delete" -> invokeAction(project, "SystemExplorer.DeleteFiles")
-            "rename" -> invokeAction(project, "SystemExplorer.RenameFile")
-            "refresh" -> invokeAction(project, "SystemExplorer.RefreshTree")
-            "open" -> invokeAction(project, "SystemExplorer.OpenSelected")
-            "copyPath" -> invokeAction(project, "SystemExplorer.CopyPath")
+            "copy", "cut", "paste", "delete", "rename", "refresh", 
+            "open", "copyPath", 
+            "newFile", "newFolder", "editInIde", "showInTerminal", 
+            "showInExplorer", "copyName" -> {
+                explorerPanel?.let { FileBrowserShortcuts.executeAction(it, actionId) }
+                    ?: ChordToast.showActionFailed(actionId, "Explorer panel not available")
+            }
             
-            // File browser specific - via FileBrowserShortcuts
-            "newFile" -> explorerPanel?.let { FileBrowserShortcuts.executeAction(it, actionId) }
-            "newFolder" -> explorerPanel?.let { FileBrowserShortcuts.executeAction(it, actionId) }
-            "editInIde" -> explorerPanel?.let { FileBrowserShortcuts.executeAction(it, actionId) }
-            "showInTerminal" -> explorerPanel?.let { FileBrowserShortcuts.executeAction(it, actionId) }
-            "showInExplorer" -> explorerPanel?.let { FileBrowserShortcuts.executeAction(it, actionId) }
-            "copyName" -> explorerPanel?.let { FileBrowserShortcuts.executeAction(it, actionId) }
-            
-            // Git operations - via GitPanelShortcuts (Phase 5)
+            // Git operations
             "cherryPick" -> {
                 val gitPanel = findGitPanel(project)
                 GitPanelShortcuts.executeAction(project, actionId, gitPanel)
@@ -70,7 +60,7 @@ class ExplorerActionRegistry {
                 GitPanelShortcuts.executeAction(project, actionId, gitPanel)
             }
             
-            // Quick Open operations - via QuickOpenShortcuts (Phase 5)
+            // Quick Open operations
             "copyPathQuickOpen" -> {
                 val quickOpenPanel = findQuickOpenPanel(project)
                 QuickOpenShortcuts.executeAction(project, actionId, quickOpenPanel)

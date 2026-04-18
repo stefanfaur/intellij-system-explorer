@@ -1,4 +1,4 @@
-# Repository Guidelines
+`# Repository Guidelines
 
 ## Project Structure & Module Organization
 Core plugin code lives in `src/main/kotlin/ro/faur/explorer/` and is organized by concern: `actions/`, `model/`, `settings/`, `ui/`, and `util/`. Plugin metadata and icons are in `src/main/resources/META-INF/` (`plugin.xml`, `pluginIcon*.svg`).

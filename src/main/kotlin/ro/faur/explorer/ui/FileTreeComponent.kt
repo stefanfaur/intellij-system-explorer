@@ -158,6 +158,9 @@ class FileTreeComponent(private val project: Project) : Disposable {
             true
         )
 
+        // Store reference to this FileTreeComponent in the tree for lookup from ContextResolver
+        tree.putClientProperty("FileTreeComponent", this)
+
         // Subscribe to VCS status changes — FileStatusManager.addFileStatusListener auto-disconnects
         // when the given Disposable (this) is disposed.
         FileStatusManager.getInstance(project).addFileStatusListener(object : FileStatusListener {
@@ -923,6 +926,23 @@ class FileTreeComponent(private val project: Project) : Disposable {
             return "$prefix$permString"
         } catch (_: Exception) {
             return ""  // Fail silently on any error
+        }
+    }
+
+    /**
+     * Hides the speed search popup if it's active.
+     * Call this before processing chord keys to prevent speed search from consuming them.
+     */
+    fun hideSpeedSearch() {
+        // Look up the speed search using getSupply (the API method)
+        val search = com.intellij.ui.speedSearch.SpeedSearchSupply.getSupply(tree) as? com.intellij.ui.TreeSpeedSearch
+        java.lang.System.err.println("DEBUG FileTreeComponent.hideSpeedSearch: getSupply returned=$search, isActive=${search?.isPopupActive}")
+        
+        if (search != null && search.isPopupActive) {
+            java.lang.System.err.println("DEBUG FileTreeComponent.hideSpeedSearch: hiding popup")
+            search.hidePopup()
+        } else {
+            java.lang.System.err.println("DEBUG FileTreeComponent.hideSpeedSearch: speed search not active or not found")
         }
     }
 }

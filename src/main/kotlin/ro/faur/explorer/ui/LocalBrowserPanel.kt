@@ -18,7 +18,7 @@ import ro.faur.explorer.gitpanel.LocalGitBackend
 import ro.faur.explorer.model.BookmarkManager
 import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.settings.ExplorerSettings
-import ro.faur.explorer.shortcuts.actions.ChordShortcutHandler
+import ro.faur.explorer.shortcuts.ChordShortcutHandler
 import ro.faur.explorer.util.FileSizeFormatter
 import java.awt.BorderLayout
 import java.awt.Component

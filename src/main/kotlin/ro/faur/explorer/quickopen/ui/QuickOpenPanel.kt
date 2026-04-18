@@ -60,6 +60,7 @@ import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.quickopen.ranking.Ranker
 import ro.faur.explorer.settings.ExplorerSettings
 import ro.faur.explorer.settings.QuickOpenSettings
+import ro.faur.explorer.shortcuts.ShortcutController
 import ro.faur.explorer.util.explorerExceptionHandler
 import java.awt.BorderLayout
 import java.awt.CardLayout
@@ -1052,6 +1053,10 @@ class QuickOpenPanel(
         if (activePanel === this) {
             activePanel = null
         }
+        
+        // Unregister from ShortcutController
+        ShortcutController.instance.unregisterQuickOpenPanel(this)
+        
         previewPane.dispose()
         candidatePool.cancel()
         pendingSearch?.cancel(true)

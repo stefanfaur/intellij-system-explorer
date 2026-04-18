@@ -40,6 +40,12 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
     /** Called on EDT after the active panel changes. ExplorerPanel uses this to refresh nav button states. */
     var onActivePanelChanged: ((BrowserPanel) -> Unit)? = null
 
+    /** Called when a panel is added (including the initial local panel). */
+    var onPanelAdded: ((BrowserPanel) -> Unit)? = null
+
+    /** Called when a panel is removed. */
+    var onPanelRemoved: ((BrowserPanel) -> Unit)? = null
+
     val localPanel: LocalBrowserPanel get() = panels[0] as LocalBrowserPanel
     val activePanel: BrowserPanel     get() = panels[activeIndex]
     val panelCount: Int               get() = panels.size
@@ -94,7 +100,9 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
      * Closes and disposes the panel at [index]. Index 0 (local) cannot be removed.
      */
     fun removePanel(index: Int) {
-        if (index <= 0 || index >= panels.size) return
+        if (index < 0 || index >= panels.size) return
+        val isLocalPanel = index == 0
+        if (isLocalPanel) return  // Local panel cannot be removed
         val panel = panels[index]
         panels.removeAt(index)
         cardPanel.remove(panel)
@@ -102,6 +110,7 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
         activeIndex = (index - 1).coerceAtLeast(0)
         rebuildTabStrip()
         showActive()
+        onPanelRemoved?.invoke(panel)
     }
 
     /** Removes [panel] by identity — safe even if indices have shifted since tab was built. */
@@ -109,6 +118,9 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
         val idx = panels.indexOf(panel)
         if (idx >= 0) removePanel(idx)
     }
+
+    /** Returns a snapshot of panel indices that have been added and are still present. */
+    fun indexOf(panel: BrowserPanel): Int = panels.indexOf(panel)
 
     /**
      * Switches the active panel to [index]. No-op if out of range.
@@ -130,6 +142,7 @@ class BrowserHost(localPanel: LocalBrowserPanel) : JPanel(BorderLayout()), Dispo
         panels.add(panel)
         cardPanel.add(panel, cardKey(panel))
         rebuildTabStrip()
+        onPanelAdded?.invoke(panel)
     }
 
     private fun cardKey(panel: BrowserPanel): String = System.identityHashCode(panel).toString()

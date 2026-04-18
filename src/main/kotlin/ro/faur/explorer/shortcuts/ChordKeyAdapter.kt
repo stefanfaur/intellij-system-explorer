@@ -1,39 +1,61 @@
 package ro.faur.explorer.shortcuts
 
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.project.Project
+import com.intellij.ide.IdeEventQueue
 import java.awt.Component
-import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
-import java.awt.event.KeyListener
 import java.util.Timer
 import java.util.TimerTask
 import javax.swing.SwingUtilities
 
 /**
- * Programmatic KeyAdapter that implements chord-based shortcut detection.
+ * Chord-based shortcut detection using IntelliJ's IdeEventQueue dispatcher.
  *
- * Intercepts the base chord key (VK_BACK_QUOTE / backtick) and buffers
- * the next keypress, dispatching to ChordRegistry for resolution.
- *
- * Key features:
- * - 2-second timeout clears chord state
- * - Guards against text input (doesn't intercept during text editing)
- * - Visual feedback integration
- * - Thread-safe state management
+ * This runs at the IntelliJ event queue level, before IntelliJ processes keyboard shortcuts,
+ * so we can properly intercept and consume events.
  */
 class ChordKeyAdapter(
     private val chordRegistry: ChordRegistry,
     private val contextResolver: ContextResolver
-) : KeyListener {
+) : IdeEventQueue.EventDispatcher, Disposable {
 
     private val timer = Timer("ChordKeyAdapter-Timer", true)
     
     @Volatile private var isChordActive = false
     @Volatile private var baseKeyCode: Int = 0
     @Volatile private var pendingComponent: Component? = null
+
+    // When we consume a KEY_PRESSED for a printable key, AWT still emits a paired
+    // KEY_TYPED that would reach the focused JTree and activate IntelliJ's
+    // TreeSpeedSearch. We swallow the very next KEY_TYPED to suppress it.
+    @Volatile private var swallowNextKeyTyped: Boolean = false
     
     private var timeoutTask: TimerTask? = null
     private var visualFeedback: VisualChordFeedback? = null
     private var onActionDispatched: ((String) -> Unit)? = null
+    private var currentProject: Project? = null
+
+    /**
+     * Keys that IntelliJ interprets as action keys and processes even after we consume them.
+     * For these keys, we need to explicitly block IntelliJ's processing.
+     */
+    private val intellijActionKeys = setOf(
+        KeyEvent.VK_F,    // Search
+        KeyEvent.VK_Y,    // Redo
+        KeyEvent.VK_C,    // Copy
+        KeyEvent.VK_X,    // Cut
+        KeyEvent.VK_V,    // Paste
+        KeyEvent.VK_Z,    // Undo
+        KeyEvent.VK_A     // Select All
+    )
+
+    /**
+     * Sets the current project for context.
+     */
+    fun setProject(project: Project) {
+        currentProject = project
+    }
 
     /**
      * Callback for when a chord action is successfully dispatched.
@@ -50,29 +72,17 @@ class ChordKeyAdapter(
     }
 
     /**
-     * Registers this adapter on a component.
+     * Registers this dispatcher with IdeEventQueue.
      */
-    fun register(component: Component) {
-        component.addKeyListener(this)
-        // If component is a container, register on all children too
-        if (component is java.awt.Container) {
-            component.addContainerListener(object : java.awt.event.ContainerAdapter() {
-                override fun componentAdded(e: java.awt.event.ContainerEvent) {
-                    e.child.addKeyListener(this@ChordKeyAdapter)
-                }
-                override fun componentRemoved(e: java.awt.event.ContainerEvent) {
-                    e.child.removeKeyListener(this@ChordKeyAdapter)
-                }
-            })
-        }
+    fun register() {
+        IdeEventQueue.getInstance().addDispatcher(this, this)
     }
 
     /**
-     * Unregisters this adapter from a component.
+     * Unregisters this dispatcher from IdeEventQueue.
      */
-    fun unregister(component: Component) {
-        component.removeKeyListener(this)
-        pendingComponent = null
+    fun unregister() {
+        IdeEventQueue.getInstance().removeDispatcher(this)
         resetChordState()
     }
 
@@ -81,55 +91,107 @@ class ChordKeyAdapter(
      */
     fun isChordActive(): Boolean = isChordActive
 
-    override fun keyPressed(e: KeyEvent) {
-        // Don't intercept if text input is focused
-        if (contextResolver.isTextInputFocused()) {
-            return
+    /**
+     * Checks if this key is one that IntelliJ processes specially.
+     * These keys need extra handling to ensure they don't trigger IntelliJ actions.
+     */
+    private fun isIntelliJActionKey(keyCode: Int): Boolean {
+        return keyCode in intellijActionKeys
+    }
+
+    /**
+     * IdeEventQueue.EventDispatcher.dispatch method.
+     * Returns true if the event was consumed (processed by us), false otherwise.
+     */
+    override fun dispatch(e: java.awt.AWTEvent): Boolean {
+        if (e !is KeyEvent) return false
+
+        // Swallow the KEY_TYPED paired with a KEY_PRESSED we consumed, so it can't
+        // reach the focused JTree and trigger TreeSpeedSearch.
+        if (e.id == KeyEvent.KEY_TYPED) {
+            if (swallowNextKeyTyped) {
+                swallowNextKeyTyped = false
+                e.consume()
+                return true
+            }
+            return false
         }
 
-        val sourceComponent = SwingUtilities.getRoot(e.component) as? Component ?: return
+        // Also swallow KEY_RELEASED for a consumed press; otherwise some listeners
+        // still react (e.g. mnemonic processing). Cheap to be defensive here.
+        if (e.id == KeyEvent.KEY_RELEASED) {
+            return false
+        }
+
+        if (e.id != KeyEvent.KEY_PRESSED) return false
+
+        // New KEY_PRESSED: the paired KEY_TYPED for any previous consumed press
+        // has either already been dispatched or will never arrive.
+        swallowNextKeyTyped = false
+
+        // Debug: log chord-related key presses (can be removed once stable)
+        if (e.keyCode == ChordAction.BASE_KEY_BACKTICK || isChordActive) {
+            java.lang.System.err.println("ChordDispatcher: keyCode=${e.keyCode}, isChordActive=$isChordActive, textFocused=${contextResolver.isTextInputFocused()}, context=${contextResolver.getActiveContext()}")
+        }
+
+        // Don't intercept if text input is focused, UNLESS we're already in chord mode
+        if (contextResolver.isTextInputFocused() && !isChordActive) {
+            return false
+        }
+
+        // Check if focus is in one of our registered panels
+        val activeContext = contextResolver.getActiveContext()
+        if (activeContext == PanelContext.UNKNOWN) {
+            // Not in our panels - let IntelliJ handle it
+            return false
+        }
+
+        // Hide IntelliJ's speed search before processing chord keys
+        // This prevents speed search from consuming keys like F for search
+        contextResolver.hideSpeedSearch()
+
+        val sourceComponent = SwingUtilities.getRoot(e.component) as? Component ?: return false
 
         if (!isChordActive) {
             // Check for base chord key (backtick)
             if (e.keyCode == ChordAction.BASE_KEY_BACKTICK) {
                 activateChordMode(e, sourceComponent)
-                e.consume()
-                return
+                return consumeKeyPressed(e)
             }
+            return false  // Let IntelliJ handle other keys
         } else {
             // Chord mode active - buffer the second key
             if (e.keyCode == ChordAction.BASE_KEY_BACKTICK) {
                 // Double backtick - clear and restart
                 resetChordState()
                 activateChordMode(e, sourceComponent)
-                e.consume()
-                return
+                return consumeKeyPressed(e)
             }
-            
+
             // Handle escape - cancel chord
             if (e.keyCode == KeyEvent.VK_ESCAPE) {
                 resetChordState()
-                e.consume()
-                return
+                return consumeKeyPressed(e)
             }
-            
+
             // Ignore modifier-only presses
             if (isModifierOnly(e)) {
-                return
+                return consumeKeyPressed(e)
             }
-            
+
             // Dispatch the chord
-            dispatchChord(e, sourceComponent)
-            e.consume()
+            return dispatchChord(e, sourceComponent)
         }
     }
 
-    override fun keyReleased(e: KeyEvent) {
-        // Not used but required by interface
-    }
-
-    override fun keyTyped(e: KeyEvent) {
-        // Not used - we use keyPressed for reliable keycode detection
+    /**
+     * Consumes a KEY_PRESSED and arms the paired KEY_TYPED to be swallowed,
+     * preventing it from reaching the focused component (e.g. TreeSpeedSearch).
+     */
+    private fun consumeKeyPressed(e: KeyEvent): Boolean {
+        e.consume()
+        swallowNextKeyTyped = true
+        return true
     }
 
     private fun activateChordMode(e: KeyEvent, sourceComponent: Component) {
@@ -144,23 +206,30 @@ class ChordKeyAdapter(
         startTimeout()
     }
 
-    private fun dispatchChord(e: KeyEvent, sourceComponent: Component) {
+    private fun dispatchChord(e: KeyEvent, sourceComponent: Component): Boolean {
         val context = contextResolver.getActiveContext()
         val action = chordRegistry.getAction(baseKeyCode, e.keyCode, context)
         
         if (action != null) {
-            // Valid action found
+            // Consume and arm the KEY_TYPED swallow BEFORE running the action
+            // callback. Actions that show a modal dialog pump the event queue
+            // on the EDT, which would otherwise dispatch the paired KEY_TYPED
+            // while we're still inside this handler and before the flag is set.
+            val consumed = consumeKeyPressed(e)
             resetChordState()
             onActionDispatched?.invoke(action.actionId)
+            return consumed
         } else {
             // Check if chord exists but not for this context
             if (chordRegistry.isChordUsed(baseKeyCode, e.keyCode)) {
-                // Chord exists but no action for this context
+                val consumed = consumeKeyPressed(e)
                 resetChordState()
                 ChordToast.showNoActionForContext()
+                return consumed
             } else {
-                // Unknown chord - clear and pass through
+                // Unknown chord - clear and let it pass through
                 resetChordState()
+                return false  // Don't consume - let IntelliJ handle
             }
         }
     }
@@ -198,6 +267,11 @@ class ChordKeyAdapter(
             KeyEvent.VK_META,
             KeyEvent.VK_ALT_GRAPH
         )
+    }
+
+    override fun dispose() {
+        unregister()
+        timer.cancel()
     }
 
     companion object {

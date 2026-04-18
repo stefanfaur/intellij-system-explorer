@@ -3,9 +3,9 @@ package ro.faur.explorer.shortcuts
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
-import com.intellij.openapi.wm.ToolWindowManager
 import ro.faur.explorer.ui.BrowserHost
-import java.awt.Component
+import ro.faur.explorer.remote.ui.RemoteBrowserPanel
+import ro.faur.explorer.quickopen.ui.QuickOpenPanel
 
 /**
  * Main coordinator for the shortcut system.
@@ -13,8 +13,8 @@ import java.awt.Component
  * Initializes and wires together:
  * - ChordRegistry (singleton)
  * - ContextResolver (singleton)
- * - ChordKeyAdapter (per-panel)
- * - PopupChordManager (for Quick Open)
+ * - ChordKeyAdapter (IdeEventQueue dispatcher - registered globally)
+ * - VisualChordFeedback
  * - ShortcutReferencePanel
  */
 class ShortcutController : Disposable {
@@ -24,10 +24,13 @@ class ShortcutController : Disposable {
     
     private val chordKeyAdapter = ChordKeyAdapter(chordRegistry, contextResolver)
     private val visualChordFeedback = VisualChordFeedback()
-    private val popupChordManager = PopupChordManager(chordKeyAdapter)
     
     private var referenceToolWindow: ToolWindow? = null
     private var referencePanel: ShortcutReferencePanel? = null
+    private var isRegistered = false
+    
+    /** Current project for action dispatch */
+    private var currentProject: Project? = null
     
     /** Callback for when a chord action is dispatched */
     var onActionDispatched: ((String) -> Unit)? = null
@@ -36,25 +39,42 @@ class ShortcutController : Disposable {
         // Set up visual feedback
         chordKeyAdapter.setVisualFeedback(visualChordFeedback)
         
-        // Set up action dispatch callback
+        // Set up action dispatch callback - wire to ExplorerActionRegistry
         chordKeyAdapter.setOnActionDispatched { actionId ->
+            // First call any external callbacks
             onActionDispatched?.invoke(actionId)
+            // Then dispatch via ExplorerActionRegistry
+            currentProject?.let { project ->
+                ExplorerActionRegistry.getInstance().executeAction(project, actionId)
+            }
         }
     }
 
     /**
-     * Registers a browser host's panels with the context resolver and chord adapter.
+     * Sets the current project for action dispatch.
+     */
+    fun setProject(project: Project) {
+        currentProject = project
+        chordKeyAdapter.setProject(project)
+    }
+
+    /**
+     * Registers a browser host's panels with the context resolver.
+     * Also registers the IdeEventQueue dispatcher.
      */
     fun registerBrowserHost(browserHost: BrowserHost, project: Project) {
+        currentProject = project
+        chordKeyAdapter.setProject(project)
+        
         val localPanel = browserHost.localPanel
         
-        // Register with context resolver
+        // Register with context resolver for context detection
         contextResolver.registerPanel(PanelContext.LOCAL_BROWSER, localPanel)
         
-        // Register chord adapter on local panel's tree component
-        val treeComponent = getTreeComponent(localPanel)
-        if (treeComponent != null) {
-            chordKeyAdapter.register(treeComponent)
+        // Register IdeEventQueue dispatcher globally (only once)
+        if (!isRegistered) {
+            chordKeyAdapter.register()
+            isRegistered = true
         }
     }
 
@@ -67,11 +87,52 @@ class ShortcutController : Disposable {
         // Unregister from context resolver
         contextResolver.unregisterPanel(PanelContext.LOCAL_BROWSER, localPanel)
         
-        // Unregister chord adapter
-        val treeComponent = getTreeComponent(localPanel)
-        if (treeComponent != null) {
-            chordKeyAdapter.unregister(treeComponent)
+        // Unregister IdeEventQueue dispatcher
+        if (isRegistered) {
+            chordKeyAdapter.unregister()
+            isRegistered = false
         }
+    }
+
+    /**
+     * Registers a remote browser panel with context resolver.
+     */
+    fun registerRemotePanel(panel: RemoteBrowserPanel, project: Project) {
+        // Register with context resolver for context detection
+        contextResolver.registerPanel(PanelContext.REMOTE_BROWSER, panel)
+        
+        // Register IdeEventQueue dispatcher globally (only once)
+        if (!isRegistered) {
+            chordKeyAdapter.register()
+            isRegistered = true
+        }
+    }
+
+    /**
+     * Unregisters a remote browser panel.
+     */
+    fun unregisterRemotePanel(panel: RemoteBrowserPanel) {
+        contextResolver.unregisterPanel(PanelContext.REMOTE_BROWSER, panel)
+    }
+
+    /**
+     * Registers a Quick Open panel with the chord system.
+     */
+    fun registerQuickOpenPanel(panel: QuickOpenPanel) {
+        contextResolver.registerPanel(PanelContext.QUICK_OPEN, panel)
+        
+        // Register IdeEventQueue dispatcher globally (only once)
+        if (!isRegistered) {
+            chordKeyAdapter.register()
+            isRegistered = true
+        }
+    }
+
+    /**
+     * Unregisters a Quick Open panel from the chord system.
+     */
+    fun unregisterQuickOpenPanel(panel: QuickOpenPanel) {
+        contextResolver.unregisterPanel(PanelContext.QUICK_OPEN, panel)
     }
 
     /**
@@ -103,34 +164,13 @@ class ShortcutController : Disposable {
     }
 
     override fun dispose() {
+        if (isRegistered) {
+            chordKeyAdapter.unregister()
+            isRegistered = false
+        }
         visualChordFeedback.dispose()
         referenceToolWindow = null
         referencePanel = null
-    }
-
-    private fun getTreeComponent(panel: ro.faur.explorer.ui.LocalBrowserPanel): Component? {
-        // LocalBrowserPanel exposes getTree() or similar
-        // We'll use reflection or a known accessor
-        return try {
-            val method = panel.javaClass.getMethod("getTreeComponent")
-            method.invoke(panel) as? Component
-        } catch (e: Exception) {
-            // Fallback: try to find JTree in the component hierarchy
-            findJTree(panel)
-        }
-    }
-
-    private fun findJTree(component: Component): Component? {
-        if (component is javax.swing.JTree) {
-            return component
-        }
-        if (component is java.awt.Container) {
-            for (child in component.components) {
-                val found = findJTree(child)
-                if (found != null) return found
-            }
-        }
-        return null
     }
 
     companion object {

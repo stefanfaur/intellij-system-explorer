@@ -31,6 +31,8 @@ import com.intellij.vcsUtil.VcsUtil
 import ro.faur.explorer.gitpanel.ActiveBrowserTracker
 import ro.faur.explorer.gitpanel.BackendType
 import ro.faur.explorer.gitpanel.BranchInfo
+import ro.faur.explorer.shortcuts.ContextResolver
+import ro.faur.explorer.shortcuts.PanelContext
 import ro.faur.explorer.gitpanel.CommitFile
 import ro.faur.explorer.gitpanel.GitBackend
 import ro.faur.explorer.gitpanel.GitRepositoryRegistry
@@ -121,6 +123,9 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         }
         // Load any backends that were registered before this panel was created
         rebuildCombo()
+
+        // Register with ContextResolver for context detection
+        ContextResolver.instance.registerPanel(PanelContext.GIT_PANEL, this)
     }
 
     // ── Toolbar ─────────────────────────────────────────────────────────────
@@ -1038,5 +1043,6 @@ class GitPanelComponent(private val project: Project) : JPanel(BorderLayout()), 
         disposed = true
         registry.removeListener(registryListener)
         ActiveBrowserTracker.getInstance(project).removeListener(navListener)
+        ContextResolver.instance.unregisterPanel(PanelContext.GIT_PANEL, this)
     }
 }

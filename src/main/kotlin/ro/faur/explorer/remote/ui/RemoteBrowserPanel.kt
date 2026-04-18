@@ -41,7 +41,7 @@ import ro.faur.explorer.gitpanel.ActiveBrowserTracker
 import ro.faur.explorer.gitpanel.GitRepositoryRegistry
 import ro.faur.explorer.gitpanel.RemoteGitBackend
 import ro.faur.explorer.ui.BrowserPanel
-import ro.faur.explorer.shortcuts.actions.ChordShortcutHandler
+import ro.faur.explorer.shortcuts.ChordShortcutHandler
 import java.awt.Color
 import java.awt.event.InputEvent
 import java.awt.event.KeyAdapter

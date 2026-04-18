@@ -1,21 +1,19 @@
-package ro.faur.explorer.shortcuts.actions
+package ro.faur.explorer.shortcuts
 
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.DumbAwareAction
-import ro.faur.explorer.actions.ExplorerActionUtil
+import ro.faur.explorer.actions.FileActions
 import ro.faur.explorer.shortcuts.ChordToast
-import ro.faur.explorer.shortcuts.actions.ChordShortcutHandler
-import ro.faur.explorer.ui.BrowserPanel
+import ro.faur.explorer.shortcuts.ChordShortcutHandler
 import ro.faur.explorer.ui.ExplorerPanel
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 
 /**
  * Action implementations for file browser chord shortcuts.
  * 
  * These actions are triggered by chord sequences (e.g., `c for copy).
- * They delegate to the existing IntelliJ actions registered in plugin.xml.
+ * They call operations directly on the FileTreeComponent to avoid IntelliJ's
+ * action system which requires a proper DataContext with project info.
  */
 object FileBrowserShortcuts {
 
@@ -24,18 +22,79 @@ object FileBrowserShortcuts {
      */
     fun executeAction(panel: ExplorerPanel, actionId: String) {
         val activePanel = panel.browserHost.activePanel
-        val project = panel.project
+        val tree = panel.fileTreeComponent
         
         when (actionId) {
-            // IntelliJ actions - delegate to ActionManager
-            "copy" -> invokeAction(project, "SystemExplorer.CopyFiles")
-            "cut" -> invokeAction(project, "SystemExplorer.CutFiles")
-            "paste" -> invokeAction(project, "SystemExplorer.PasteFiles")
-            "delete" -> invokeAction(project, "SystemExplorer.DeleteFiles")
-            "rename" -> invokeAction(project, "SystemExplorer.RenameFile")
-            "refresh" -> invokeAction(project, "SystemExplorer.RefreshTree")
-            "open" -> invokeAction(project, "SystemExplorer.OpenSelected")
-            "copyPath" -> invokeAction(project, "SystemExplorer.CopyPath")
+            // File operations - call directly on FileTreeComponent
+            "copy" -> {
+                val selected = tree.getSelectedFiles()
+                if (selected.isNotEmpty()) {
+                    FileActions.copyToClipboard(selected)
+                    tree.cutFiles = null  // Clear cut state on copy
+                    ChordToast.showNotification("Copied", "${selected.size} file(s) copied to clipboard", com.intellij.notification.NotificationType.INFORMATION)
+                } else {
+                    ChordToast.showActionFailed("copy", "No files selected")
+                }
+            }
+            "cut" -> {
+                val selected = tree.getSelectedFiles()
+                if (selected.isNotEmpty()) {
+                    tree.cutFiles = selected  // Set cut state
+                    ChordToast.showNotification("Cut", "${selected.size} file(s) marked for move", com.intellij.notification.NotificationType.INFORMATION)
+                } else {
+                    ChordToast.showActionFailed("cut", "No files selected")
+                }
+            }
+            "paste" -> {
+                val contextDir = tree.getContextDirectory()
+                if (contextDir != null) {
+                    tree.pasteFiles(contextDir)
+                    ChordToast.showNotification("Pasted", "Files pasted to ${contextDir.name}", com.intellij.notification.NotificationType.INFORMATION)
+                } else {
+                    ChordToast.showActionFailed("paste", "Cannot determine paste location")
+                }
+            }
+            "delete" -> {
+                val selected = tree.getSelectedFiles()
+                if (selected.isNotEmpty()) {
+                    tree.deleteFiles(selected)
+                    ChordToast.showNotification("Deleted", "${selected.size} file(s) deleted", com.intellij.notification.NotificationType.INFORMATION)
+                } else {
+                    ChordToast.showActionFailed("delete", "No files selected")
+                }
+            }
+            "rename" -> {
+                val selected = tree.getSelectedFiles().firstOrNull()
+                if (selected != null) {
+                    tree.renameFile(selected)
+                } else {
+                    ChordToast.showActionFailed("rename", "No file selected")
+                }
+            }
+            "refresh" -> {
+                tree.refresh()
+            }
+            "open" -> {
+                tree.openSelected()
+            }
+            "copyPath" -> {
+                val selected = tree.getSelectedFiles().firstOrNull()
+                if (selected != null) {
+                    copyToClipboard(selected.path)
+                    ChordToast.showNotification("Copied", "Path: ${selected.path}", com.intellij.notification.NotificationType.INFORMATION)
+                } else {
+                    ChordToast.showActionFailed("copyPath", "No file selected")
+                }
+            }
+            "copyName" -> {
+                val selected = tree.getSelectedFiles().firstOrNull()
+                if (selected != null) {
+                    copyToClipboard(selected.name)
+                    ChordToast.showNotification("Copied", "Name: ${selected.name}", com.intellij.notification.NotificationType.INFORMATION)
+                } else {
+                    ChordToast.showActionFailed("copyName", "No file selected")
+                }
+            }
             
             // Panel-specific operations via ChordShortcutHandler
             "newFile" -> {
@@ -58,31 +117,17 @@ object FileBrowserShortcuts {
                 if (activePanel is ChordShortcutHandler) activePanel.triggerShowInExplorer()
                 else ChordToast.showActionFailed("showInExplorer", "Not available in this context")
             }
-            "copyName" -> {
-                if (activePanel is ChordShortcutHandler) activePanel.triggerCopyName()
-                else ChordToast.showActionFailed("copyName", "Not available in this context")
-            }
             
             else -> ChordToast.showActionFailed(actionId, "Unknown action")
         }
     }
-
-    private fun invokeAction(project: Project, actionId: String) {
+    
+    private fun copyToClipboard(text: String) {
         try {
-            val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
-            val action = actionManager.getAction(actionId)
-            if (action != null) {
-                val event = AnActionEvent.createFromAnAction(
-                    action, null,
-                    com.intellij.openapi.actionSystem.ActionPlaces.UNKNOWN,
-                    DataContext.EMPTY_CONTEXT
-                )
-                action.actionPerformed(event)
-            } else {
-                ChordToast.showActionFailed(actionId, "Action not found")
-            }
+            val clipboard = Toolkit.getDefaultToolkit().systemClipboard
+            clipboard.setContents(StringSelection(text), null)
         } catch (e: Exception) {
-            ChordToast.showActionFailed(actionId, e.message ?: "Unknown error")
+            ChordToast.showActionFailed("copy", e.message ?: "Failed to copy")
         }
     }
 }

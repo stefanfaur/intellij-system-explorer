@@ -59,10 +59,11 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
 <ul>
   <li><b>Alt+E</b> &mdash; Toggle/focus System Explorer</li>
   <li><b>Cmd+Shift+P</b> &mdash; Quick Open</li>
-  <li><b>Ctrl+C / Ctrl+X / Ctrl+V</b> &mdash; Copy, cut, paste</li>
-  <li><b>F2</b> &mdash; Rename &nbsp; <b>Delete</b> &mdash; Delete &nbsp; <b>F5</b> &mdash; Refresh</li>
-  <li><b>Ctrl+Shift+C</b> &mdash; Copy path &nbsp; <b>Enter</b> &mdash; Open &nbsp; <b>Backspace</b> &mdash; Go back &nbsp; <b>Alt+Left</b> &mdash; Up one level</li>
+  <li><b>`c / `x / `v</b> &mdash; Copy, cut, paste (backtick + key)</li>
+  <li><b>`r</b> &mdash; Rename &nbsp; <b>`d</b> &mdash; Delete &nbsp; <b>`f</b> &mdash; Refresh</li>
+  <li><b>`y</b> &mdash; Copy path &nbsp; <b>Enter</b> &mdash; Open &nbsp; <b>Backspace</b> &mdash; Go back &nbsp; <b>Alt+Left</b> &mdash; Up one level</li>
   <li><b>Option+Shift+1&ndash;5</b> &mdash; Switch to panel 1 (Local) or 2&ndash;5 (SSH)</li>
+  <li><b>`?</b> &mdash; Show shortcuts reference panel</li>
 </ul>
 ]]></description>
 
@@ -223,28 +224,24 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
                     class="ro.faur.explorer.actions.CopyFilesAction"
                     text="Copy"
                     description="Copy selected files to clipboard">
-                <keyboard-shortcut keymap="$default" first-keystroke="ctrl C"/>
             </action>
 
             <action id="SystemExplorer.CutFiles"
                     class="ro.faur.explorer.actions.CutFilesAction"
                     text="Cut"
                     description="Cut selected files (move on paste)">
-                <keyboard-shortcut keymap="$default" first-keystroke="ctrl X"/>
             </action>
 
             <action id="SystemExplorer.PasteFiles"
                     class="ro.faur.explorer.actions.PasteFilesAction"
                     text="Paste"
                     description="Paste files from clipboard">
-                <keyboard-shortcut keymap="$default" first-keystroke="ctrl V"/>
             </action>
 
             <action id="SystemExplorer.CopyPath"
                     class="ro.faur.explorer.actions.CopyPathAction"
                     text="Copy Path"
                     description="Copy absolute path of selected file">
-                <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift C"/>
             </action>
 
             <action id="SystemExplorer.RenameFile"

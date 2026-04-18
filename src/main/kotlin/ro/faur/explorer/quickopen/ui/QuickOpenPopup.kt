@@ -12,6 +12,7 @@ import ro.faur.explorer.quickopen.model.CandidateType
 import ro.faur.explorer.quickopen.model.SearchCandidate
 import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.remote.SftpConnectionManager
+import ro.faur.explorer.shortcuts.ShortcutController
 import ro.faur.explorer.ui.ExplorerPanel
 import java.awt.Dimension
 
@@ -69,6 +70,9 @@ object QuickOpenPopup {
             .createPopup()
 
         qoPanel.popup = popup
+
+        // Register with ShortcutController for context detection and chord handling
+        ShortcutController.instance.registerQuickOpenPanel(qoPanel)
 
         popup.showCenteredInCurrentWindow(project)
         IdeFocusManager.getInstance(project).requestFocus(qoPanel.searchField, true)

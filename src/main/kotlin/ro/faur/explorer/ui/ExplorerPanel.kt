@@ -10,6 +10,8 @@ import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.JBUI
 import ro.faur.explorer.actions.NavigationActions
 import ro.faur.explorer.gitpanel.ActiveBrowserTracker
+import ro.faur.explorer.shortcuts.PanelContext
+import ro.faur.explorer.shortcuts.ShortcutController
 import ro.faur.explorer.remote.ConnectionProfile
 import ro.faur.explorer.remote.SftpConnectionManager
 import ro.faur.explorer.remote.ui.RemoteBrowserPanel
@@ -66,6 +68,25 @@ class ExplorerPanel(val explorerProject: Project) : Disposable {
 
     init {
         Disposer.register(this, browserHost)
+
+        // Register with shortcut system for context detection
+        ShortcutController.instance.registerBrowserHost(browserHost, explorerProject)
+
+        // Register remote panels as they are added/removed
+        browserHost.onPanelAdded = { panel ->
+            if (panel is RemoteBrowserPanel) {
+                ShortcutController.instance.registerRemotePanel(panel, explorerProject)
+            }
+        }
+        browserHost.onPanelRemoved = { panel ->
+            if (panel is RemoteBrowserPanel) {
+                ShortcutController.instance.unregisterRemotePanel(panel)
+            }
+        }
+
+        Disposer.register(this, Disposable {
+            ShortcutController.instance.unregisterBrowserHost(browserHost)
+        })
 
         // Wire nav buttons to active panel
         backBtn.addActionListener    { browserHost.activePanel.navigateBack() }
