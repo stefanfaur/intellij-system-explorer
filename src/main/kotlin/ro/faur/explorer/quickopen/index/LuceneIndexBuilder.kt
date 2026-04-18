@@ -115,6 +115,7 @@ object LuceneIndexBuilder {
 
     /**
      * Walk [root] and index all eligible files into [manager].
+     * Also removes any indexed files that no longer exist on disk.
      *
      * Must be called on Dispatchers.IO (suspend).
      */
@@ -138,6 +139,9 @@ object LuceneIndexBuilder {
             var totalIndexedBytes = 0L
             var contentCapReached = false
             var progressCount = 0
+            
+            // Track all paths visited during this walk to detect deletions
+            val visitedPaths = mutableSetOf<String>()
 
             Files.walkFileTree(root, object : SimpleFileVisitor<Path>() {
                 override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
@@ -151,6 +155,9 @@ object LuceneIndexBuilder {
 
                 override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
                     if (!shouldIndex(file, allowedExts)) return FileVisitResult.CONTINUE
+
+                    // Track this path
+                    visitedPaths.add(file.toString())
 
                     val fileSize = attrs.size()
                     if (!contentCapReached && totalIndexedBytes + fileSize > totalContentCapBytes) {
@@ -180,6 +187,16 @@ object LuceneIndexBuilder {
                     return FileVisitResult.CONTINUE
                 }
             })
+            
+            // Remove indexed files that no longer exist on disk
+            val indexedPaths = manager.searchPaths("", Int.MAX_VALUE)
+            for (indexedPath in indexedPaths) {
+                // Only delete paths that are under the root and were not visited
+                if (indexedPath.startsWith(root.toString()) && indexedPath !in visitedPaths) {
+                    manager.deleteFile(indexedPath)
+                    LOG.debug("Removed deleted file from index: $indexedPath")
+                }
+            }
 
             if (progressCount > 0) onProgress?.invoke(progressCount)
             manager.commit()
