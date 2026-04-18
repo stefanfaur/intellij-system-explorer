@@ -6,8 +6,10 @@ import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.keymap.KeymapUtil
 import com.intellij.openapi.project.Project
 import com.intellij.ui.JBColor
+import com.intellij.ui.components.JBScrollPane
 import java.awt.BorderLayout
 import java.awt.Color
+import java.awt.Dimension
 import java.awt.Font
 import java.util.Timer
 import java.util.TimerTask
@@ -15,6 +17,7 @@ import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JLabel
 import javax.swing.JPanel
+import javax.swing.ScrollPaneConstants
 
 /**
  * Dockable panel showing keyboard shortcuts for the current context.
@@ -39,10 +42,22 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
     private val contentPanel = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
         border = javax.swing.BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        background = JBColor(Color(0xFAFAFA), Color(0x2B2B2B))
+        isOpaque = true
     }
-    
+
+    private val scrollPane = JBScrollPane(contentPanel).apply {
+        verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
+        horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED
+        border = javax.swing.BorderFactory.createEmptyBorder()
+        verticalScrollBar.unitIncrement = 16
+        // Small preferred size so the tool window can shrink freely.
+        preferredSize = Dimension(240, 200)
+        minimumSize = Dimension(120, 80)
+    }
+
     val component: JPanel = JPanel(BorderLayout()).apply {
-        add(contentPanel, BorderLayout.CENTER)
+        add(scrollPane, BorderLayout.CENTER)
         background = JBColor(Color(0xFAFAFA), Color(0x2B2B2B))
     }
 
