@@ -21,6 +21,15 @@ class LocalGitBackend(
         if (parts.size >= 2) "${parts[parts.size - 2]}/${parts.last()}" else parts.last()
     }
 
+    /**
+     * Executes an arbitrary git command.
+     * This is used by shortcut handlers for operations like cherry-pick, revert, etc.
+     */
+    fun execGitCommand(command: String): GitCommandResult {
+        val args = command.split(" ").toTypedArray()
+        return executor.executeBlocking(repoPath, args = args)
+    }
+
     override fun getCurrentBranch(): String? {
         val result = executor.executeBlocking(repoPath, args = arrayOf("rev-parse", "--abbrev-ref", "HEAD"))
         return if (result.isSuccess) result.stdout.trim().takeIf { it.isNotEmpty() } else null
