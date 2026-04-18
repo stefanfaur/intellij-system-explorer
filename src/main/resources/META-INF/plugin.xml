@@ -98,6 +98,12 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
     <depends>org.jetbrains.plugins.terminal</depends>
 
     <extensions defaultExtensionNs="com.intellij">
+        <!-- Shortcut system services -->
+        <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ChordRegistry"/>
+        <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ContextResolver"/>
+        <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ShortcutSettings"/>
+        <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ShortcutController"/>
+
         <applicationService serviceImplementation="ro.faur.explorer.settings.ExplorerSettings"/>
         <applicationService serviceImplementation="ro.faur.explorer.settings.QuickOpenSettings"/>
         <applicationService serviceImplementation="ro.faur.explorer.model.BookmarkManager"/>
@@ -139,6 +145,12 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
             instance="ro.faur.explorer.settings.QuickOpenConfigurable"/>
 
         <applicationConfigurable
+            id="ro.faur.explorer.shortcuts.settings"
+            displayName="Keyboard Shortcuts"
+            parentId="ro.faur.explorer.parent"
+            instance="ro.faur.explorer.shortcuts.settings.ShortcutSettingsConfigurable"/>
+
+        <applicationConfigurable
             id="ro.faur.explorer.remote.settings"
             displayName="Remote SSH"
             parentId="ro.faur.explorer.parent"
@@ -155,6 +167,12 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
         <statusBarWidgetFactory
             id="RemoteGitBranch"
             implementation="ro.faur.explorer.remote.git.RemoteGitBranchWidgetFactory"/>
+
+        <!-- Shortcut reference panel -->
+        <toolWindow id="System Explorer Shortcuts"
+                    anchor="right"
+                    secondary="true"
+                    factoryClass="ro.faur.explorer.shortcuts.ShortcutReferenceToolWindowFactory"/>
 
         <toolWindow id="System Explorer"
                     anchor="right"
@@ -298,6 +316,27 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
                 text="Switch to Panel 5" description="Switch to fourth SSH panel">
             <keyboard-shortcut keymap="Mac OS X"      first-keystroke="alt shift 5"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="alt shift 5"/>
+            <!-- Ctrl+Alt+1-4 for tab switching (Phase 3) -->
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 1"/>
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 1"/>
+        </action>
+
+        <action id="SystemExplorer.SwitchPanel6" class="ro.faur.explorer.actions.SwitchPanel6Action"
+                text="Switch to Panel 6" description="Switch to fifth SSH panel">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 2"/>
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 2"/>
+        </action>
+
+        <action id="SystemExplorer.SwitchPanel7" class="ro.faur.explorer.actions.SwitchPanel7Action"
+                text="Switch to Panel 7" description="Switch to sixth SSH panel">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 3"/>
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 3"/>
+        </action>
+
+        <action id="SystemExplorer.SwitchPanel8" class="ro.faur.explorer.actions.SwitchPanel8Action"
+                text="Switch to Panel 8" description="Switch to seventh SSH panel">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 4"/>
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 4"/>
         </action>
     </actions>
 </idea-plugin>
