@@ -30,13 +30,16 @@ import javax.swing.JPanel
  * nav buttons and action buttons, and the tab strip (SOUTH).
  * All browser logic lives in [BrowserHost] and the [BrowserPanel] subclasses it manages.
  */
-class ExplorerPanel(private val project: Project) : Disposable {
+class ExplorerPanel(val explorerProject: Project) : Disposable {
+
+    /** Exposes project for chord shortcuts */
+    val project: Project get() = explorerProject
 
     companion object {
         private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(ExplorerPanel::class.java)
     }
 
-    val browserHost = BrowserHost(LocalBrowserPanel(project))
+    val browserHost = BrowserHost(LocalBrowserPanel(explorerProject))
 
     // ── Backward-compat shims (used by existing IDE actions) ───────────────
     internal val fileTreeComponent  get() = browserHost.localPanel.fileTreeComponent
@@ -73,7 +76,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
 
         // Wire action buttons
         settingsBtn.addActionListener {
-            ShowSettingsUtil.getInstance().showSettingsDialog(project, "System Explorer")
+            ShowSettingsUtil.getInstance().showSettingsDialog(explorerProject, "System Explorer")
         }
         connectBtn.addActionListener { showConnectDropdown(connectBtn) }
 
@@ -82,7 +85,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
             bindNavCallbackToPanel(panel)
             refreshNavButtons()
             val connName = (panel as? RemoteBrowserPanel)?.getConnectionName()
-            ActiveBrowserTracker.getInstance(project).reportNavigation(connName, panel.currentPath())
+            ActiveBrowserTracker.getInstance(explorerProject).reportNavigation(connName, panel.currentPath())
         }
 
         // Bind callback to the initial local panel
@@ -137,7 +140,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
         val menu = javax.swing.JPopupMenu()
 
         val profiles = ro.faur.explorer.remote.settings.RemoteConnectionSettings
-            .getInstance(project).state.connections
+            .getInstance(explorerProject).state.connections
         if (profiles.isEmpty()) {
             val emptyItem = javax.swing.JMenuItem("No saved connections").apply { isEnabled = false }
             menu.add(emptyItem)
@@ -157,14 +160,14 @@ class ExplorerPanel(private val project: Project) : Disposable {
 
         val newItem = javax.swing.JMenuItem("+ New Connection...").apply {
             addActionListener {
-                val dialog = ro.faur.explorer.remote.ui.ConnectionDialog(project)
+                val dialog = ro.faur.explorer.remote.ui.ConnectionDialog(explorerProject)
                 if (dialog.showAndGet()) {
                     val profile  = dialog.getProfile()
                     val password = dialog.getPassword()?.let { String(it) }
                     if (dialog.shouldRememberPassword() && password != null)
                         ro.faur.explorer.remote.security.CredentialHandler
                             .storePassword(profile.name, profile.username, password)
-                    ro.faur.explorer.remote.settings.RemoteConnectionSettings.getInstance(project).addConnection(profile)
+                    ro.faur.explorer.remote.settings.RemoteConnectionSettings.getInstance(explorerProject).addConnection(profile)
                 }
             }
         }
@@ -172,7 +175,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
 
         val manageItem = javax.swing.JMenuItem("Manage Connections...").apply {
             icon = AllIcons.General.Settings
-            addActionListener { ro.faur.explorer.remote.ui.ManageConnectionsDialog(project).show() }
+            addActionListener { ro.faur.explorer.remote.ui.ManageConnectionsDialog(explorerProject).show() }
         }
         menu.add(manageItem)
 
@@ -186,7 +189,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
         connectBtn.toolTipText = "Connecting to ${profile.name}…"
 
         fun onSuccess(ops: ro.faur.explorer.remote.SftpFileOperations, gitManager: SftpConnectionManager?) {
-            val panel = RemoteBrowserPanel(project, connectionManager = gitManager)
+            val panel = RemoteBrowserPanel(explorerProject, connectionManager = gitManager)
             panel.connect(profile.name, ops, profile)
             bindNavCallbackToPanel(panel)
             browserHost.addPanel(panel)
@@ -201,7 +204,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
                 .getNotificationGroup("SftpBrowser.Notifications")
                 .createNotification("Failed to connect to ${profile.name}",
                     e.message ?: "Unknown error", com.intellij.notification.NotificationType.ERROR)
-                .notify(project)
+                .notify(explorerProject)
         }
 
         fun onCancelled() { connectBtn.isEnabled = true; connectBtn.toolTipText = null }
@@ -222,7 +225,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
                     if (profile.authMethod == ConnectionProfile.AuthMethod.KEY_FILE && keyPassphrase == null) {
                         // Need key passphrase — prompt on EDT, then retry
                         ApplicationManager.getApplication().invokeLater {
-                            val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, "'${profile.name}' key file")
+                            val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(explorerProject, "'${profile.name}' key file")
                             if (dialog.showAndGet()) {
                                 val kp = String(dialog.getPassword())
                                 val shouldRememberKp = dialog.rememberPassword.isSelected
@@ -246,7 +249,7 @@ class ExplorerPanel(private val project: Project) : Disposable {
                     doConnect(resolved, null)
                 } else {
                     // Need password — prompt on EDT, then connect in background
-                    val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(project, profile.name)
+                    val dialog = ro.faur.explorer.remote.ui.PasswordPromptDialog(explorerProject, profile.name)
                     if (dialog.showAndGet()) {
                         val pw = String(dialog.getPassword())
                         val shouldRememberPassword = dialog.rememberPassword.isSelected
