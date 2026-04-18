@@ -173,6 +173,7 @@ fun detectHostPlatform(): String {
 tasks {
     test {
         useJUnitPlatform()
+        jvmArgs = listOf("-Xmx4g", "-XX:+HeapDumpOnOutOfMemoryError")
         val includeIdeTests = project.findProperty("includeIdeTests")?.toString()?.toBoolean() == true
         val includeSftpTests = project.findProperty("includeSftpTests")?.toString()?.toBoolean() == true
         // Default: keep :test headless-safe.
