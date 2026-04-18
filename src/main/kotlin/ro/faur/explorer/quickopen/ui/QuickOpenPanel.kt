@@ -100,6 +100,10 @@ class QuickOpenPanel(
 
     companion object {
         private const val MAX_CONTENT_RESULTS = 200
+        
+        /** Tracks the currently active QuickOpenPanel instance for chord shortcuts */
+        @JvmStatic var activePanel: QuickOpenPanel? = null
+            private set
     }
 
     val searchField = SearchTextField(true).apply {
@@ -194,6 +198,9 @@ class QuickOpenPanel(
     var popup: JBPopup? = null  // set by QuickOpenPopup after creation
 
     init {
+        // Track this panel as the active one for chord shortcuts
+        activePanel = this
+        
         val statusPanel = JPanel(java.awt.GridLayout(2, 1)).apply {
             val topRow = JPanel(BorderLayout()).apply {
                 add(truncationLabel, BorderLayout.WEST)
@@ -1041,6 +1048,10 @@ class QuickOpenPanel(
     }
 
     override fun dispose() {
+        // Clear active panel tracking
+        if (activePanel === this) {
+            activePanel = null
+        }
         previewPane.dispose()
         candidatePool.cancel()
         pendingSearch?.cancel(true)
