@@ -20,9 +20,7 @@ data class ChordAction(
     /** The context in which this chord is active */
     val context: PanelContext,
     /** Category for grouping in the reference panel */
-    val category: ActionCategory,
-    /** Whether this shortcut was customized by the user */
-    val isUserOverride: Boolean = false
+    val category: ActionCategory
 ) {
     companion object {
         const val BASE_KEY_BACKTICK = KeyEvent.VK_BACK_QUOTE

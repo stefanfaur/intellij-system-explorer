@@ -141,11 +141,9 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
         )
         
         for ((actionId, shortcut) in actions) {
-            val action = chordRegistry.getActionById(actionId)
-            val isOverride = action?.isUserOverride == true
-            addShortcutRow(shortcut, getDisplayName(actionId), isOverride)
+            addShortcutRow(shortcut, getDisplayName(actionId))
         }
-        
+
         addSectionHeader("Help")
         addShortcutRow("`/", "Show shortcuts")
     }
@@ -164,11 +162,9 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
         )
         
         for ((actionId, shortcut) in actions) {
-            val action = chordRegistry.getActionById(actionId)
-            val isOverride = action?.isUserOverride == true
-            addShortcutRow(shortcut, getDisplayName(actionId), isOverride)
+            addShortcutRow(shortcut, getDisplayName(actionId))
         }
-        
+
         addSectionHeader("Help")
         addShortcutRow("`/", "Show shortcuts")
     }
@@ -185,11 +181,9 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
         )
         
         for ((actionId, shortcut) in actions) {
-            val action = chordRegistry.getActionById(actionId)
-            val isOverride = action?.isUserOverride == true
-            addShortcutRow(shortcut, getDisplayName(actionId), isOverride)
+            addShortcutRow(shortcut, getDisplayName(actionId))
         }
-        
+
         addSectionHeader("Help")
         addShortcutRow("`/", "Show shortcuts")
     }
@@ -203,15 +197,12 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
         contentPanel.add(Box.createVerticalStrut(4))
     }
 
-    private fun addShortcutRow(shortcut: String, description: String, isOverride: Boolean = false) {
+    private fun addShortcutRow(shortcut: String, description: String) {
         val row = JPanel(BorderLayout(8, 0)).apply {
             isOpaque = false
-            
+
             val shortcutLabel = JLabel(shortcut).apply {
                 font = Font(Font.MONOSPACED, Font.PLAIN, 12)
-                if (isOverride) {
-                    font = font.deriveFont(Font.BOLD)
-                }
             }
             
             val descLabel = JLabel(description).apply {

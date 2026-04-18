@@ -102,7 +102,6 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
         <!-- Shortcut system services -->
         <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ChordRegistry"/>
         <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ContextResolver"/>
-        <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ShortcutSettings"/>
         <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ShortcutController"/>
 
         <applicationService serviceImplementation="ro.faur.explorer.settings.ExplorerSettings"/>
@@ -144,12 +143,6 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
             displayName="Quick Open"
             parentId="ro.faur.explorer.parent"
             instance="ro.faur.explorer.settings.QuickOpenConfigurable"/>
-
-        <applicationConfigurable
-            id="ro.faur.explorer.shortcuts.settings"
-            displayName="Keyboard Shortcuts"
-            parentId="ro.faur.explorer.parent"
-            instance="ro.faur.explorer.shortcuts.settings.ShortcutSettingsConfigurable"/>
 
         <applicationConfigurable
             id="ro.faur.explorer.remote.settings"
