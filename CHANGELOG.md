@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 ### Added
+- Configurable chord-based keyboard shortcuts system for System Explorer
+  - Backtick-based chords (e.g., `` `c`` for copy, `` `n`` for new file)
+  - Context-aware: same chord does panel-appropriate action based on active panel
+  - Visual chord feedback with floating overlay during chord mode
+  - Shortcut reference panel (dockable, auto-hides)
+  - Settings UI for customization with import/export
+  - Space preview (hold-to-preview) for file browser
+  - Keyboard shortcut hints for context menu items
+- File browser chord shortcuts: copy, cut, paste, delete, rename, new file/folder, edit, terminal, explorer, copy path/name
+- Git panel chord shortcuts: cherry-pick, revert, rename branch, new branch, fetch, pull, copy commit hash
+- Quick Open chord shortcuts: copy path, open, edit, copy result, refresh index
+- Tab switching with Ctrl+Alt+1-4 (alternative to Option+Shift+1-4)
+- Git panel shortcuts for cherry-pick, revert, and branch management
+
 ### Changed
 ### Fixed
 

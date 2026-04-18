@@ -56,8 +56,58 @@ Settings → Plugins → ⚙ → Install Plugin from Disk → select the ZIP →
 | `Alt+E` | Toggle / focus System Explorer |
 | `Cmd+Shift+P` | Open Quick Open popup |
 | `Option+Shift+1` – `Option+Shift+5` | Switch to panel: 1=Local, 2–5=SSH |
+| `Ctrl+Alt+1` – `Ctrl+Alt+4` | Switch to panel 1-4 (alternative) |
 
 All shortcuts configurable via Settings → Keymap → "System Explorer".
+
+### Chord Shortcuts
+
+System Explorer uses **chord shortcuts** for context-aware actions. Press the backtick (`` ` ``) key followed by a letter to trigger an action. The active panel determines what each chord does.
+
+Press `` `/`` to show the shortcut reference panel with all available shortcuts for the current context.
+
+#### File Browser (Local/Remote)
+
+| Chord | Action |
+|-------|--------|
+| `` `c`` | Copy selected files |
+| `` `x`` | Cut selected files |
+| `` `v`` | Paste files |
+| `` `d`` | Delete selected |
+| `` `r`` | Rename selected |
+| `` `n`` | New file |
+| `` `N`` | New folder (local only) |
+| `` `f`` | Refresh |
+| `` `o`` | Open selected |
+| `` `e`` | Edit in IDE |
+| `` `p`` | Show in terminal |
+| `` `t`` | Show in explorer |
+| `` `y`` | Copy path |
+| `` `/`` | Show shortcuts reference |
+
+#### Git Panel
+
+| Chord | Action |
+|-------|--------|
+| `` `c`` | Cherry-pick selected commit |
+| `` `x`` | Revert selected commit |
+| `` `r`` | Rename branch |
+| `` `n`` | New branch |
+| `` `f`` | Fetch from remote |
+| `` `p`` | Pull from remote |
+| `` `y`` | Copy commit hash |
+| `` `/`` | Show shortcuts reference |
+
+#### Quick Open
+
+| Chord | Action |
+|-------|--------|
+| `` `c`` | Copy selected path |
+| `` `o`` | Open selected |
+| `` `e`` | Edit/rename selected |
+| `` `y`` | Copy result |
+| `` `f`` | Refresh index |
+| `` `/`` | Show shortcuts reference |
 
 ---
 
