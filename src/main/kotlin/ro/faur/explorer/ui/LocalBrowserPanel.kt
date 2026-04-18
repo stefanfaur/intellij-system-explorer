@@ -18,6 +18,7 @@ import ro.faur.explorer.gitpanel.LocalGitBackend
 import ro.faur.explorer.model.BookmarkManager
 import ro.faur.explorer.quickopen.ranking.FrecencyStore
 import ro.faur.explorer.settings.ExplorerSettings
+import ro.faur.explorer.shortcuts.actions.ChordShortcutHandler
 import ro.faur.explorer.util.FileSizeFormatter
 import java.awt.BorderLayout
 import java.awt.Component
@@ -35,7 +36,7 @@ import javax.swing.JPanel
  * Wraps [FileTreeComponent] and [BookmarksPanel].
  * This panel is always present as panel #0 in [BrowserHost].
  */
-class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
+class LocalBrowserPanel(private val project: Project) : BrowserPanel(), ChordShortcutHandler {
 
     companion object {
         private val LOG = com.intellij.openapi.diagnostic.Logger.getInstance(LocalBrowserPanel::class.java)
@@ -231,6 +232,88 @@ class LocalBrowserPanel(private val project: Project) : BrowserPanel() {
     }
 
     fun getStatusText(): String = statusLabel.text
+
+    // ── Chord shortcut handlers ─────────────────────────────────────────
+    
+    override fun triggerNewFile() {
+        com.intellij.openapi.ui.Messages.showInputDialog(
+            project,
+            "Enter file name:",
+            "New File",
+            null
+        )?.let { name ->
+            val parentPath = _currentPath
+            val newFile = java.io.File(parentPath, name)
+            if (!newFile.exists()) {
+                newFile.createNewFile()
+                refresh()
+            }
+        }
+    }
+    
+    override fun triggerNewFolder() {
+        com.intellij.openapi.ui.Messages.showInputDialog(
+            project,
+            "Enter folder name:",
+            "New Folder",
+            null
+        )?.let { name ->
+            val parentPath = _currentPath
+            val newFolder = java.io.File(parentPath, name)
+            if (!newFolder.exists()) {
+                newFolder.mkdir()
+                refresh()
+            }
+        }
+    }
+    
+    override fun triggerEditInIde() {
+        val selected = fileTreeComponent.getSelectedFiles().firstOrNull() ?: return
+        val virtualFile = LocalFileSystem.getInstance().findFileByPath(selected.path) ?: return
+        com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openFile(virtualFile, true)
+    }
+    
+    override fun triggerShowInTerminal() {
+        try {
+            val terminalManager = org.jetbrains.plugins.terminal.TerminalToolWindowManager.getInstance(project)
+            terminalManager.createLocalShellWidget(null, "System Explorer", true, true)
+                .executeCommand("cd \"${currentPath()}\"")
+        } catch (_: Exception) {
+            // Terminal plugin not available
+        }
+    }
+    
+    override fun triggerShowInExplorer() {
+        val selected = fileTreeComponent.getSelectedFiles().firstOrNull() ?: return
+        val path = selected.path
+        // Reveal in Finder on macOS, Explorer on Windows, file manager on Linux
+        when {
+            System.getProperty("os.name").lowercase().contains("mac") -> {
+                Runtime.getRuntime().exec(arrayOf("open", "-R", path))
+            }
+            System.getProperty("os.name").lowercase().contains("win") -> {
+                Runtime.getRuntime().exec(arrayOf("explorer", "/select,", path))
+            }
+            else -> {
+                // Linux: try common file managers
+                val managers = listOf("nautilus", "dolphin", "thunar", "pcmanfm")
+                for (cmd in managers) {
+                    try {
+                        Runtime.getRuntime().exec(arrayOf(cmd, path))
+                        break
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+    }
+    
+    override fun triggerCopyName() {
+        val selected = fileTreeComponent.getSelectedFiles().firstOrNull() ?: return
+        val name = selected.name
+        val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+        val contents = java.awt.datatransfer.StringSelection(name)
+        clipboard.setContents(contents, contents)
+    }
 
     // ── Overridden path-field handler (validates VFS path) ─────────────────
 

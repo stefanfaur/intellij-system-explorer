@@ -41,6 +41,7 @@ import ro.faur.explorer.gitpanel.ActiveBrowserTracker
 import ro.faur.explorer.gitpanel.GitRepositoryRegistry
 import ro.faur.explorer.gitpanel.RemoteGitBackend
 import ro.faur.explorer.ui.BrowserPanel
+import ro.faur.explorer.shortcuts.actions.ChordShortcutHandler
 import java.awt.Color
 import java.awt.event.InputEvent
 import java.awt.event.KeyAdapter
@@ -71,7 +72,7 @@ class RemoteBrowserPanel(
     private val project: Project,
     private val transferService: CrossPanelTransferService? = null,
     val connectionManager: SftpConnectionManager? = null,
-) : BrowserPanel() {
+) : BrowserPanel(), ChordShortcutHandler {
 
     private val directoryCache = DirectoryCache(ttl = Duration.ofMinutes(2), maxEntries = 200)
     private val sftpFileTreeModel = SftpFileTreeModel(directoryCache)
@@ -606,6 +607,81 @@ class RemoteBrowserPanel(
             bytes < 1024L * 1024 * 1024 -> "${bytes / (1024 * 1024)}MB"
             else                     -> "${bytes / (1024L * 1024 * 1024)}GB"
         }
+    }
+
+    // ── Chord shortcut handlers ─────────────────────────────────────────
+
+    override fun triggerNewFile() {
+        if (!isConnected) return
+        com.intellij.openapi.ui.Messages.showInputDialog(
+            project,
+            "Enter file name:",
+            "New Remote File",
+            null
+        )?.let { name ->
+            val parentPath = _currentPath.trimEnd('/')
+            val newPath = "$parentPath/$name"
+            // Create empty file via upload
+            val tempFile = java.io.File.createTempFile("newfile", "")
+            tempFile.delete()
+            fileOps?.upload(tempFile.toPath(), newPath)
+            tempFile.delete()
+            refresh()
+        }
+    }
+
+    override fun triggerNewFolder() {
+        if (!isConnected) return
+        com.intellij.openapi.ui.Messages.showInputDialog(
+            project,
+            "Enter folder name:",
+            "New Remote Folder",
+            null
+        )?.let { name ->
+            val parentPath = _currentPath.trimEnd('/')
+            val newPath = "$parentPath/$name"
+            fileOps?.mkdir(newPath)
+            refresh()
+        }
+    }
+
+    override fun triggerEditInIde() {
+        val selected = getSelectedEntries().firstOrNull() ?: return
+        if (selected.isDirectory) return
+        // Download to temp and open in IDE
+        val tempDir = java.io.File(System.getProperty("java.io.tmpdir"))
+        val tempFile = java.io.File(tempDir, selected.name)
+        fileOps?.download(selected.path, tempFile.toPath())
+        val virtualFile = LocalFileSystem.getInstance().findFileByPath(tempFile.absolutePath)
+        if (virtualFile != null) {
+            com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openFile(virtualFile, true)
+        }
+    }
+
+    override fun triggerShowInTerminal() {
+        connectionProfile?.let { profile ->
+            SshTerminalAction.openTerminal(project, profile, _currentPath)
+        }
+    }
+
+    override fun triggerShowInExplorer() {
+        // For remote, this could reveal in remote file manager or copy path
+        val selected = getSelectedEntries().firstOrNull() ?: return
+        val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+        val contents = java.awt.datatransfer.StringSelection(selected.path)
+        clipboard.setContents(contents, contents)
+        com.intellij.notification.NotificationGroupManager.getInstance()
+            .getNotificationGroup("System Explorer")
+            .createNotification("Path copied", selected.path, com.intellij.notification.NotificationType.INFORMATION)
+            .notify(project)
+    }
+
+    override fun triggerCopyName() {
+        val selected = getSelectedEntries().firstOrNull() ?: return
+        val name = selected.name
+        val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+        val contents = java.awt.datatransfer.StringSelection(name)
+        clipboard.setContents(contents, contents)
     }
 
     // ── Dispose ────────────────────────────────────────────────────────────
