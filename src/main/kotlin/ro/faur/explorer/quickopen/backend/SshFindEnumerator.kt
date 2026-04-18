@@ -72,13 +72,16 @@ class SshFindEnumerator(
 
     private fun buildFindCommand(root: String): String {
         val escapedRoot = shellEscape(root)
+        // Use -name with -prune to exclude directories at any depth, including directly under root.
+        // The -o (OR) operator has lower precedence than -a (AND), so we need parentheses.
+        // Pattern: find ... \( -name ".git" -o -name "node_modules" ... \) -prune -o -print
+        // This means: if name matches, prune (skip it and its contents); otherwise, print.
         val pruneConditions = ignoredDirNames.joinToString(" -o ") { name ->
-            "-path ${shellEscape("*/$name/*")}"
+            "-name ${shellEscape(name)}"
         }
-        // find ... -not \( ... \) -type f
         // -L follows symlinks (like VfsEnumerator File.walkTopDown)
-        // -type f only returns files (not directories)
-        return "find -L $escapedRoot -not \\( $pruneConditions \\) -type f"
+        // No -type filter: return both files and directories (matches VfsEnumerator behavior)
+        return "find -L $escapedRoot \\( $pruneConditions \\) -prune -o -print"
     }
 
     companion object {
