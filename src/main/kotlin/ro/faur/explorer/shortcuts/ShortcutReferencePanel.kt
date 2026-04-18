@@ -1,25 +1,20 @@
 package ro.faur.explorer.shortcuts
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.keymap.KeymapManager
+import com.intellij.openapi.keymap.KeymapUtil
 import com.intellij.openapi.project.Project
 import com.intellij.ui.JBColor
-import com.intellij.ui.components.JBPanel
-import com.intellij.ui.components.JBScrollPane
 import java.awt.BorderLayout
 import java.awt.Color
-import java.awt.Component
 import java.awt.Font
 import java.util.Timer
 import java.util.TimerTask
 import javax.swing.Box
 import javax.swing.BoxLayout
-import javax.swing.JButton
 import javax.swing.JLabel
 import javax.swing.JPanel
-import javax.swing.JTree
-import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.DefaultTreeModel
-import javax.swing.tree.TreeCellRenderer
 
 /**
  * Dockable panel showing keyboard shortcuts for the current context.
@@ -106,7 +101,9 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
                 addQuickOpenSection()
             }
             PanelContext.UNKNOWN -> {
-                contentPanel.add(JLabel("No active panel"))
+                addGlobalShortcutsSection()
+                addInExplorerShortcutsSection()
+                addAllChordShortcutsSection()
             }
         }
         
@@ -186,6 +183,108 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
 
         addSectionHeader("Help")
         addShortcutRow("`/", "Show shortcuts")
+    }
+
+    private fun addGlobalShortcutsSection() {
+        addSectionHeader("Global")
+        val globals = listOf(
+            "SystemExplorer.Toggle" to "Toggle System Explorer",
+            "SystemExplorer.QuickOpen" to "Quick Open",
+            "SystemExplorer.SwitchPanel1" to "Switch to Panel 1 (Local)",
+            "SystemExplorer.SwitchPanel2" to "Switch to Panel 2",
+            "SystemExplorer.SwitchPanel3" to "Switch to Panel 3",
+            "SystemExplorer.SwitchPanel4" to "Switch to Panel 4",
+            "SystemExplorer.SwitchPanel5" to "Switch to Panel 5",
+            "SystemExplorer.SwitchPanel6" to "Switch to Panel 6",
+            "SystemExplorer.SwitchPanel7" to "Switch to Panel 7",
+            "SystemExplorer.SwitchPanel8" to "Switch to Panel 8",
+        )
+        for ((actionId, description) in globals) {
+            val shortcut = shortcutText(actionId) ?: continue
+            addShortcutRow(shortcut, description)
+        }
+    }
+
+    private fun addInExplorerShortcutsSection() {
+        addSectionHeader("In System Explorer")
+        val actions = listOf(
+            "SystemExplorer.OpenSelected" to "Open",
+            "SystemExplorer.Back" to "Navigate back",
+            "SystemExplorer.NavigateUp" to "Navigate up one level",
+            "SystemExplorer.RenameFile" to "Rename",
+            "SystemExplorer.DeleteFiles" to "Delete",
+            "SystemExplorer.RefreshTree" to "Refresh",
+        )
+        for ((actionId, description) in actions) {
+            val shortcut = shortcutText(actionId) ?: continue
+            addShortcutRow(shortcut, description)
+        }
+        addShortcutRow("Space (hold)", "Preview file")
+        addShortcutRow("Tab", "Switch to next panel")
+    }
+
+    private fun addAllChordShortcutsSection() {
+        addSectionHeader("Chord — File Operations (Local / Remote)")
+        val fileOps = listOf(
+            "copy" to "`c",
+            "cut" to "`x",
+            "paste" to "`v",
+            "delete" to "`d",
+            "rename" to "`r",
+            "newFile" to "`n",
+            "newFolder" to "`n (Local only)",
+            "refresh" to "`f",
+            "open" to "`o",
+            "editInIde" to "`e",
+            "showInTerminal" to "`p",
+            "showInExplorer" to "`t",
+            "copyPath" to "`y",
+        )
+        for ((actionId, shortcut) in fileOps) {
+            addShortcutRow(shortcut, getDisplayName(actionId))
+        }
+
+        addSectionHeader("Chord — Git Panel")
+        val git = listOf(
+            "cherryPick" to "`c",
+            "revertChanges" to "`x",
+            "renameBranch" to "`r",
+            "newBranch" to "`n",
+            "fetch" to "`f",
+            "pull" to "`p",
+            "copyCommitHash" to "`y",
+        )
+        for ((actionId, shortcut) in git) {
+            addShortcutRow(shortcut, getDisplayName(actionId))
+        }
+
+        addSectionHeader("Chord — Quick Open")
+        val quickOpen = listOf(
+            "copyPathQuickOpen" to "`c",
+            "openQuickOpen" to "`o",
+            "editPathQuickOpen" to "`e",
+            "copyResultQuickOpen" to "`y",
+            "refreshIndexQuickOpen" to "`f",
+        )
+        for ((actionId, shortcut) in quickOpen) {
+            addShortcutRow(shortcut, getDisplayName(actionId))
+        }
+
+        addSectionHeader("Help")
+        addShortcutRow("`/", "Show shortcuts")
+    }
+
+    /**
+     * Reads the active keymap's shortcut for the given IntelliJ action id and
+     * returns the user-facing text (e.g. "⌘⇧P"). Returns null if no shortcut.
+     */
+    private fun shortcutText(actionId: String): String? {
+        val action = ActionManager.getInstance().getAction(actionId) ?: return null
+        val keymap = KeymapManager.getInstance().activeKeymap
+        val shortcut = keymap.getShortcuts(actionId).firstOrNull()
+            ?: action.shortcutSet.shortcuts.firstOrNull()
+            ?: return null
+        return KeymapUtil.getShortcutText(shortcut)
     }
 
     private fun addSectionHeader(title: String) {
