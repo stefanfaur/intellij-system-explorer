@@ -78,11 +78,4 @@ class VisualChordFeedback : JWindow() {
         isVisible = false
     }
 
-    /**
-     * Updates the label text during chord mode.
-     */
-    fun setPrompt(text: String) {
-        label.text = text
-        pack()
-    }
 }

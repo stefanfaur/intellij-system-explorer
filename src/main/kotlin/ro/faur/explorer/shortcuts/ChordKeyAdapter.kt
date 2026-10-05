@@ -1,6 +1,7 @@
 package ro.faur.explorer.shortcuts
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ide.IdeEventQueue
 import java.awt.Component
@@ -35,20 +36,6 @@ class ChordKeyAdapter(
     private var visualFeedback: VisualChordFeedback? = null
     private var onActionDispatched: ((String) -> Unit)? = null
     private var currentProject: Project? = null
-
-    /**
-     * Keys that IntelliJ interprets as action keys and processes even after we consume them.
-     * For these keys, we need to explicitly block IntelliJ's processing.
-     */
-    private val intellijActionKeys = setOf(
-        KeyEvent.VK_F,    // Search
-        KeyEvent.VK_Y,    // Redo
-        KeyEvent.VK_C,    // Copy
-        KeyEvent.VK_X,    // Cut
-        KeyEvent.VK_V,    // Paste
-        KeyEvent.VK_Z,    // Undo
-        KeyEvent.VK_A     // Select All
-    )
 
     /**
      * Sets the current project for context.
@@ -92,14 +79,6 @@ class ChordKeyAdapter(
     fun isChordActive(): Boolean = isChordActive
 
     /**
-     * Checks if this key is one that IntelliJ processes specially.
-     * These keys need extra handling to ensure they don't trigger IntelliJ actions.
-     */
-    private fun isIntelliJActionKey(keyCode: Int): Boolean {
-        return keyCode in intellijActionKeys
-    }
-
-    /**
      * IdeEventQueue.EventDispatcher.dispatch method.
      * Returns true if the event was consumed (processed by us), false otherwise.
      */
@@ -129,9 +108,12 @@ class ChordKeyAdapter(
         // has either already been dispatched or will never arrive.
         swallowNextKeyTyped = false
 
-        // Debug: log chord-related key presses (can be removed once stable)
-        if (e.keyCode == ChordAction.BASE_KEY_BACKTICK || isChordActive) {
-            java.lang.System.err.println("ChordDispatcher: keyCode=${e.keyCode}, isChordActive=$isChordActive, textFocused=${contextResolver.isTextInputFocused()}, context=${contextResolver.getActiveContext()}")
+        if (logger.isDebugEnabled && (e.keyCode == ChordAction.BASE_KEY_BACKTICK || isChordActive)) {
+            logger.debug(
+                "keyCode=${e.keyCode}, isChordActive=$isChordActive, " +
+                "textFocused=${contextResolver.isTextInputFocused()}, " +
+                "context=${contextResolver.getActiveContext()}"
+            )
         }
 
         // Don't intercept if text input is focused, UNLESS we're already in chord mode
@@ -275,6 +257,7 @@ class ChordKeyAdapter(
     }
 
     companion object {
+        private val logger = Logger.getInstance(ChordKeyAdapter::class.java)
         /** Chord mode timeout in milliseconds */
         const val CHORD_TIMEOUT_MS = 2000L
     }

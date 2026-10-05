@@ -26,7 +26,7 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
   <li>Query language: <code>d:</code> dirs, <code>f:</code> files, <code>b:</code> bookmarks, <code>r:</code> recent, <code>&gt;</code> IDE actions, <code>~</code> regex, <code>/:</code> content search</li>
   <li>Modifiers: <code>@ext:EXT</code> filter by extension, <code>@in:PATH</code> scope to directory</li>
   <li>Lucene hybrid index for fast full-text content search (falls back to VFS enumeration)</li>
-  <li>Ripgrep content search with line-precise editor navigation and match highlighting</li>
+  <li>Ripgrep content search (when <code>rg</code> is installed) with line-precise editor navigation and match highlighting</li>
   <li>Speed dial on empty query (top frecency items, <code>Cmd+1</code>&ndash;<code>Cmd+6</code>)</li>
   <li>Preview pane (<code>Tab</code>), recent query cycling (<code>Ctrl+R</code>), bookmark toggle (<code>Cmd+D</code>)</li>
   <li>Teleport aliases: map short names to absolute paths in Settings</li>
@@ -68,6 +68,11 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
 ]]></description>
 
     <change-notes><![CDATA[
+<h3>1.1.1</h3>
+<ul>
+  <li>Compatibility: support IDE build 261.* (2026.1)</li>
+</ul>
+
 <h3>1.1.0</h3>
 <ul>
   <li>Remote SSH/SFTP panels: up to 4 remote browser panels with full file operations, bookmarks, and keepalive</li>
@@ -102,7 +107,6 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
         <!-- Shortcut system services -->
         <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ChordRegistry"/>
         <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ContextResolver"/>
-        <applicationService serviceImplementation="ro.faur.explorer.shortcuts.ShortcutController"/>
 
         <applicationService serviceImplementation="ro.faur.explorer.settings.ExplorerSettings"/>
         <applicationService serviceImplementation="ro.faur.explorer.settings.QuickOpenSettings"/>
@@ -124,6 +128,9 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
         <!-- DnD error notifications -->
         <notificationGroup id="Explorer.DnD" displayType="BALLOON"/>
         <notificationGroup id="Explorer.Errors" displayType="STICKY_BALLOON" isLogByDefault="true"/>
+
+        <!-- Chord system notifications -->
+        <notificationGroup id="System Explorer.Shortcuts" displayType="BALLOON"/>
 
         <!-- Settings hierarchy: Tools > System Explorer > {Local Browser, Quick Open, Remote SSH, Remote Git} -->
         <applicationConfigurable

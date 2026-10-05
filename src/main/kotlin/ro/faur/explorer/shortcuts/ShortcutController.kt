@@ -28,6 +28,7 @@ class ShortcutController : Disposable {
     private var referenceToolWindow: ToolWindow? = null
     private var referencePanel: ShortcutReferencePanel? = null
     private var isRegistered = false
+    private val activeContexts = mutableSetOf<PanelContext>()
     
     /** Current project for action dispatch */
     private var currentProject: Project? = null
@@ -65,17 +66,13 @@ class ShortcutController : Disposable {
     fun registerBrowserHost(browserHost: BrowserHost, project: Project) {
         currentProject = project
         chordKeyAdapter.setProject(project)
-        
+
         val localPanel = browserHost.localPanel
-        
+
         // Register with context resolver for context detection
         contextResolver.registerPanel(PanelContext.LOCAL_BROWSER, localPanel)
-        
-        // Register IdeEventQueue dispatcher globally (only once)
-        if (!isRegistered) {
-            chordKeyAdapter.register()
-            isRegistered = true
-        }
+
+        activateContext(PanelContext.LOCAL_BROWSER)
     }
 
     /**
@@ -83,15 +80,11 @@ class ShortcutController : Disposable {
      */
     fun unregisterBrowserHost(browserHost: BrowserHost) {
         val localPanel = browserHost.localPanel
-        
+
         // Unregister from context resolver
         contextResolver.unregisterPanel(PanelContext.LOCAL_BROWSER, localPanel)
-        
-        // Unregister IdeEventQueue dispatcher
-        if (isRegistered) {
-            chordKeyAdapter.unregister()
-            isRegistered = false
-        }
+
+        deactivateContext(PanelContext.LOCAL_BROWSER)
     }
 
     /**
@@ -100,12 +93,8 @@ class ShortcutController : Disposable {
     fun registerRemotePanel(panel: RemoteBrowserPanel, project: Project) {
         // Register with context resolver for context detection
         contextResolver.registerPanel(PanelContext.REMOTE_BROWSER, panel)
-        
-        // Register IdeEventQueue dispatcher globally (only once)
-        if (!isRegistered) {
-            chordKeyAdapter.register()
-            isRegistered = true
-        }
+
+        activateContext(PanelContext.REMOTE_BROWSER)
     }
 
     /**
@@ -113,6 +102,7 @@ class ShortcutController : Disposable {
      */
     fun unregisterRemotePanel(panel: RemoteBrowserPanel) {
         contextResolver.unregisterPanel(PanelContext.REMOTE_BROWSER, panel)
+        deactivateContext(PanelContext.REMOTE_BROWSER)
     }
 
     /**
@@ -120,12 +110,8 @@ class ShortcutController : Disposable {
      */
     fun registerQuickOpenPanel(panel: QuickOpenPanel) {
         contextResolver.registerPanel(PanelContext.QUICK_OPEN, panel)
-        
-        // Register IdeEventQueue dispatcher globally (only once)
-        if (!isRegistered) {
-            chordKeyAdapter.register()
-            isRegistered = true
-        }
+
+        activateContext(PanelContext.QUICK_OPEN)
     }
 
     /**
@@ -133,6 +119,23 @@ class ShortcutController : Disposable {
      */
     fun unregisterQuickOpenPanel(panel: QuickOpenPanel) {
         contextResolver.unregisterPanel(PanelContext.QUICK_OPEN, panel)
+        deactivateContext(PanelContext.QUICK_OPEN)
+    }
+
+    private fun activateContext(context: PanelContext) {
+        activeContexts.add(context)
+        if (!isRegistered) {
+            chordKeyAdapter.register()
+            isRegistered = true
+        }
+    }
+
+    private fun deactivateContext(context: PanelContext) {
+        activeContexts.remove(context)
+        if (isRegistered && activeContexts.isEmpty()) {
+            chordKeyAdapter.unregister()
+            isRegistered = false
+        }
     }
 
     /**

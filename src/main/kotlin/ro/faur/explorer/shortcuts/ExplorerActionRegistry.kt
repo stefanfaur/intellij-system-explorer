@@ -90,34 +90,12 @@ class ExplorerActionRegistry {
     }
 
     /**
-     * Invokes an IntelliJ action by ID.
-     */
-    private fun invokeAction(project: Project, actionId: String) {
-        try {
-            val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
-            val action = actionManager.getAction(actionId)
-            if (action != null) {
-                val event = com.intellij.openapi.actionSystem.AnActionEvent.createFromAnAction(
-                    action, null, 
-                    com.intellij.openapi.actionSystem.ActionPlaces.UNKNOWN,
-                    com.intellij.openapi.actionSystem.DataContext.EMPTY_CONTEXT
-                )
-                action.actionPerformed(event)
-            } else {
-                ChordToast.showActionFailed(actionId, "Action not found")
-            }
-        } catch (e: Exception) {
-            ChordToast.showActionFailed(actionId, e.message ?: "Unknown error")
-        }
-    }
-
-    /**
      * Finds the Git panel component if available.
      */
     private fun findGitPanel(project: Project): ro.faur.explorer.gitpanel.ui.GitPanelComponent? {
         return try {
             val toolWindow = com.intellij.openapi.wm.ToolWindowManager.getInstance(project)
-                .getToolWindow("Git")
+                .getToolWindow("System Explorer Git")
             toolWindow?.contentManager?.contents
                 ?.firstOrNull()
                 ?.component as? ro.faur.explorer.gitpanel.ui.GitPanelComponent

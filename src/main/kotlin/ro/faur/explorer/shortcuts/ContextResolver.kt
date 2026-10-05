@@ -1,8 +1,10 @@
 package ro.faur.explorer.shortcuts
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.diagnostic.Logger
 import java.awt.Component
 import java.awt.KeyboardFocusManager
+import java.beans.PropertyChangeListener
 import javax.swing.JLayeredPane
 import javax.swing.SwingUtilities
 import ro.faur.explorer.ui.FileTreeComponent
@@ -17,13 +19,15 @@ class ContextResolver : Disposable {
 
     private val registeredPanels = mutableMapOf<PanelContext, MutableSet<Component>>()
     private var currentContext: PanelContext = PanelContext.UNKNOWN
-    
+
     /** Called when the active context changes */
     var onContextChanged: ((PanelContext) -> Unit)? = null
 
+    private val focusOwnerListener: PropertyChangeListener = PropertyChangeListener { updateContext() }
+
     init {
         KeyboardFocusManager.getCurrentKeyboardFocusManager()
-            .addPropertyChangeListener("focusOwner") { updateContext() }
+            .addPropertyChangeListener("focusOwner", focusOwnerListener)
     }
 
     /**
@@ -172,13 +176,15 @@ class ContextResolver : Disposable {
         val focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
             ?: return
 
-        java.lang.System.err.println("DEBUG hideSpeedSearch: focusOwner=${focusOwner?.javaClass?.name}")
+        if (logger.isDebugEnabled) {
+            logger.debug("hideSpeedSearch: focusOwner=${focusOwner.javaClass.name}")
+        }
 
         // First try: Look for FileTreeComponent in component hierarchy
         var component: Component? = focusOwner
         while (component != null) {
             if (component is FileTreeComponent) {
-                java.lang.System.err.println("DEBUG hideSpeedSearch: FOUND FileTreeComponent in hierarchy")
+                logger.debug("hideSpeedSearch: found FileTreeComponent in hierarchy")
                 component.hideSpeedSearch()
                 return
             }
@@ -186,26 +192,27 @@ class ContextResolver : Disposable {
         }
 
         // Second try: If focus is on a JTree, try to find FileTreeComponent via client property
-        java.lang.System.err.println("DEBUG hideSpeedSearch: Not found in hierarchy, checking JTree client property")
+        logger.debug("hideSpeedSearch: not found in hierarchy, checking JTree client property")
         if (focusOwner is javax.swing.JTree) {
             val ftc = focusOwner.getClientProperty("FileTreeComponent") as? FileTreeComponent
             if (ftc != null) {
-                java.lang.System.err.println("DEBUG hideSpeedSearch: FOUND FileTreeComponent via JTree client property")
+                logger.debug("hideSpeedSearch: found FileTreeComponent via JTree client property")
                 ftc.hideSpeedSearch()
                 return
             }
         }
 
-        java.lang.System.err.println("DEBUG hideSpeedSearch: FileTreeComponent NOT FOUND")
+        logger.debug("hideSpeedSearch: FileTreeComponent not found")
     }
 
     override fun dispose() {
         KeyboardFocusManager.getCurrentKeyboardFocusManager()
-            .removePropertyChangeListener("focusOwner") { updateContext() }
+            .removePropertyChangeListener("focusOwner", focusOwnerListener)
         registeredPanels.clear()
     }
 
     companion object {
+        private val logger = Logger.getInstance(ContextResolver::class.java)
         @JvmStatic val instance = ContextResolver()
     }
 }

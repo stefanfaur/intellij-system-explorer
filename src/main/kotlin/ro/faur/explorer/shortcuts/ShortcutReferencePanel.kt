@@ -136,25 +136,13 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
 
     private fun addFileOpsSection() {
         addSectionHeader("File Operations")
-        
-        val actions = listOf(
-            "copy" to "`c",
-            "cut" to "`x",
-            "paste" to "`v",
-            "delete" to "`d",
-            "rename" to "`r",
-            "newFile" to "`n",
-            "refresh" to "`f",
-            "open" to "`o",
-            "editInIde" to "`e",
-            "showInTerminal" to "`p",
-            "showInExplorer" to "`t",
-            "copyPath" to "`y"
+
+        val actionIds = listOf(
+            "copy", "cut", "paste", "delete", "rename",
+            "newFile", "newFolder", "refresh", "open",
+            "editInIde", "showInTerminal", "showInExplorer", "copyPath"
         )
-        
-        for ((actionId, shortcut) in actions) {
-            addShortcutRow(shortcut, getDisplayName(actionId))
-        }
+        addRowsFromRegistry(currentContext, actionIds)
 
         addSectionHeader("Help")
         addShortcutRow("`/", "Show shortcuts")
@@ -162,20 +150,12 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
 
     private fun addGitSection() {
         addSectionHeader("Git Operations")
-        
-        val actions = listOf(
-            "cherryPick" to "`c",
-            "revertChanges" to "`x",
-            "renameBranch" to "`r",
-            "newBranch" to "`n",
-            "fetch" to "`f",
-            "pull" to "`p",
-            "copyCommitHash" to "`y"
+
+        val actionIds = listOf(
+            "cherryPick", "revertChanges", "renameBranch",
+            "newBranch", "fetch", "pull", "copyCommitHash"
         )
-        
-        for ((actionId, shortcut) in actions) {
-            addShortcutRow(shortcut, getDisplayName(actionId))
-        }
+        addRowsFromRegistry(PanelContext.GIT_PANEL, actionIds)
 
         addSectionHeader("Help")
         addShortcutRow("`/", "Show shortcuts")
@@ -183,21 +163,22 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
 
     private fun addQuickOpenSection() {
         addSectionHeader("Quick Open")
-        
-        val actions = listOf(
-            "copyPathQuickOpen" to "`c",
-            "openQuickOpen" to "`o",
-            "editPathQuickOpen" to "`e",
-            "copyResultQuickOpen" to "`y",
-            "refreshIndexQuickOpen" to "`f"
+
+        val actionIds = listOf(
+            "copyPathQuickOpen", "openQuickOpen", "editPathQuickOpen",
+            "copyResultQuickOpen", "refreshIndexQuickOpen"
         )
-        
-        for ((actionId, shortcut) in actions) {
-            addShortcutRow(shortcut, getDisplayName(actionId))
-        }
+        addRowsFromRegistry(PanelContext.QUICK_OPEN, actionIds)
 
         addSectionHeader("Help")
         addShortcutRow("`/", "Show shortcuts")
+    }
+
+    private fun addRowsFromRegistry(context: PanelContext, actionIds: List<String>) {
+        for (actionId in actionIds) {
+            val chord = chordRegistry.getChordDisplay(context, actionId) ?: continue
+            addShortcutRow(chord, getDisplayName(actionId))
+        }
     }
 
     private fun addGlobalShortcutsSection() {
@@ -241,49 +222,25 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
     private fun addAllChordShortcutsSection() {
         addSectionHeader("Chord — File Operations (Local / Remote)")
         val fileOps = listOf(
-            "copy" to "`c",
-            "cut" to "`x",
-            "paste" to "`v",
-            "delete" to "`d",
-            "rename" to "`r",
-            "newFile" to "`n",
-            "newFolder" to "`n (Local only)",
-            "refresh" to "`f",
-            "open" to "`o",
-            "editInIde" to "`e",
-            "showInTerminal" to "`p",
-            "showInExplorer" to "`t",
-            "copyPath" to "`y",
+            "copy", "cut", "paste", "delete", "rename",
+            "newFile", "newFolder", "refresh", "open",
+            "editInIde", "showInTerminal", "showInExplorer", "copyPath"
         )
-        for ((actionId, shortcut) in fileOps) {
-            addShortcutRow(shortcut, getDisplayName(actionId))
-        }
+        addRowsFromRegistry(PanelContext.LOCAL_BROWSER, fileOps)
 
         addSectionHeader("Chord — Git Panel")
         val git = listOf(
-            "cherryPick" to "`c",
-            "revertChanges" to "`x",
-            "renameBranch" to "`r",
-            "newBranch" to "`n",
-            "fetch" to "`f",
-            "pull" to "`p",
-            "copyCommitHash" to "`y",
+            "cherryPick", "revertChanges", "renameBranch",
+            "newBranch", "fetch", "pull", "copyCommitHash"
         )
-        for ((actionId, shortcut) in git) {
-            addShortcutRow(shortcut, getDisplayName(actionId))
-        }
+        addRowsFromRegistry(PanelContext.GIT_PANEL, git)
 
         addSectionHeader("Chord — Quick Open")
         val quickOpen = listOf(
-            "copyPathQuickOpen" to "`c",
-            "openQuickOpen" to "`o",
-            "editPathQuickOpen" to "`e",
-            "copyResultQuickOpen" to "`y",
-            "refreshIndexQuickOpen" to "`f",
+            "copyPathQuickOpen", "openQuickOpen", "editPathQuickOpen",
+            "copyResultQuickOpen", "refreshIndexQuickOpen"
         )
-        for ((actionId, shortcut) in quickOpen) {
-            addShortcutRow(shortcut, getDisplayName(actionId))
-        }
+        addRowsFromRegistry(PanelContext.QUICK_OPEN, quickOpen)
 
         addSectionHeader("Help")
         addShortcutRow("`/", "Show shortcuts")

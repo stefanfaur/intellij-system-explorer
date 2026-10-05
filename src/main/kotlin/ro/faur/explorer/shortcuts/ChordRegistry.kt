@@ -43,6 +43,18 @@ class ChordRegistry {
             .distinctBy { it.actionId }
     }
 
+    /**
+     * Returns the display string for the chord mapped to [actionId] in [context],
+     * e.g. "`c". Returns null if no mapping exists.
+     */
+    fun getChordDisplay(context: PanelContext, actionId: String): String? {
+        val action = defaultMappings.values
+            .firstOrNull { it.context == context && it.actionId == actionId }
+            ?: return null
+        return keyCodeToDisplayString(action.baseKeyCode) +
+               keyCodeToDisplayString(action.secondKeyCode)
+    }
+
     fun getAllActions(): Collection<ChordAction> = actionsById.values
 
     /**
@@ -64,6 +76,7 @@ class ChordRegistry {
             KeyEvent.VK_D -> "d"
             KeyEvent.VK_R -> "r"
             KeyEvent.VK_N -> "n"
+            KeyEvent.VK_B -> "b"
             KeyEvent.VK_F -> "f"
             KeyEvent.VK_O -> "o"
             KeyEvent.VK_E -> "e"
@@ -98,8 +111,10 @@ class ChordRegistry {
             registerDefault(ChordAction.backtick(KeyEvent.VK_Y, "copyPath", "Copy Path", context, ActionCategory.FILE_OPS))
         }
 
-        // Local browser specific
-        registerDefault(ChordAction.backtick(KeyEvent.VK_N, "newFolder", "New Folder", PanelContext.LOCAL_BROWSER, ActionCategory.FILE_OPS))
+        // newFolder shares `b` in both Local and Remote (avoids collision with newFile on `n`)
+        for (context in fileBrowserContexts) {
+            registerDefault(ChordAction.backtick(KeyEvent.VK_B, "newFolder", "New Folder", context, ActionCategory.FILE_OPS))
+        }
 
         // Git panel actions
         registerDefault(ChordAction.backtick(KeyEvent.VK_C, "cherryPick", "Cherry-pick", PanelContext.GIT_PANEL, ActionCategory.GIT))
@@ -109,7 +124,6 @@ class ChordRegistry {
         registerDefault(ChordAction.backtick(KeyEvent.VK_F, "fetch", "Fetch", PanelContext.GIT_PANEL, ActionCategory.GIT))
         registerDefault(ChordAction.backtick(KeyEvent.VK_P, "pull", "Pull", PanelContext.GIT_PANEL, ActionCategory.GIT))
         registerDefault(ChordAction.backtick(KeyEvent.VK_Y, "copyCommitHash", "Copy Commit Hash", PanelContext.GIT_PANEL, ActionCategory.GIT))
-        registerDefault(ChordAction.backtick(KeyEvent.VK_Y.toInt() - 32, "copyBranchName", "Copy Branch Name", PanelContext.GIT_PANEL, ActionCategory.GIT)) // VK_Y with shift
 
         // Quick Open actions
         registerDefault(ChordAction.backtick(KeyEvent.VK_C, "copyPathQuickOpen", "Copy Path", PanelContext.QUICK_OPEN, ActionCategory.QUICK_OPEN))
