@@ -1,6 +1,8 @@
-package ro.faur.explorer.shortcuts
+package ro.faur.explorer.light
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import ro.faur.explorer.shortcuts.ContextResolver
+import ro.faur.explorer.shortcuts.PanelContext
 import ro.faur.explorer.ui.ExplorerPanel
 import javax.swing.JPanel
 

@@ -1,6 +1,7 @@
 package ro.faur.explorer.unit
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -183,7 +184,7 @@ class LuceneIndexBuilderWatcherTest {
         // Wait for watcher to pick up the change (2-3 poll cycles)
         delay(500)
 
-        watcherJob.cancel()
+        watcherJob.cancelAndJoin()
 
         val paths = manager.searchPaths("", 100)
         assertTrue(paths.any { it.endsWith("PolledFile.kt") },

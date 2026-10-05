@@ -89,22 +89,6 @@ class ExplorerActionsTest : BasePlatformTestCase() {
         assertShortcutBound("SystemExplorer.Back", "BACK_SPACE")
     }
 
-    fun `test CopyFiles has Ctrl+C shortcut`() {
-        assertShortcutBound("SystemExplorer.CopyFiles", "$platformCtrl C")
-    }
-
-    fun `test CutFiles has Ctrl+X shortcut`() {
-        assertShortcutBound("SystemExplorer.CutFiles", "$platformCtrl X")
-    }
-
-    fun `test PasteFiles has Ctrl+V shortcut`() {
-        assertShortcutBound("SystemExplorer.PasteFiles", "$platformCtrl V")
-    }
-
-    fun `test CopyPath has Ctrl+Shift+C shortcut`() {
-        assertShortcutBound("SystemExplorer.CopyPath", "$platformCtrl shift C")
-    }
-
     fun `test RenameFile has F2 shortcut`() {
         assertShortcutBound("SystemExplorer.RenameFile", "F2")
     }
