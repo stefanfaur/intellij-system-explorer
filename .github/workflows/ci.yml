@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: ['**']
+    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -256,3 +257,54 @@ jobs:
             --jq '.[] | select(.isPrerelease and (.tagName | startswith("snapshot-build."))) | .tagName' \
             | tail -n +6 \
             | xargs -I {} gh release delete {} --yes --cleanup-tag
+
+  release:
+    name: Publish to Marketplace
+    runs-on: ubuntu-latest
+    needs: [verify, build-natives]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Download native artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native-libs/
+
+      - name: Place native libs in resources
+        run: |
+          for dir in native-libs/native-*/; do
+            platform=$(basename "$dir" | sed 's/native-//')
+            mkdir -p src/main/resources/natives/$platform
+            cp "$dir"* src/main/resources/natives/$platform/
+          done
+
+      - name: Set version from tag
+        run: ./.github/scripts/update-version.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Publish plugin
+        env:
+          CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: ./gradlew publishPlugin -PskipCargo=true --no-daemon --stacktrace
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/distributions/*-signed.zip

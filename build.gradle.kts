@@ -1,3 +1,4 @@
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
@@ -74,7 +75,7 @@ intellijPlatform {
 
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
-            untilBuild = providers.gradleProperty("pluginUntilBuild")
+            untilBuild = provider { null }
         }
     }
 
@@ -90,9 +91,10 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            // Verify against released IDE versions
-            create(providers.gradleProperty("platformType").get(), providers.gradleProperty("platformVersion").get()) // 2025.1
-            create(providers.gradleProperty("platformType").get(), "2025.2")
+            create(providers.gradleProperty("platformType").get(), providers.gradleProperty("platformVersion").get())
+            create(IntelliJPlatformType.IntellijIdea, "2025.3")
+            // IC artifacts stop at 2025.2; later versions are only published as the unified IntelliJ IDEA
+            create(IntelliJPlatformType.IntellijIdea, "2026.2")
         }
     }
 }
