@@ -1,23 +1,34 @@
 # Changelog
 
 ## [Unreleased]
+
+## [1.2.0] - 2026-10-05
 ### Added
-- Configurable chord-based keyboard shortcuts system for System Explorer
-  - Backtick-based chords (e.g., `` `c`` for copy, `` `n`` for new file)
-  - Context-aware: same chord does panel-appropriate action based on active panel
-  - Visual chord feedback with floating overlay during chord mode
-  - Shortcut reference panel (dockable, auto-hides)
-  - Settings UI for customization with import/export
-  - Space preview (hold-to-preview) for file browser
-  - Keyboard shortcut hints for context menu items
-- File browser chord shortcuts: copy, cut, paste, delete, rename, new file/folder, edit, terminal, explorer, copy path/name
-- Git panel chord shortcuts: cherry-pick, revert, rename branch, new branch, fetch, pull, copy commit hash
-- Quick Open chord shortcuts: copy path, open, edit, copy result, refresh index
-- Tab switching with Ctrl+Alt+1-4 (alternative to Option+Shift+1-4)
-- Git panel shortcuts for cherry-pick, revert, and branch management
+- Chord shortcuts: press backtick, then a key (e.g. `` `c`` copy, `` `n`` new file); the active panel decides the action
+  - File browser: copy, cut, paste, delete, rename, new file/folder, refresh, open, edit in IDE, open terminal, reveal in file manager, copy path
+  - Git panel: cherry-pick, revert, rename branch, new branch, fetch, pull, copy commit hash
+  - Quick Open: copy path, open, edit, copy result, refresh index
+  - On-screen chord feedback while a chord is in progress
+- Shortcut reference tool window (`` `/``): context-aware, scrollable and resizable; lists all global and chord shortcuts when no panel is active
+- Ctrl+Alt+1-4 (Cmd+Alt on Mac) as an alternative to Option+Shift+1-4 for panel switching
+- Alt+Left navigates up one directory level, in local and remote panels
+- Quick Open works on remote SSH panels (enumerates files with `find` over SSH)
+- Error notifications for Lucene index corruption, ripgrep failures and background task crashes
 
 ### Changed
+- Compatible with all IDE builds from 2025.1 onward (no upper version limit)
+- Kotlin standard library is no longer bundled; the IDE's copy is used
+- Licensed under Apache 2.0
+
 ### Fixed
+- Chord keys no longer trigger tree speed search
+- UI freezes from file type, VCS color, child count and permission lookups on the EDT
+- Deadlock when a drag-and-drop collision dialog opened inside the drop callback
+- File watcher crash on file descriptor limit; replaced WatchService with a periodic poller
+- Lucene index: deletion handling, missing or unreadable roots, no indexing on remote panels
+- Remote Quick Open path pruning
+- Status bar not updating after async root load; update after panel disposal
+- Bookmark reordering out-of-bounds error and null home directory handling
 
 ## [1.1.0] - 2026-03-02
 
