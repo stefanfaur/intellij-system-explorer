@@ -259,12 +259,17 @@ jobs:
             | xargs -I {} gh release delete {} --yes --cleanup-tag
 
   release:
-    name: Publish to Marketplace
+    name: Release
     runs-on: ubuntu-latest
     needs: [verify, build-natives]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
+    env:
+      CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
+      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+      PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+      PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -296,15 +301,18 @@ jobs:
       - name: Set version from tag
         run: ./.github/scripts/update-version.sh "${GITHUB_REF_NAME#v}"
 
-      - name: Publish plugin
-        env:
-          CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
-          PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
-          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-        run: ./gradlew publishPlugin -PskipCargo=true --no-daemon --stacktrace
+      - name: Build plugin
+        run: ./gradlew buildPlugin -PskipCargo=true --no-daemon --stacktrace
+
+      - name: Extract changelog
+        run: ./.github/scripts/extract-changelog.sh "${GITHUB_REF_NAME#v}" release-notes.md
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/distributions/*-signed.zip
+          body_path: release-notes.md
+          files: build/distributions/*.zip
+
+      - name: Publish to Marketplace
+        if: env.PUBLISH_TOKEN != ''
+        run: ./gradlew publishPlugin -PskipCargo=true --no-daemon --stacktrace
