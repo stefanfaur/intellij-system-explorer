@@ -62,15 +62,21 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
   <li><b>`c / `x / `v</b> &mdash; Copy, cut, paste (backtick + key)</li>
   <li><b>`r</b> &mdash; Rename &nbsp; <b>`d</b> &mdash; Delete &nbsp; <b>`f</b> &mdash; Refresh</li>
   <li><b>`y</b> &mdash; Copy path &nbsp; <b>Enter</b> &mdash; Open &nbsp; <b>Backspace</b> &mdash; Go back &nbsp; <b>Alt+Left</b> &mdash; Up one level</li>
-  <li><b>Option+Shift+1&ndash;5</b> &mdash; Switch to panel 1 (Local) or 2&ndash;5 (SSH)</li>
-  <li><b>`?</b> &mdash; Show shortcuts reference panel</li>
+  <li><b>Option+Shift+1&ndash;5</b> &mdash; Switch to panel 1 (Local) or 2&ndash;5 (SSH); <b>Ctrl+Alt+1&ndash;4</b> (Cmd+Alt on Mac) as alternative</li>
+  <li><b>`/</b> &mdash; Show shortcuts reference panel</li>
 </ul>
 ]]></description>
 
     <change-notes><![CDATA[
-<h3>1.1.1</h3>
+<h3>1.2.0</h3>
 <ul>
-  <li>Compatibility: support IDE build 261.* (2026.1)</li>
+  <li>Chord shortcuts: backtick + key for context-aware file, Git panel and Quick Open actions</li>
+  <li>Shortcut reference tool window (<code>`/</code>), scrollable and resizable</li>
+  <li>Ctrl+Alt+1&ndash;4 (Cmd+Alt on Mac) as an alternative for panel switching; Alt+Left navigates up</li>
+  <li>Quick Open on remote SSH panels</li>
+  <li>Error notifications for index corruption, ripgrep failures and background crashes</li>
+  <li>Compatible with all IDE builds from 2025.1 onward</li>
+  <li>Fixed UI freezes, a drag-and-drop deadlock, file watcher crashes and several Lucene index issues</li>
 </ul>
 
 <h3>1.1.0</h3>
@@ -288,52 +294,43 @@ with Lucene-backed content search, and a full Git panel &mdash; all without leav
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift P"/>
         </action>
 
-        <!-- Panel switching: Option+Shift+1 = Local, Option+Shift+2 = first SSH, etc. -->
+        <!-- Panel switching: Option+Shift+1 = Local, Option+Shift+2 = first SSH, etc.; Ctrl+Alt (Cmd+Alt on Mac) +1-4 as alternative -->
         <action id="SystemExplorer.SwitchPanel1" class="ro.faur.explorer.actions.SwitchPanel1Action"
                 text="Switch to Panel 1" description="Switch to Local browser panel">
             <keyboard-shortcut keymap="Mac OS X"      first-keystroke="alt shift 1"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="alt shift 1"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 1"/>
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 1"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta alt 1"/>
         </action>
         <action id="SystemExplorer.SwitchPanel2" class="ro.faur.explorer.actions.SwitchPanel2Action"
                 text="Switch to Panel 2" description="Switch to first SSH panel">
             <keyboard-shortcut keymap="Mac OS X"      first-keystroke="alt shift 2"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="alt shift 2"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 2"/>
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 2"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta alt 2"/>
         </action>
         <action id="SystemExplorer.SwitchPanel3" class="ro.faur.explorer.actions.SwitchPanel3Action"
                 text="Switch to Panel 3" description="Switch to second SSH panel">
             <keyboard-shortcut keymap="Mac OS X"      first-keystroke="alt shift 3"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="alt shift 3"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 3"/>
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 3"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta alt 3"/>
         </action>
         <action id="SystemExplorer.SwitchPanel4" class="ro.faur.explorer.actions.SwitchPanel4Action"
                 text="Switch to Panel 4" description="Switch to third SSH panel">
             <keyboard-shortcut keymap="Mac OS X"      first-keystroke="alt shift 4"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="alt shift 4"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 4"/>
+            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 4"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta alt 4"/>
         </action>
         <action id="SystemExplorer.SwitchPanel5" class="ro.faur.explorer.actions.SwitchPanel5Action"
                 text="Switch to Panel 5" description="Switch to fourth SSH panel">
             <keyboard-shortcut keymap="Mac OS X"      first-keystroke="alt shift 5"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="alt shift 5"/>
-            <!-- Ctrl+Alt+1-4 for tab switching (Phase 3) -->
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 1"/>
-            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 1"/>
-        </action>
-
-        <action id="SystemExplorer.SwitchPanel6" class="ro.faur.explorer.actions.SwitchPanel6Action"
-                text="Switch to Panel 6" description="Switch to fifth SSH panel">
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 2"/>
-            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 2"/>
-        </action>
-
-        <action id="SystemExplorer.SwitchPanel7" class="ro.faur.explorer.actions.SwitchPanel7Action"
-                text="Switch to Panel 7" description="Switch to sixth SSH panel">
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 3"/>
-            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 3"/>
-        </action>
-
-        <action id="SystemExplorer.SwitchPanel8" class="ro.faur.explorer.actions.SwitchPanel8Action"
-                text="Switch to Panel 8" description="Switch to seventh SSH panel">
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt 4"/>
-            <keyboard-shortcut keymap="Mac OS X"      first-keystroke="meta alt 4"/>
         </action>
     </actions>
 </idea-plugin>

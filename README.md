@@ -23,6 +23,8 @@ File browser plugin for IntelliJ-based IDEs. Local and remote (SSH/SFTP) browsin
 
 ## Installation
 
+**From GitHub Releases:** download the ZIP from the [latest release](https://github.com/stefanfaur/intellij-system-explorer/releases/latest), then Settings → Plugins → ⚙ → Install Plugin from Disk → select the ZIP → restart.
+
 **From disk (local build):**
 
 ```bash
@@ -56,7 +58,7 @@ Settings → Plugins → ⚙ → Install Plugin from Disk → select the ZIP →
 | `Alt+E` | Toggle / focus System Explorer |
 | `Cmd+Shift+P` | Open Quick Open popup |
 | `Option+Shift+1` – `Option+Shift+5` | Switch to panel: 1=Local, 2–5=SSH |
-| `Ctrl+Alt+1` – `Ctrl+Alt+4` | Switch to panel 1-4 (alternative) |
+| `Ctrl+Alt+1` – `Ctrl+Alt+4` (`Cmd+Alt` on Mac) | Switch to panel 1-4 (alternative) |
 
 All shortcuts configurable via Settings → Keymap → "System Explorer".
 
@@ -388,4 +390,4 @@ The Git panel automatically tracks the active browser tab — switching from a l
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+[Apache License 2.0](LICENSE)

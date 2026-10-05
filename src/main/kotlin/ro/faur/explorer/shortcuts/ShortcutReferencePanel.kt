@@ -128,10 +128,8 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
 
     private fun addNavigationSection() {
         addSectionHeader("Navigation")
-        addShortcutRow("Space (hold)", "Preview file")
         addShortcutRow("Enter", "Open file")
         addShortcutRow("Backspace", "Navigate back")
-        addShortcutRow("Tab", "Switch to next panel")
     }
 
     private fun addFileOpsSection() {
@@ -191,9 +189,6 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
             "SystemExplorer.SwitchPanel3" to "Switch to Panel 3",
             "SystemExplorer.SwitchPanel4" to "Switch to Panel 4",
             "SystemExplorer.SwitchPanel5" to "Switch to Panel 5",
-            "SystemExplorer.SwitchPanel6" to "Switch to Panel 6",
-            "SystemExplorer.SwitchPanel7" to "Switch to Panel 7",
-            "SystemExplorer.SwitchPanel8" to "Switch to Panel 8",
         )
         for ((actionId, description) in globals) {
             val shortcut = shortcutText(actionId) ?: continue
@@ -215,8 +210,6 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
             val shortcut = shortcutText(actionId) ?: continue
             addShortcutRow(shortcut, description)
         }
-        addShortcutRow("Space (hold)", "Preview file")
-        addShortcutRow("Tab", "Switch to next panel")
     }
 
     private fun addAllChordShortcutsSection() {
@@ -253,10 +246,9 @@ class ShortcutReferencePanel(private val project: Project) : Disposable {
     private fun shortcutText(actionId: String): String? {
         val action = ActionManager.getInstance().getAction(actionId) ?: return null
         val keymap = KeymapManager.getInstance().activeKeymap
-        val shortcut = keymap.getShortcuts(actionId).firstOrNull()
-            ?: action.shortcutSet.shortcuts.firstOrNull()
-            ?: return null
-        return KeymapUtil.getShortcutText(shortcut)
+        val shortcuts = keymap.getShortcuts(actionId).ifEmpty { action.shortcutSet.shortcuts }
+        if (shortcuts.isEmpty()) return null
+        return shortcuts.joinToString(" / ") { KeymapUtil.getShortcutText(it) }
     }
 
     private fun addSectionHeader(title: String) {

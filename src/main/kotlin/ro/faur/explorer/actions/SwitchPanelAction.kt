@@ -5,7 +5,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 
 /**
  * Switches the active panel in [ro.faur.explorer.ui.BrowserHost] to a specific index.
- * Registered as Option+Shift+1 (index 0 = Local), Option+Shift+2 (index 1 = first SSH), etc.
+ * Registered as Option+Shift+1 (index 0 = Local), Option+Shift+2 (index 1 = first SSH), etc., and Ctrl+Alt+1-4.
  */
 open class SwitchPanelAction(private val panelIndex: Int) : AnAction() {
 
@@ -28,9 +28,3 @@ class SwitchPanel2Action : SwitchPanelAction(1)
 class SwitchPanel3Action : SwitchPanelAction(2)
 class SwitchPanel4Action : SwitchPanelAction(3)
 class SwitchPanel5Action : SwitchPanelAction(4)
-
-// Ctrl+Alt+1-4 (Phase 3: Tab Switching)
-class SwitchPanel6Action : SwitchPanelAction(0)
-class SwitchPanel7Action : SwitchPanelAction(1)
-class SwitchPanel8Action : SwitchPanelAction(2)
-class SwitchPanel9Action : SwitchPanelAction(3)
